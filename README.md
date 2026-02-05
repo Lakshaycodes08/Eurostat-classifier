@@ -1,93 +1,450 @@
-# shell
+## Swytchcode Kernel (Go skeleton)
 
+Swytchcode is the **execution kernel** for tools. Editors, agents, and languages are **guests** that must call `swytch exec` instead of doing their own SDK logic.
 
+This repo contains a **minimal, opinionated Go skeleton** for that kernel, ready for a Go developer to extend.
 
-## Getting started
+Swytchcode is not a library.  
+It is a kernel.  
+All languages, editors, and agents are guests.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+**`tooling.json` defines what is trusted.**  
+**Wrekenfiles define what is possible.**
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+---
 
-## Add your files
+### Repository layout
 
-* [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+This project is structured as a single Go module with a `swytchcode` CLI:
 
+- **`cmd/swytchcode/`**: CLI entrypoint
+- **`internal/cli/`**: Cobra commands (`init`, `get`, `exec`, `rm`, `upgrade`, `list`, `describe`, `mode`)
+- **`internal/kernel/`**: Execution kernel (deterministic, non-interactive)
+- **`internal/wreken/`**: Wrekenfile loading and validation
+- **`internal/tooling/`**: `tooling.json` contract loader
+- **`internal/editors/`**: Init-time only editor configuration writers
+- **`internal/util/`**: Shared helpers (interactive detection, JSON IO, filesystem, env)
+
+The `.swytchcode/` directory is created by `swytchcode init`.
+It may be uncommitted in local development, but must exist in CI and production.
+
+---
+
+### `tooling.json` vs Wrekenfiles (important)
+
+Swytchcode intentionally separates **execution contracts** from **execution implementations**.
+
+#### `tooling.json` (authoritative contract)
+- Defines **what tools are allowed** in this project.
+- Defines the **canonical input/output schema** for each tool.
+- Stores the **execution mode** (`production` or `sandbox`).
+- Is **committed**, reviewed, and stable.
+- Is the **only agent-facing contract**.
+
+If it affects *what a tool is allowed to do*, it belongs in `tooling.json`.
+
+Example structure:
+```json
+{
+  "mode": "production",
+  "tools": {
+    "stripe.createCustomer": {
+      "library": "stripe",
+      "operation": "createCustomer"
+    }
+  }
+}
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/swytchcode/shell.git
-git branch -M main
-git push -uf origin main
-```
 
-## Integrate with your tools
+#### Wrekenfiles (implementation details)
+- Define **how an SDK method is executed**.
+- Encode SDK calls, auth mapping, retries, and metadata.
+- Are **library-specific** and may change independently.
+- Must **conform to** the I/O contract defined in `tooling.json`.
 
-* [Set up project integrations](https://gitlab.com/swytchcode/shell/-/settings/integrations)
+If it affects *how the SDK is called*, it belongs in a Wrekenfile.
 
-## Collaborate with your team
+The kernel enforces the boundary:
+- Inputs are validated against `tooling.json`.
+- SDK outputs are normalized to the shape declared in `tooling.json`.
+- Extra fields are dropped; missing required fields cause failure.
 
-* [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Wrekenfiles must never define public I/O schemas.
 
-## Test and Deploy
+---
 
-Use the built-in continuous integration in GitLab.
+### Verified tools vs Raw methods
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+Swytchcode intentionally exposes two execution surfaces.
 
-***
+#### Verified tools (tooling.json)
+Verified tools are explicitly declared in `tooling.json`.
 
-# Editing this README
+Properties:
+- Reviewed and intentional
+- Stable input/output contracts
+- Safe for CI, production, and agents
+- Suggested by editors and agents by default
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+`tooling.json` defines what is **trusted**.
 
-## Suggestions for a good README
+This surface may include:
+- Single SDK methods
+- Curated SDK methods
+- Verified multi-step workflows (explicitly declared)
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+---
 
-## Name
-Choose a self-explaining name for your project.
+#### Raw methods (Wrekenfiles)
+Raw methods are defined in Wrekenfiles but **not promoted** into `tooling.json`.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Properties:
+- Fully executable
+- Discoverable
+- Not guaranteed stable
+- Not allowed in CI or agents by default
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+Wrekenfiles define what is **possible**.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+Raw methods are intended for:
+- Exploration
+- Advanced users
+- Rapid iteration before promotion
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+Execution of raw methods is always **explicitly opt-in**.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+---
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### CI and `.swytchcode/` policy
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+`.swytchcode/` is **execution metadata**, not user state.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+#### Local development
+- `.swytchcode/` may be uncommitted.
+- Developers may experiment freely using `init` and `get`.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+#### CI / Docker / production
+- `.swytchcode/` **must exist**.
+- If `.swytchcode/` is missing, `swytchcode exec` must fail.
+- CI must never infer or auto-download integrations.
+- Mode must be explicitly set during `init`: `swytchcode init --mode=production --editor=none --non-interactive`.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+In CI, Swytchcode never infers integrations.
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+If `.swytchcode/` is missing, execution fails.  
+If a tool is not declared in `tooling.json`, execution fails.  
+If a raw method is used without explicit opt-in, execution fails.  
+If mode is not set, defaults to `production` (strict policies enforced).
 
-## License
-For open source projects, say how it is licensed.
+Swytchcode does not guess in CI.
+If execution matters, it must be declared and reviewable.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+---
+
+### No workflows (by design)
+
+Wrekenfiles describe **individual SDK methods**, not workflows.
+
+Swytchcode intentionally does not own workflows:
+- No hidden sequences
+- No implicit multi-step behavior
+- No business logic encoded in specs
+
+Workflows emerge through **composition**:
+- In application code
+- In agent reasoning
+- In CI scripts
+
+If a multi-step operation must exist, it should be exposed explicitly
+as a single tool in `tooling.json`, implemented transparently by the kernel.
+
+Nothing is hidden inside Wrekenfiles.
+
+---
+
+### Promotion model
+
+The expected lifecycle of a method is:
+
+1. Method exists in a Wrekenfile
+2. User discovers it via `swytchcode list`
+3. User experiments locally using raw execution
+4. Team promotes it into `tooling.json`
+5. Method becomes verified, agent-safe, and CI-safe
+
+Swytchcode does not auto-promote anything.
+
+---
+
+### Non‑negotiable principles
+
+- **Single execution path**: All execution flows through `swytch exec`.
+- **Deterministic**: Same JSON input → same JSON output, no hidden state.
+- **Exec is never interactive**: No prompts, no TTY detection, no prose.
+- **Setup only is interactive**: `init` and `get` may prompt on a TTY, and must be scriptable via flags.
+- **Editor‑agnostic at runtime**: Editor rules are for authoring only; `exec` ignores them.
+- **Env‑only auth**: Secrets come from environment variables only.
+- **Stable exit codes**: Locked contract for automation (see below).
+
+If an implementation choice violates these, it is wrong.
+
+---
+
+### What NOT to add (explicitly forbidden)
+
+The following are non-negotiable:
+
+- ❌ No auto-promotion
+- ❌ No inference from imports
+- ❌ No "helpful" fallback to raw
+- ❌ No workflows hidden in Wrekenfiles
+- ❌ No agent auto-discovery of raw methods
+
+---
+
+### Commands and behavior (developer contract)
+
+- **`swytchcode init`**
+  - **Purpose**: One‑time project setup, `.swytchcode/` creation, editor rules, and mode configuration.
+  - **Behavior** (interactive by default):
+    - When running on a TTY without flags, `init` interactively prompts for:
+      - Editor selection (`cursor | vscode | claude | none`)
+      - Mode selection (`production | sandbox`)
+    - Example interactive session:
+      ```
+      $ swytchcode init
+      
+      Which editor do you use?
+        1) cursor
+        2) vscode
+        3) claude
+        4) none
+      Select [1-4]: 1
+      
+      Which execution mode do you want to use?
+        1) production
+        2) sandbox
+      Select [1-2]: 1
+      
+      Swytchcode initialized for project at /path/to/project
+      ```
+    - If `--non-interactive` is set, prompts are disabled and flags are required.
+  - **CI / non‑interactive**:
+    - Use: `swytchcode init --editor=cursor --mode=production --non-interactive`.
+    - If non‑interactive and `--editor` is missing → error (exit code 1).
+    - If non‑interactive and `--mode` is missing → error (exit code 1).
+    - All required parameters must be provided via flags.
+  - **Flags**:
+    - `--editor`: Set editor (`cursor | vscode | claude | none`)
+    - `--mode`: Set execution mode (`production | sandbox`)
+    - `--non-interactive`: Disable prompts (required for CI)
+  - **Responsibilities**:
+    - Detect project root.
+    - Create `.swytchcode/`.
+    - Write `tooling.json` with mode configuration.
+    - Write editor‑specific configs via `internal/editors/*` (Cursor, VS Code, Claude), if editor ≠ `none`.
+
+- **`swytchcode get <library>`**
+  - **Purpose**: Fetch and manage Wrekenfiles (e.g. `stripe`, `openai`).
+  - **Human / TTY**:
+    - With no args, `swytchcode get` may prompt to select a library and confirm overwrites.
+  - **CI / non‑interactive**:
+    - Should be usable as: `swytchcode get stripe --yes --non-interactive`.
+    - If overwrite is needed and `--yes` is missing → fail, do not prompt.
+  - **Responsibilities**:
+    - Resolve library → registry endpoint.
+    - Fetch Wrekenfile JSON/YAML.
+    - Validate schema.
+    - Save to `.swytchcode/wrekenfiles/<library>.json`.
+    - Never execute tools or touch `tooling.json`.
+
+- **`swytchcode rm <library>`**
+  - **Purpose**: Delete a local Wrekenfile spec for a library.
+  - **Human / TTY**:
+    - May prompt to confirm deletion (once implemented).
+    - For now, requires an explicit `--yes` to proceed.
+  - **CI / non‑interactive**:
+    - Use as: `swytchcode rm stripe --yes --non-interactive`.
+    - Must never block or prompt; fails fast without `--yes`.
+  - **Responsibilities**:
+    - Remove `.swytchcode/wrekenfiles/<library>.json` if it exists.
+    - Treat missing specs as a deterministic error (no “best effort”).
+
+- **`swytchcode upgrade <library>`**
+  - **Purpose**: Refresh an existing Wrekenfile spec from the registry.
+  - **Human / TTY**:
+    - May prompt before overwriting the existing spec (once implemented).
+    - For now, requires `--yes` to indicate an intentional upgrade.
+  - **CI / non‑interactive**:
+    - Use as: `swytchcode upgrade stripe --yes --non-interactive`.
+    - Must never prompt and must be safe to run repeatedly.
+  - **Responsibilities**:
+    - Verify an existing spec is present.
+    - Fetch latest Wrekenfile as in `get`.
+    - Validate and overwrite the local spec atomically.
+
+- **`swytchcode list <library>`**
+  - **Purpose**: Discover available methods without executing anything.
+  - **Output**: JSON to stdout:
+    ```json
+    {
+      "verified": [
+        "stripe.createCustomer",
+        "stripe.attachPaymentMethod"
+      ],
+      "raw": [
+        "customers.search",
+        "customers.update",
+        "subscriptions.resume"
+      ]
+    }
+    ```
+  - **Flags**:
+    - `--raw`: Show only raw methods
+    - `--verified`: Show only verified tools
+  - **Behavior**:
+    - Reads `tooling.json` + Wrekenfile
+    - Never executes anything
+    - Safe for CI
+    - Default output is JSON only (no prose)
+
+- **`swytchcode describe <tool>`**
+  - **Purpose**: Inspect a tool or raw method without execution.
+  - **Examples**:
+    - `swytchcode describe stripe.createCustomer` (verified tool)
+    - `swytchcode describe raw.stripe.customers.search` (raw method)
+  - **Behavior**:
+    - Verified tool → show I/O schema from `tooling.json`
+    - Raw method → show metadata from Wrekenfile
+    - No SDK calls
+    - No side effects
+
+- **`swytchcode mode [production|sandbox]`**
+  - **Purpose**: Set or display the execution mode for the project.
+  - **Modes**:
+    - `production`: Use production credentials and enforce strict policies
+    - `sandbox`: Use sandbox/test credentials and allow experimental features
+  - **Usage**:
+    - `swytchcode mode` → Display current mode (defaults to `production`)
+    - `swytchcode mode production` → Set mode to production
+    - `swytchcode mode sandbox` → Set mode to sandbox
+  - **Behavior**:
+    - Mode is stored in `tooling.json` (not a separate config file)
+    - Affects credential selection and policy enforcement
+    - Default mode is `production` if not explicitly set
+    - Can be set during `swytchcode init` or changed later with this command
+  - **CI / non‑interactive**:
+    - Use: `swytchcode mode production` or `swytchcode mode sandbox`
+    - No prompts, deterministic behavior
+
+- **`swytchcode exec`**
+  - **Purpose**: The **only** execution path for tools.
+  - **Input**: JSON on stdin, e.g.
+
+    ```json
+    {
+      "tool": "stripe.createCustomer",
+      "args": {
+        "email": "test@example.com"
+      }
+    }
+    ```
+
+  - **Behavior** (always non‑interactive):
+    - Read and parse stdin JSON.
+    - If tool starts with `raw.`:
+      - Require `--allow-raw` flag
+      - If missing → fail with exit code 1
+      - Resolve directly via Wrekenfile (bypass `tooling.json`)
+    - Else (verified tool):
+      - Load `tooling.json`
+      - Resolve tool → Wrekenfile
+      - Validate input schema
+    - Load env‑based credentials.
+    - Apply policy (retries, idempotency).
+    - Execute SDK call.
+    - Normalize and write JSON output to stdout on success.
+    - Write JSON error to stderr on failure.
+  - **Flags**:
+    - `--allow-raw`: Required for executing raw methods (disabled by default)
+  - **Executing raw methods (explicit opt-in)**:
+    Raw methods may be executed by explicitly opting in.
+
+    Example:
+    ```json
+    {
+      "tool": "raw.stripe.customers.search",
+      "args": { "query": "email:'test@example.com'" }
+    }
+    ```
+
+    This requires:
+    ```bash
+    swytchcode exec --allow-raw
+    ```
+
+    Rules:
+    - Raw execution is disabled by default
+    - CI must never allow raw execution implicitly
+    - Agents must never use raw methods unless explicitly configured
+    - There must be no silent fallback from verified → raw
+  - **Forbidden**:
+    - Prompts, spinners, or human‑oriented prose.
+    - Any branching on editor or language.
+    - Reading editor config files at runtime.
+    - Auto-promotion of raw methods to verified
+    - Silent fallback from verified to raw methods
+
+---
+
+### Kernel responsibilities and exit codes
+
+The kernel lives under `internal/kernel/` and must own:
+
+- **Execution orchestration** (no retries in clients).
+- **Idempotency and policy** (e.g. safe retries).
+- **Error mapping** into the following **stable exit codes**:
+
+| Code | Meaning                    |
+| ---- | -------------------------- |
+| 0    | Success                    |
+| 1    | Invalid input              |
+| 2    | Tool not found             |
+| 3    | Auth missing/invalid       |
+| 4    | SDK execution failure      |
+| 5    | Internal error             |
+
+This contract is for CI, Docker images, and agents, and must not change casually.
+
+---
+
+### Developer roadmap (what to implement next)
+
+- **CLI wiring**
+  - Complete remaining TODOs in `internal/cli/init.go`:
+    - Interactive prompts for editor and mode are implemented.
+    - Create `.swytchcode/` and `tooling.json` with mode configuration (done).
+    - Delegate editor configuration to `internal/editors/*` (done).
+    - Interactive mode works by default, with `--non-interactive` for CI (done).
+  - Extend `internal/cli/get.go` to:
+    - Support optional interactive prompts on TTY.
+    - Implement non‑interactive `--yes` behavior.
+  - Complete `internal/cli/mode.go`:
+    - Integrate mode into kernel execution logic (credential selection, policy enforcement).
+    - Ensure mode affects SDK calls and environment variable selection.
+
+- **Kernel and contracts**
+  - Flesh out `internal/kernel/*`:
+    - Tool resolution from `tooling.json` + Wrekenfiles.
+    - Schema validation and env‑based auth checks.
+    - SDK invocation layer and error mapping to exit codes.
+  - Implement `internal/wreken/*` and `internal/tooling/*` loaders/validators.
+
+- **Quality gates**
+  - Ensure `echo '{"tool":"x.y","args":{}}' | swytchcode exec` works:
+    - In a Docker container.
+    - In GitHub Actions or GitLab CI.
+    - With no TTY, no `$HOME`, and no editor present.
+
+Once these pieces are in place, your thin clients (Cursor/VS Code/agents) should be <50 LOC and defer all execution to this kernel.
+
