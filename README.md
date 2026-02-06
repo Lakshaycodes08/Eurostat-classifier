@@ -4,12 +4,18 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 
 This repo contains a **minimal, opinionated Go skeleton** for that kernel, ready for a Go developer to extend.
 
+**📖 Documentation:**
+- **[DESIGN.md](./DESIGN.md)** — Architectural decisions and design principles (source of truth for design discussions)
+- **[CONTRIBUTING.md](./CONTRIBUTING.md)** — Developer guide, implementation roadmap, and contribution guidelines
+
 Swytchcode is not a library.  
 It is a kernel.  
 All languages, editors, and agents are guests.
 
 **`tooling.json` defines what is trusted.**  
 **Wrekenfiles define what is possible.**
+
+**Positioning:** Swytchcode is a deterministic execution layer between LLMs/apps and real-world SDKs/APIs — not an agent framework, not observability tooling. **"LLMs ask. Swytchcode executes."**
 
 ---
 
@@ -143,7 +149,7 @@ If execution matters, it must be declared and reviewable.
 
 ### No workflows (by design)
 
-Wrekenfiles describe **individual SDK methods**, not workflows.
+Wrekenfiles describe **individual SDK methods**, not workflows. This restriction applies to Wrekenfiles only. Verified workflows may exist as first-class tools in `tooling.json`, with explicit I/O contracts and transparent kernel implementation.
 
 Swytchcode intentionally does not own workflows:
 - No hidden sequences
@@ -178,12 +184,12 @@ Swytchcode does not auto-promote anything.
 
 ### Non‑negotiable principles
 
-- **Single execution path**: All execution flows through `swytch exec`.
+- **Single execution path**: All execution flows through `swytch exec`. Only `exec` is for integration; commands like `list`, `describe` are diagnostic/setup only — agents must not rely on them for execution.
 - **Deterministic**: Same JSON input → same JSON output, no hidden state.
 - **Exec is never interactive**: No prompts, no TTY detection, no prose.
 - **Setup only is interactive**: `init` and `get` may prompt on a TTY, and must be scriptable via flags.
 - **Editor‑agnostic at runtime**: Editor rules are for authoring only; `exec` ignores them.
-- **Env‑only auth**: Secrets come from environment variables only.
+- **Env‑only auth**: Secrets come from environment variables only. **Exec never initiates auth** (no browser, no login prompts during exec).
 - **Stable exit codes**: Locked contract for automation (see below).
 
 If an implementation choice violates these, it is wrong.
@@ -199,6 +205,76 @@ The following are non-negotiable:
 - ❌ No "helpful" fallback to raw
 - ❌ No workflows hidden in Wrekenfiles
 - ❌ No agent auto-discovery of raw methods
+
+---
+
+### Design decisions and reference (for implementation and discussion)
+
+The following are locked design decisions. When implementing or discussing later, treat this section as the source of truth.
+
+#### 1. One true integration command
+
+- **`swytchcode exec`** is the **only** command that application code, agents (Cursor, Copilot, etc.), or automations are allowed to call for execution.
+- All other commands are **diagnostic or setup only**: `list`, `describe`, `plan`, `dry-run`, `explain` (if added) are for humans debugging, inspecting, or learning. **Agents must never rely on them for integration.**
+- App code does not orchestrate retries, policies, tool selection, or fallbacks. Agents don’t “reason about tools” — they execute via `exec`.
+
+#### 2. Thin clients and how projects call Swytchcode
+
+- Other projects **never** integrate Swytchcode logic; they **shell out** to `swytchcode exec` through a **thin client** that looks native to their language.
+- **Canonical path:** App code → Thin client (serialize → invoke CLI → deserialize) → `swytchcode exec` → tooling.json + Wrekenfile → real SDKs/APIs. There is no alternate path.
+- Thin client does **only**: serialize input to JSON, invoke `swytchcode exec`, read stdout/exit code, deserialize output. It does **not**: decide which tool to call, retry, interpret failures, apply policy, or chain calls.
+- Thin clients can be implemented in any language; the kernel is language-agnostic. Target: thin client **&lt;50 LOC** per language.
+
+#### 3. Installation model (CLI first)
+
+- The **Swytchcode CLI** and **thin clients** are **separately installed**.
+- **Recommended (Option 1):** CLI is primary; users install the CLI explicitly (e.g. `curl -fsSL ... | sh`). Thin clients assume `swytchcode` is on PATH. If CLI is missing, thin client fails with a clear error.
+- **Do not** default to thin clients auto-installing the CLI (Option 2). That leads to version fragmentation and hidden binaries; CLI-first keeps one kernel per machine, one upgrade surface, and auditability. Optional “install CLI from client” can be layered on later as opt-in.
+
+#### 4. Same kernel everywhere (local, CI, prod)
+
+- **One binary** for local dev, GitHub Actions, Docker, and production. No “CI mode” or “dev mode” binary.
+- Behavior is determined by **TTY + flags only** (e.g. `util.IsInteractive()`). No environment guessing (e.g. `CI=true`). In CI there is no TTY, so init/get require flags; exec is never interactive anywhere.
+- If Swytchcode works in CI, it will work in production. If it only works in an IDE, it is broken.
+
+#### 5. Method naming (canonical IDs vs titles)
+
+- **Executable tool names** are **canonical IDs**: lowercase, dot-separated, stable (e.g. `stripe.createCustomer`, `openai.responses.create`). No spaces, no punctuation except `.` and `_`. Used in `exec`, CI, thin clients, and agents.
+- **Titles and descriptions** are **metadata only** (e.g. `"title": "Create Stripe Customer"`). They are for discovery and editors; they are never parsed, matched, or executed. Titles can change; IDs must not.
+
+#### 6. Promotion and proposals (propose → review → apply)
+
+- **Promotion into `tooling.json` is always explicit and human-controlled.** No auto-promotion.
+- **Agents may propose; they may not apply.** Recommended flow: **propose → review → apply.**
+  - **Propose:** e.g. `swytchcode propose stripe customers.search` generates a **patch** (e.g. `.swytchcode/proposals/stripe.customers.search.json`), not an edit to `tooling.json`.
+  - **Review:** Human or CI validates the proposal (schema, naming, auth).
+  - **Apply:** e.g. `swytchcode apply proposals/stripe.customers.search.json` is the only command that mutates `tooling.json`.
+- **Invariant:** `tooling.json` is write-protected; all changes go through proposals. Agents prepare; humans approve; kernel enforces.
+
+#### 7. Verified vs custom workflows
+
+- **Verified workflows** (backend-owned, curated) may be **applied directly** (e.g. `swytchcode add workflow stripe.customer-onboarding`). They are trusted; no proposal step.
+- **Custom workflows** (user-assembled, agent-assembled, or backend-generated but not in the verified catalog) are **never auto-applied**. They must be written as **proposals** (e.g. `.swytchcode/proposals/workflow.<name>.json`). Only after explicit **apply** do they become part of `tooling.json`.
+- **Rule:** Custom workflows are always proposed, never applied automatically — even if machine-generated.
+
+#### 8. IDE: accepting proposals (no auto-apply)
+
+- In the IDE (Cursor, VS Code, Claude Code), when a proposal exists, the UX must **show → explain → require explicit action**.
+- **Show a diff** (what would change in `tooling.json`), not just a yes/no prompt. User must see side effects, auth scope, and schema.
+- **Explicit acceptance:** e.g. button “Apply workflow” or command “Swytchcode: Apply Proposal”, which runs `swytchcode apply ...`. No silent or automatic apply. No “approve?” dialogs that auto-apply on yes.
+- Agents may generate proposals and ask the user to approve; agents must not apply proposals or modify `tooling.json` directly.
+
+#### 9. Authentication (exec never initiates auth)
+
+- **Authentication is configured explicitly and consumed deterministically. `exec` never initiates authentication.**
+- All secrets from **environment variables**; Wrekenfiles declare which env var(s) each operation needs. Missing → exit code 3.
+- Optional **interactive auth** (e.g. `swytchcode auth login github`) is **local dev only**; never usable in CI. Tokens from login are stored in a local auth store; in CI/prod only env vars are used.
+- OAuth refresh (if supported) must be non-interactive and explicit (e.g. `--allow-auth-refresh`); in CI default is no refresh, expired token → fail.
+
+#### 10. HTTP and API usage in the kernel
+
+- Use **Go’s standard `net/http`** with a **single shared `*http.Client`** per process (custom `Transport` for connection pooling). No heavy third-party REST client in the kernel; retries, auth, and policy live in the kernel layer, not in the HTTP layer.
+- All API calls (registry, SDK) must be **timeout-bound and non-interactive**.
 
 ---
 
@@ -242,10 +318,12 @@ The following are non-negotiable:
     - Detect project root.
     - Create `.swytchcode/`.
     - Write `tooling.json` with mode configuration.
-    - Write editor‑specific configs via `internal/editors/*` (Cursor, VS Code, Claude), if editor ≠ `none`.
+    - Write editor‑specific configs via `internal/editors/*` (Cursor, VS Code, Claude), if editor ≠ `none`. For Cursor: create **`.cursor/rules/swytchcode.mdc`** with **JSON content** (not prose), instructing Cursor to always call the thin client, never plan tools, and always defer execution to `swytchcode exec`.
 
 - **`swytchcode get <library>`**
-  - **Purpose**: Fetch and manage Wrekenfiles (e.g. `stripe`, `openai`).
+  - **Purpose**: Fetch and install integration capability (Wrekenfile) for a library. **Does not enable tools** — that is promotion into `tooling.json`.
+  - **Rule**: **get installs capability; it never grants permission.** Get must **never** modify `tooling.json`.
+  - **Invariant:** `swytchcode get` installs integration capability only. It must never modify `tooling.json` or enable tools.
   - **Human / TTY**:
     - With no args, `swytchcode get` may prompt to select a library and confirm overwrites.
   - **CI / non‑interactive**:
@@ -253,10 +331,10 @@ The following are non-negotiable:
     - If overwrite is needed and `--yes` is missing → fail, do not prompt.
   - **Responsibilities**:
     - Resolve library → registry endpoint.
-    - Fetch Wrekenfile JSON/YAML.
+    - Fetch Wrekenfile JSON/YAML (and optional manifest/metadata).
     - Validate schema.
-    - Save to `.swytchcode/wrekenfiles/<library>.json`.
-    - Never execute tools or touch `tooling.json`.
+    - Save to `.swytchcode/wrekenfiles/<library>.json` (or `.swytchcode/integrations/<library>/wreken.yaml` per your layout).
+    - Never execute tools, never touch `tooling.json`, never run OAuth or fetch secrets.
 
 - **`swytchcode rm <library>`**
   - **Purpose**: Delete a local Wrekenfile spec for a library.
@@ -284,7 +362,7 @@ The following are non-negotiable:
     - Validate and overwrite the local spec atomically.
 
 - **`swytchcode list <library>`**
-  - **Purpose**: Discover available methods without executing anything.
+  - **Purpose**: Discover available methods without executing anything. **Diagnostic/setup only** — not for integration; agents must not rely on this for execution.
   - **Output**: JSON to stdout:
     ```json
     {
@@ -309,7 +387,7 @@ The following are non-negotiable:
     - Default output is JSON only (no prose)
 
 - **`swytchcode describe <tool>`**
-  - **Purpose**: Inspect a tool or raw method without execution.
+  - **Purpose**: Inspect a tool or raw method without execution. **Diagnostic only** — not for integration.
   - **Examples**:
     - `swytchcode describe stripe.createCustomer` (verified tool)
     - `swytchcode describe raw.stripe.customers.search` (raw method)
@@ -418,6 +496,54 @@ This contract is for CI, Docker images, and agents, and must not change casually
 
 ---
 
+### API and data fetching
+
+The kernel and CLI need to pull data from APIs (e.g. Wrekenfile registry, upstream services).
+
+#### Recommended HTTP client
+
+- **Prefer the standard library** `net/http` for minimal dependencies and good efficiency (connection reuse via `http.DefaultClient` or a shared `*http.Client` with a single `Transport`).
+- Use a **single shared `*http.Client`** per process (do not create a new client per request) so connection pooling and keep-alives work.
+- Set explicit **timeouts** (e.g. `Client.Timeout`) and consider **context** for cancellation.
+
+Retries, backoff, auth, and policy live in the kernel layer. The HTTP layer must remain a thin wrapper over `net/http`. Do not introduce a third-party REST client into the kernel unless this decision is explicitly revisited.
+
+Rule: **No interactive or blocking behavior** when fetching data. All API calls must be timeout-bound and non-interactive.
+
+---
+
+### Authentication (OAuth and others)
+
+In CI and production, auth is **env-only**. In local dev, optional OAuth login may use a local auth store. The kernel never prompts for secrets during `exec` and never opens browsers.
+
+#### Principles
+
+- **All secrets come from environment variables.**  
+  Wrekenfiles declare which env var(s) each operation needs (e.g. `STRIPE_API_KEY`, `GITHUB_TOKEN`). The kernel reads them via `os.Getenv` / `util.GetEnvRequired`. Missing or empty → exit code 3 (auth error).
+- **Local dev vs CI/production:**  
+  In local development, optional OAuth login may store tokens in a local auth store (e.g. `~/.swytchcode/auth/<provider>.json`). In CI and production, authentication is **env-only**. `swytchcode exec` never initiates authentication in any environment.
+- **No interactive auth during exec.**  
+  No browser-based OAuth, no paste-this-token prompts during `exec`. The kernel runs non-interactively. Optional `swytchcode auth login` (if implemented) is for local dev only and must never be used in CI.
+
+#### OAuth
+
+- **User / browser OAuth:**  
+  The user completes OAuth (e.g. device flow, or login in a browser) **outside** Swytchcode. The resulting **access token** (and optionally refresh token) is then provided to the kernel via **environment variables** (e.g. `GITHUB_TOKEN`, `SLACK_USER_TOKEN`). The kernel only uses whatever token is in env; it does not run the OAuth flow.
+- **Machine-to-machine (client credentials, etc.):**  
+  If the Wrekenfile supports it, the kernel can **obtain** tokens using client ID and secret from env (e.g. `STRIPE_CLIENT_ID`, `STRIPE_CLIENT_SECRET`). That flow must be non-interactive (HTTP only), timeout-bound, and cache tokens in memory for the process lifetime if desired. No browser, no user interaction.
+- **Refresh tokens:**  
+  If a Wrekenfile specifies refresh behavior, the kernel may refresh using a refresh token from env, again in a non-interactive, HTTP-only way.
+
+#### Other auth types
+
+- **API keys:** Env var per key; name defined in Wrekenfile.
+- **Bearer tokens:** Same; env var holds the token.
+- **Basic auth:** Username/password from two env vars if needed.
+
+Summary: **Env-only, Wrekenfile-defined names, no prompts, no browser.** OAuth tokens are either supplied in env after the user completes the flow elsewhere, or obtained via machine-to-machine flows using env-supplied client credentials.
+
+---
+
 ### Developer roadmap (what to implement next)
 
 - **CLI wiring**
@@ -436,9 +562,15 @@ This contract is for CI, Docker images, and agents, and must not change casually
 - **Kernel and contracts**
   - Flesh out `internal/kernel/*`:
     - Tool resolution from `tooling.json` + Wrekenfiles.
-    - Schema validation and env‑based auth checks.
+    - Schema validation and env‑based auth checks (see **Authentication** above).
     - SDK invocation layer and error mapping to exit codes.
   - Implement `internal/wreken/*` and `internal/tooling/*` loaders/validators.
+  - For registry/API calls: use a single shared `*http.Client` and stdlib only; see **API and data fetching** above.
+
+- **Promotion and proposals** (see **Design decisions and reference**)
+  - Implement `swytchcode propose <library> <method>` to generate proposal files under `.swytchcode/proposals/` without modifying `tooling.json`.
+  - Implement `swytchcode apply proposals/<name>.json` as the only command that mutates `tooling.json` after validation.
+  - Support verified workflows from backend (direct add) vs custom workflows (proposals only, explicit apply).
 
 - **Quality gates**
   - Ensure `echo '{"tool":"x.y","args":{}}' | swytchcode exec` works:
