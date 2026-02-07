@@ -1,3 +1,4 @@
+// init.go implements swytchcode init: creates .swytchcode/, tooling.json, and editor-specific config (one-time project setup).
 package cli
 
 import (
@@ -12,6 +13,14 @@ import (
 	"gitlab.com/swytchcode/shell/internal/editors"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
+
+// defaultRegistryURL returns the registry base URL from env or default (used when writing tooling.json).
+func defaultRegistryURL() string {
+	if u := os.Getenv("SWYTCHCODE_REGISTRY_URL"); u != "" {
+		return u
+	}
+	return "https://localhost"
+}
 
 var (
 	initEditor         string
@@ -68,6 +77,12 @@ var initCmd = &cobra.Command{
 		if err := util.EnsureDir(swytchDir, 0o755); err != nil {
 			return fmt.Errorf("create .swytchcode directory: %w", err)
 		}
+		if err := util.EnsureDir(filepath.Join(swytchDir, "wrekenfiles"), 0o755); err != nil {
+			return fmt.Errorf("create wrekenfiles directory: %w", err)
+		}
+		if err := util.EnsureDir(filepath.Join(swytchDir, "proposals"), 0o755); err != nil {
+			return fmt.Errorf("create proposals directory: %w", err)
+		}
 
 		// Create or update tooling.json with mode
 		toolingPath := filepath.Join(swytchDir, "tooling.json")
@@ -84,13 +99,23 @@ var initCmd = &cobra.Command{
 			tooling = make(map[string]interface{})
 		}
 
-		// Ensure tools map exists
+		// Ensure tools and integrations maps exist (integrations = pinned versions for determinism)
 		if _, ok := tooling["tools"]; !ok {
 			tooling["tools"] = make(map[string]interface{})
 		}
+		if _, ok := tooling["integrations"]; !ok {
+			tooling["integrations"] = make(map[string]interface{})
+		}
 
-		// Set mode
+		// Set mode, version, and registry URL so they are visible and project-specific.
+		// version and registry_url are owned by the kernel: only set when absent (never overwrite on re-init).
 		tooling["mode"] = modeChoice
+		if _, hasVersion := tooling["version"]; !hasVersion {
+			tooling["version"] = "1.0"
+		}
+		if _, hasRegistryURL := tooling["registry_url"]; !hasRegistryURL {
+			tooling["registry_url"] = defaultRegistryURL()
+		}
 
 		// Write tooling.json
 		data, err := json.MarshalIndent(tooling, "", "  ")

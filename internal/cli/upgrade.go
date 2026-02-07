@@ -1,10 +1,15 @@
+// upgrade.go implements swytchcode upgrade: refreshes a Wrekenfile from the registry (local convenience only; not for CI).
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"gitlab.com/swytchcode/shell/internal/registry"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
 
@@ -39,19 +44,71 @@ var upgradeCmd = &cobra.Command{
 		library := args[0]
 		_ = util.IsInteractive() // reserved for future prompt behavior
 
-		if !upgradeAutoYes {
-			// Safety: until explicit prompts are implemented, require --yes.
-			return errors.New("upgrade that overwrites specs requires --yes (interactive confirmation not implemented yet)")
+		projectRoot, err := util.ProjectRoot()
+		if err != nil {
+			return fmt.Errorf("detect project root: %w", err)
 		}
 
-		// TODO:
-		// 1. Verify that .swytchcode/wrekenfiles/<library>.json already exists.
-		// 2. Resolve library -> registry endpoint.
-		// 3. Fetch latest Wrekenfile JSON/YAML.
-		// 4. Validate via internal/wreken.
-		// 5. Overwrite existing spec atomically.
+		wrekenPath := filepath.Join(projectRoot, ".swytchcode", "wrekenfiles", library+".yaml")
 
-		fmt.Printf("Wrekenfile spec for %s would be upgraded from the registry (implementation pending)\n", library)
+		// Verify existing spec exists
+		if _, err := os.Stat(wrekenPath); errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("no Wrekenfile found for %q; use 'swytchcode get %s' to fetch it first", library, library)
+		} else if err != nil {
+			return fmt.Errorf("stat Wrekenfile: %w", err)
+		}
+
+		interactive := util.IsInteractive() && !upgradeNonInteractive
+		if !upgradeAutoYes {
+			if interactive {
+				// TODO: Implement interactive prompt for overwrite confirmation
+				return errors.New("upgrade requires --yes (interactive confirmation not yet implemented)")
+			} else {
+				return errors.New("upgrade requires --yes")
+			}
+		}
+
+		// Fetch latest bundle from registry (base URL from tooling.json or env)
+		regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
+		ctx := context.Background()
+
+		bundle, err := regClient.GetIntegrationBundle(ctx, library)
+		if err != nil {
+			return fmt.Errorf("fetch integration bundle: %w", err)
+		}
+
+		// Atomic overwrite: write to temp file, then rename (decode base64 if API returned encoded content)
+		tmpPath := wrekenPath + ".tmp"
+		wrekenBytes := util.DecodeBase64OrRaw(bundle.Files.Wreken.Content)
+		if err := os.WriteFile(tmpPath, wrekenBytes, 0o644); err != nil {
+			return fmt.Errorf("write Wrekenfile: %w", err)
+		}
+
+		if err := os.Rename(tmpPath, wrekenPath); err != nil {
+			os.Remove(tmpPath) // Clean up on failure
+			return fmt.Errorf("replace Wrekenfile: %w", err)
+		}
+
+		if err := updateWrekenManifest(projectRoot, library, bundle.Version); err != nil {
+			return fmt.Errorf("update wreken manifest: %w", err)
+		}
+
+		// Remove proposals for this library so they are not stale (user can create a new proposal against new version).
+		if n, errProposals := removeProposalsForLibrary(projectRoot, library); errProposals != nil {
+			// Non-fatal: upgrade succeeded; log and continue
+			if interactive {
+				fmt.Printf("Upgraded Wrekenfile for %s to version %s (could not remove %d proposal(s): %v)\n", library, bundle.Version, n, errProposals)
+			}
+		} else if n > 0 && interactive {
+			fmt.Printf("Removed %d stale proposal(s) for %s\n", n, library)
+		}
+
+		// TODO: Validate schema via internal/wreken (once validator is implemented)
+
+		if interactive {
+			fmt.Printf("Upgraded Wrekenfile for %s to version %s\n", library, bundle.Version)
+		}
+
 		return nil
 	},
 }

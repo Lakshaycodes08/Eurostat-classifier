@@ -1,3 +1,4 @@
+// interactive.go detects TTY for setup commands only; exec must never branch on TTY.
 package util
 
 import "os"

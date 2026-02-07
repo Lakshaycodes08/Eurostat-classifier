@@ -1,3 +1,4 @@
+// describe.go implements swytchcode describe: prints metadata for a tool or integration (discovery only, no side effects).
 package cli
 
 import (

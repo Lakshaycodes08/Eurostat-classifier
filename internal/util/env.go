@@ -1,3 +1,4 @@
+// env.go provides required env var lookup for auth; missing/empty maps to kernel auth error exit code.
 package util
 
 import "os"

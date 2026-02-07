@@ -1,3 +1,4 @@
+// exec.go implements swytchcode exec: the single execution path; reads JSON from stdin, runs the kernel, writes JSON to stdout.
 package cli
 
 import (

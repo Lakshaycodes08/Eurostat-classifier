@@ -1,3 +1,4 @@
+// errors.go defines exit codes and the JSON error shape used by the kernel on failure.
 package kernel
 
 import (

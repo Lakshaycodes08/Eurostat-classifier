@@ -1,3 +1,4 @@
+// loader.go will load Wrekenfiles from .swytchcode/wrekenfiles/ and expose them to the kernel.
 package wreken
 
 // This package will be responsible for:

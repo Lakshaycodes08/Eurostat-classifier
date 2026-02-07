@@ -1,3 +1,4 @@
+// mode.go implements swytchcode mode: reads or sets execution mode (production | sandbox) in tooling.json.
 package cli
 
 import (

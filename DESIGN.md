@@ -1,8 +1,10 @@
+<!-- Authoritative design document: architectural decisions, invariants, and boundaries for the Swytchcode kernel. -->
+
 # Swytchcode Design Document
 
 This document captures the architectural decisions and design principles for Swytchcode. Treat this as the authoritative source of truth for design discussions.
 
-**Last updated:** Based on architectural decisions finalized during initial design phase.
+**Last updated:** Reflects integration version pinning, bootstrap, config, and registry-usage invariants.
 
 ---
 
@@ -58,10 +60,15 @@ Swytchcode intentionally separates **execution contracts** from **execution impl
 - Defines **what tools are allowed** in this project.
 - Defines the **canonical input/output schema** for each tool.
 - Stores the **execution mode** (`production` or `sandbox`).
+- Stores **integration version pins** (`integrations: { <name>: { version: "<exact>" } }`). No ranges, no `"latest"`. The registry decides what versions exist; the project decides which versions it trusts.
+- Stores **registry_url** (base URL for the registry API). Set by init only when absent; overridable at runtime by `SWYTCHCODE_REGISTRY_URL` (env wins; override is never persisted).
+- Stores **version** (tooling.json schema version only; kernel-owned, set once by init).
 - Is **committed**, reviewed, and stable.
 - Is the **only agent-facing contract**.
 
 **Rule:** If it affects *what a tool is allowed to do*, it belongs in `tooling.json`.
+
+**Kernel-owned fields:** `version`, `mode`, and `registry_url` are owned by the kernel. Proposals must not include them; apply rejects any proposal that does. Init never overwrites an existing `version` or `registry_url`.
 
 #### Wrekenfiles (implementation details)
 
@@ -76,6 +83,74 @@ Swytchcode intentionally separates **execution contracts** from **execution impl
 - Inputs are validated against `tooling.json`.
 - SDK outputs are normalized to the shape declared in `tooling.json`.
 - Extra fields are dropped; missing required fields cause failure.
+
+#### Installed versions (wreken manifest)
+
+- **Path:** `.swytchcode/wrekenfiles/manifest.json`.
+- **Purpose:** Records which integration version is installed for each library (e.g. `{"stripe": "2025-01-10"}`).
+- **Updated by:** `get` and `upgrade` when they write a Wrekenfile; `bootstrap` when it installs.
+- **Used by:** `bootstrap` to decide “fetch” vs “version mismatch → fail”. Enables deterministic, reproducible installs.
+
+---
+
+## Registry: Who Uses It, Who Does Not
+
+**Invariant: `swytchcode exec` must never call the registry.** CI determinism, offline execution, and security boundaries depend on it.
+
+| Command            | Uses registry |
+|--------------------|---------------|
+| `get`              | ✅            |
+| `upgrade`          | ✅            |
+| `list`             | ❌ (local only) |
+| `describe`         | ❌            |
+| `add workflow`     | ✅            |
+| `add integration`  | ❌ (writes tooling.json only) |
+| `apply`            | ❌            |
+| **`exec`**         | **❌ never**  |
+| **`bootstrap`**    | ✅ (exact versions only) |
+
+**Rule:** If exec ever needs registry access, the architecture has broken.
+
+---
+
+## Integration Version Pinning (Determinism)
+
+### No implicit “latest”
+
+- **No “latest” at exec or bootstrap time. Ever.** Implicit “current” versions would destroy CI reproducibility, auditability, and rollbacks.
+- Versions are **exact and explicit** in `tooling.json` (e.g. `"2025-01-10"`). No semver ranges, no operators.
+
+### How versions enter tooling.json (explicit only)
+
+1. **`swytchcode add integration <name>@<version>`** — Pins the integration version. Does **not** fetch; reviewable and commit-worthy.
+2. **`swytchcode apply`** — If a proposal includes an `integrations` block, apply merges it into tooling.json. **Every integration in the proposal must have an explicit `version`**; otherwise apply fails.
+3. **Manual edit** — Always allowed.
+
+### Bootstrap
+
+- **Command:** `swytchcode bootstrap`.
+- **Behavior:** Reads `integrations` from tooling.json. For each integration: if not installed → fetch **exact version** from registry and write Wrekenfile + manifest; if installed but version mismatch → **fail** (no silent upgrade).
+- **Never** installs “latest”. **Never** mutates tooling.json. **Never** runs during exec.
+- **Invariant:** *tooling.json pins what is trusted. The registry supplies how it works. `bootstrap` reconciles the two. `exec` only executes.*
+
+### get vs bootstrap
+
+- **`get`:** For exploration and discovery. Fetches latest available, installs locally, updates manifest. **Does not** modify tooling.json. Not authoritative for version pinning.
+- **`bootstrap`:** For deterministic install. Uses only versions declared in tooling.json; fails on mismatch. Authoritative for “what is installed” in CI and production.
+
+---
+
+## Config and Env Overrides
+
+### Registry base URL
+
+- **Stored in:** `tooling.json` as `registry_url`.
+- **Override:** `SWYTCHCODE_REGISTRY_URL` overrides at runtime when set.
+- **Rule:** Environment variable overrides **must not be silently persisted**. The CLI never rewrites `tooling.json` with the env value.
+
+### Visibility of overrides
+
+- **`swytchcode config`** — Outputs effective configuration as JSON. For `registry_url`, shows `effective` (URL in use) and `source` (`"env"` | `"tooling"` | `"default"`). Ensures overrides are visible and avoids “why is this pointing somewhere else?” incidents.
 
 ---
 
@@ -116,6 +191,8 @@ Wrekenfiles define what is **possible**.
 **Execution:** Always **explicitly opt-in** via `raw.*` namespace + `--allow-raw` flag.
 
 **Critical rule:** There must be no silent fallback from verified → raw.
+
+**CI rule:** Raw methods are not allowed in CI by default. In CI, `--allow-raw` must never be used. If `--allow-raw` is present in a CI context, `exec` must fail unless an explicit override is provided (e.g. `--ci-allow-raw`, default false). Even if that override is never implemented, the intent is clear: raw ≠ CI; no accidental enabling via copied commands.
 
 ---
 
@@ -205,28 +282,30 @@ There is no alternate path.
 1. Method exists in a Wrekenfile
 2. User discovers it via `swytchcode list`
 3. User experiments locally using raw execution (`raw.*` + `--allow-raw`)
-4. Team promotes it into `tooling.json` (via `propose` → `apply`)
+4. Team promotes it into `tooling.json` (IDE generates proposal → `validate` → `apply`)
 5. Method becomes verified, agent-safe, and CI-safe
 
-### Propose → Review → Apply
+### Validate → Apply
 
-**Agents may propose; they may not apply.**
+**IDEs generate proposals; only the kernel validates and applies.**
 
-1. **Propose:** `swytchcode propose stripe customers.search`
-   - Generates a **patch** (e.g. `.swytchcode/proposals/stripe.customers.search.json`)
-   - Does **not** edit `tooling.json`
+1. **Proposal:** IDE (or user) writes a file to `.swytchcode/proposals/<name>.json` (no CLI command for generation).
 
-2. **Review:** Human or CI validates the proposal
-   - Schema correctness
-   - Naming rules
-   - Auth compatibility
-   - No forbidden patterns
+2. **Validate:** `swytchcode validate <proposal>`
+   - Proof — no side effects. Full validation (structure, kernel-owned fields, integrations with version).
+   - Produces structured errors or success.
 
-3. **Apply:** `swytchcode apply proposals/stripe.customers.search.json`
-   - **Only command** that mutates `tooling.json`
-   - Requires clean validation
+3. **Review:** Human or CI reviews (schema, naming, auth, no forbidden patterns).
 
-**Invariant:** `tooling.json` is write-protected; all changes go through proposals. Agents prepare; humans approve; kernel enforces.
+4. **Apply:** `swytchcode apply <proposal>`
+   - **Authorization** — only command that mutates `tooling.json` from proposals.
+   - Fails if proposal is invalid (same checks as validate). Merges **tools** and optional **integrations** (with explicit versions). Archives to `proposals/applied/`.
+
+**IDE-first:** Proposal generation is IDE-owned (IDEs generate proposal files). The kernel owns **validate** and **apply**.
+
+**Invariant:** `tooling.json` is write-protected; all changes go through validation and explicit apply (or explicit `add integration` / `add workflow`). Agents/IDEs prepare; humans approve; kernel enforces.
+
+**Backend boundary:** The backend never receives, stores, validates, or applies proposal files. Proposal files are local, project-scoped artifacts.
 
 ---
 
@@ -285,8 +364,8 @@ There is no alternate path.
 
 ### Local Dev vs CI/Production
 
-- **Local development:** Optional OAuth login may store tokens in a local auth store (e.g. `~/.swytchcode/auth/<provider>.json`).
-- **CI and production:** Authentication is **env-only**. No local auth store.
+- **Local development:** Optional OAuth login (e.g. `swytchcode auth login`) may store tokens in a local auth store. This is **optional and local-dev only**; the kernel’s core execution path does not depend on it.
+- **CI and production:** Authentication is **env-only**. No local auth store; OAuth login must never be used in CI.
 - **Exec:** Never initiates authentication in any environment.
 
 ### Auth Sources
@@ -332,7 +411,7 @@ There is no alternate path.
 
 - `.swytchcode/` **must exist**.
 - If `.swytchcode/` is missing, `swytchcode exec` must fail.
-- CI must never infer or auto-download integrations.
+- CI must never infer or auto-download integrations. Required integrations are declared in `tooling.json` (`integrations`); `swytchcode bootstrap` installs those exact versions.
 
 **In CI, Swytchcode never infers integrations.**
 
@@ -370,6 +449,9 @@ If a multi-step operation must exist, it should be exposed explicitly as a singl
 
 ## What NOT to Add (Explicitly Forbidden)
 
+- ❌ No implicit “latest” at exec or bootstrap (versions must be explicit in tooling.json)
+- ❌ No registry calls from `exec`
+- ❌ No persisting env overrides into tooling.json
 - ❌ No auto-promotion
 - ❌ No inference from imports
 - ❌ No "helpful" fallback to raw
@@ -405,27 +487,42 @@ This contract is for CI, Docker images, and agents.
 
 ## Command Interaction Matrix
 
-| Command        | Human (TTY)        | CI / No TTY                    |
-| -------------- | ------------------ | ------------------------------- |
-| `swytchcode init` | ✅ Interactive     | ❌ Error unless flags provided  |
-| `swytchcode get`  | ✅ Optional prompts | ❌ Non-interactive              |
-| `swytchcode exec` | ❌ Never           | ❌ Never                        |
+| Command                  | Human (TTY)        | CI / No TTY                    |
+| ------------------------ | ------------------ | ------------------------------- |
+| `swytchcode init`        | ✅ Interactive     | ❌ Error unless flags provided  |
+| `swytchcode get`         | ✅ Optional prompts | ❌ Non-interactive              |
+| `swytchcode bootstrap`   | ❌ No prompts      | ❌ No prompts                  |
+| `swytchcode config`      | ❌ No prompts      | ❌ No prompts                  |
+| `swytchcode add integration` | ❌ No prompts  | ❌ No prompts                  |
+| `swytchcode validate`        | ❌ No prompts  | ❌ No prompts                  |
+| `swytchcode apply`          | ❌ No prompts  | ❌ No prompts                  |
+| `swytchcode exec`           | ❌ Never       | ❌ Never                        |
 
-**Rule:** Only setup commands are interactive. Execution is never interactive.
+**Rule:** Only setup commands (init, get) are interactive. Execution, validate, apply, and bootstrap/config are never interactive.
 
 ---
 
-## Key Invariants
+## Key Invariants (canonical list)
 
-1. **`swytchcode get` installs capability; it never grants permission.** Get must never modify `tooling.json` or enable tools.
+The list below is the **canonical** set of non-negotiable principles. README and CONTRIBUTING reference this section to avoid drift.
+
+1. **`swytchcode get` installs capability; it never grants permission.** Get must never modify `tooling.json` or enable tools. **`swytchcode get` is exploratory only.** Nothing fetched by get is ever trusted until pinned in `tooling.json` and installed via `bootstrap`.
 
 2. **`tooling.json` defines what is trusted. Wrekenfiles define what is possible.**
 
-3. **Exec never initiates authentication.** No browser, no login prompts during exec.
+3. **tooling.json pins what is trusted. The registry supplies how it works. `bootstrap` reconciles the two. `exec` only executes.** No implicit “latest” at exec or bootstrap.
 
-4. **Same binary everywhere.** Behavior by TTY + flags only, not environment type.
+4. **`swytchcode exec` must never call the registry.** All data comes from local tooling.json and Wrekenfiles only.
 
-5. **If Swytchcode works in CI, it will work in production.** If it only works in an IDE, it is broken.
+5. **Env overrides are visible and never persisted.** `SWYTCHCODE_REGISTRY_URL` overrides `registry_url` at runtime only; the CLI never writes that value into `tooling.json`. Use `swytchcode config` to see effective config and source.
+
+6. **Proposals cannot mutate `version`, `mode`, or `registry_url`.** Those fields are kernel-owned. Apply rejects any proposal that includes them.
+
+7. **Exec never initiates authentication.** No browser, no login prompts during exec.
+
+8. **Same binary everywhere.** Behavior by TTY + flags only, not environment type.
+
+9. **If Swytchcode works in CI, it will work in production.** If it only works in an IDE, it is broken.
 
 ---
 
@@ -434,3 +531,5 @@ This contract is for CI, Docker images, and agents.
 Swytchcode is friendly during setup and ruthless during execution.
 
 The kernel is the execution authority. Everything else is a guest.
+
+**Determinism guarantee:** Integration versions are explicit in `tooling.json`. `bootstrap` installs those exact versions. `exec` uses only local files and never calls the registry. No implicit “latest” — CI, audits, and rollbacks stay reproducible.

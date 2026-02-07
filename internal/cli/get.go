@@ -1,10 +1,15 @@
+// get.go implements swytchcode get: fetches and installs a Wrekenfile for an integration (exploratory only; does not modify tooling.json).
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"gitlab.com/swytchcode/shell/internal/registry"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
 
@@ -35,33 +40,90 @@ var getCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		interactive := util.IsInteractive() && !getNonInteractive
 
+		projectRoot, err := util.ProjectRoot()
+		if err != nil {
+			return fmt.Errorf("detect project root: %w", err)
+		}
+		regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
+		ctx := context.Background()
+
 		var library string
 		if len(args) > 0 {
 			library = args[0]
 		} else if interactive {
-			// TODO: Implement interactive selection of library when running on a TTY:
-			//   - Present a small curated list (e.g. stripe, openai, slack, ...)
-			//   - Or allow freeform entry.
-			return errors.New("interactive library selection not yet implemented; rerun with a library argument")
+			// Interactive selection: fetch available integrations from registry
+
+			listResp, err := regClient.ListIntegrations(ctx)
+			if err != nil {
+				return fmt.Errorf("fetch available integrations: %w", err)
+			}
+
+			if len(listResp.Integrations) == 0 {
+				return errors.New("no integrations available")
+			}
+
+			options := make([]string, len(listResp.Integrations))
+			for i, integration := range listResp.Integrations {
+				options[i] = integration.ID
+			}
+
+			fmt.Println()
+			_, library = util.SelectWithRetry("Which library do you want to add?", options)
 		}
 
 		if library == "" {
 			return errors.New("library name required")
 		}
 
-		// TODO:
-		// 1. Resolve library -> registry endpoint.
-		// 2. Fetch Wrekenfile JSON/YAML.
-		// 3. Validate schema via internal/wreken.
-		// 4. Check if .swytchcode/wrekenfiles/<library>.json exists.
-		//    - If interactive and not --non-interactive: prompt before overwrite.
-		//    - If non-interactive and overwrite required:
-		//        - Overwrite only when --yes is set.
-		//        - Otherwise fail without prompting.
-		// 5. Write to .swytchcode/wrekenfiles/<library>.json.
+		swytchDir := filepath.Join(projectRoot, ".swytchcode")
+		wrekenDir := filepath.Join(swytchDir, "wrekenfiles")
+		if err := util.EnsureDir(wrekenDir, 0o755); err != nil {
+			return fmt.Errorf("create wrekenfiles directory: %w", err)
+		}
 
-		// For now we only stub behavior to make the CLI shape concrete.
-		fmt.Printf("Wrekenfile for %s would be fetched and stored (implementation pending)\n", library)
+		wrekenPath := filepath.Join(wrekenDir, library+".yaml")
+
+		// Check if file already exists
+		exists := false
+		if _, err := os.Stat(wrekenPath); err == nil {
+			exists = true
+			if !getAutoYes {
+				if interactive {
+					// TODO: Implement interactive prompt for overwrite confirmation
+					return errors.New("Wrekenfile already exists; use --yes to overwrite (interactive confirmation not yet implemented)")
+				} else {
+					return errors.New("Wrekenfile already exists; use --yes to overwrite")
+				}
+			}
+		}
+
+		// Fetch bundle from registry
+		bundle, err := regClient.GetIntegrationBundle(ctx, library)
+		if err != nil {
+			return fmt.Errorf("fetch integration bundle: %w", err)
+		}
+
+		// Write Wrekenfile (YAML); decode base64 if the API returned encoded content
+		wrekenBytes := util.DecodeBase64OrRaw(bundle.Files.Wreken.Content)
+		if err := os.WriteFile(wrekenPath, wrekenBytes, 0o644); err != nil {
+			return fmt.Errorf("write Wrekenfile: %w", err)
+		}
+
+		// Record installed version in manifest (get is for exploration; tooling.json pins are set via add integration / apply)
+		if err := updateWrekenManifest(projectRoot, library, bundle.Version); err != nil {
+			return fmt.Errorf("update wreken manifest: %w", err)
+		}
+
+		// TODO: Validate schema via internal/wreken (once validator is implemented)
+
+		if interactive {
+			if exists {
+				fmt.Printf("Updated Wrekenfile for %s (version %s)\n", library, bundle.Version)
+			} else {
+				fmt.Printf("Added Wrekenfile for %s (version %s)\n", library, bundle.Version)
+			}
+		}
+
 		return nil
 	},
 }

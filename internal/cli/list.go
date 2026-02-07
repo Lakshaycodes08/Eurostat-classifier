@@ -1,3 +1,4 @@
+// list.go implements swytchcode list: lists verified and raw tools for an integration (discovery only, no side effects).
 package cli
 
 import (

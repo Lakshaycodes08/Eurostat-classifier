@@ -1,3 +1,4 @@
+// rm.go implements swytchcode rm: removes an integration’s Wrekenfile and optional proposals from the project.
 package cli
 
 import (
@@ -47,7 +48,7 @@ var rmCmd = &cobra.Command{
 			return fmt.Errorf("detect project root: %w", err)
 		}
 
-		wrekenPath := filepath.Join(projectRoot, ".swytchcode", "wrekenfiles", library+".json")
+		wrekenPath := filepath.Join(projectRoot, ".swytchcode", "wrekenfiles", library+".yaml")
 		if _, err := os.Stat(wrekenPath); errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("no Wrekenfile spec found for library %q", library)
 		} else if err != nil {
@@ -56,6 +57,13 @@ var rmCmd = &cobra.Command{
 
 		if err := os.Remove(wrekenPath); err != nil {
 			return fmt.Errorf("remove Wrekenfile: %w", err)
+		}
+
+		// Remove any proposals for this library so they don't reference a removed integration.
+		if n, errProposals := removeProposalsForLibrary(projectRoot, library); errProposals != nil {
+			return fmt.Errorf("removed Wrekenfile; removed %d proposal(s) but then failed: %w", n, errProposals)
+		} else if n > 0 && interactive {
+			fmt.Printf("Removed %d proposal(s) for %s\n", n, library)
 		}
 
 		if interactive {

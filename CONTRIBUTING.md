@@ -1,8 +1,10 @@
+<!-- Developer guide: how to contribute, repository layout, implementation roadmap, and coding guidelines. -->
+
 # Contributing to Swytchcode
 
 This guide helps developers understand how to contribute to the Swytchcode kernel implementation.
 
-**Before you start:** Read [DESIGN.md](./DESIGN.md) to understand the architectural principles and boundaries.
+**Before you start:** Read [DESIGN.md](./DESIGN.md) to understand the architectural principles and boundaries. The canonical list of non-negotiable invariants is [DESIGN.md § Key Invariants (canonical list)](./DESIGN.md#key-invariants-canonical-list).
 
 ---
 
@@ -20,9 +22,9 @@ This guide helps developers understand how to contribute to the Swytchcode kerne
 swytchcode/
 ├── cmd/
 │   └── swytchcode/
-│       └── main.go          # CLI entrypoint
+│       └── main.go              # CLI entrypoint
 ├── internal/
-│   ├── cli/                 # Cobra commands
+│   ├── cli/                     # Cobra commands
 │   │   ├── root.go
 │   │   ├── init.go
 │   │   ├── get.go
@@ -31,28 +33,38 @@ swytchcode/
 │   │   ├── describe.go
 │   │   ├── rm.go
 │   │   ├── upgrade.go
-│   │   └── mode.go
-│   ├── kernel/              # Execution authority
+│   │   ├── mode.go
+│   │   ├── config_cmd.go        # swytchcode config (effective config + source)
+│   │   ├── apply.go             # Apply proposal to tooling.json
+│   │   ├── validate_cmd.go      # Validate proposal (proof, no side effects)
+│   │   ├── proposal_validate.go # Shared validation logic for validate/apply
+│   │   ├── add.go               # add workflow, add integration
+│   │   ├── bootstrap.go         # Install exact integration versions from tooling.json
+│   │   └── wreken_manifest.go   # Installed versions manifest (wrekenfiles/manifest.json)
+│   ├── kernel/                  # Execution authority
 │   │   ├── executor.go
 │   │   ├── resolver.go
 │   │   ├── policy.go
 │   │   └── errors.go
-│   ├── wreken/              # Wrekenfile parsing & validation
+│   ├── registry/               # Registry API client
+│   │   ├── api.go
+│   │   ├── client.go
+│   │   └── config.go
+│   ├── wreken/                  # Wrekenfile parsing & validation
 │   │   ├── loader.go
-│   │   ├── validator.go
-│   │   └── schema.go (to be added)
-│   ├── tooling/             # tooling.json contract
-│   │   ├── loader.go
-│   │   └── schema.go (to be added)
-│   ├── editors/             # Init-time only
+│   │   └── validator.go
+│   ├── tooling/                 # tooling.json contract
+│   │   └── loader.go
+│   ├── editors/                 # Init-time only
 │   │   ├── cursor.go
 │   │   ├── vscode.go
 │   │   └── claude.go
-│   └── util/                # Shared helpers
+│   └── util/                    # Shared helpers
 │       ├── interactive.go
 │       ├── jsonio.go
 │       ├── fs.go
 │       ├── env.go
+│       ├── base64.go
 │       └── prompt.go
 ├── go.mod
 ├── go.sum
@@ -68,7 +80,7 @@ swytchcode/
 ### 1. Building the CLI
 
 ```bash
-go build ./cmd/swytchcode
+go build -o swytchcode ./cmd/swytchcode
 ```
 
 This creates a `swytchcode` binary in the current directory.
@@ -92,17 +104,25 @@ go test ./...
 
 ### Phase 1: CLI Wiring (Current State)
 
-**Status:** ✅ Skeleton complete, interactive prompts implemented
+**Status:** ✅ Skeleton complete, IDE-first proposal flow implemented
 
 **Completed:**
-- ✅ Basic command structure (`init`, `get`, `exec`, `rm`, `upgrade`, `list`, `describe`, `mode`)
+- ✅ Basic command structure (`init`, `get`, `exec`, `rm`, `upgrade`, `list`, `describe`, `mode`, `config`, `validate`, `apply`, `add`, `bootstrap`)
 - ✅ Interactive prompts for `init` (editor and mode selection)
 - ✅ Non-interactive mode support with flags
-- ✅ Mode stored in `tooling.json`
-- ✅ Editor config writers (stubs for Cursor, VS Code, Claude)
+- ✅ Mode, version, registry_url, and integrations in `tooling.json` (init never overwrites registry_url/version)
+- ✅ Editor config writers (Cursor, VS Code, Claude)
+- ✅ `swytchcode config` — effective config and registry_url source (env vs tooling)
+- ✅ `swytchcode validate <proposal>` — full validation, no side effects; shared logic with apply
+- ✅ `swytchcode apply <proposal>` — only command that mutates tooling.json from proposals; reuses validate
+- ✅ `swytchcode add integration <name>@<version>` — pin version in tooling.json
+- ✅ `swytchcode bootstrap` — install exact integration versions from tooling.json; wreken manifest
+- ✅ `swytchcode add workflow` — verified workflows from registry
+- ✅ Proposals: kernel-owned fields rejected; optional integrations block with explicit versions
+- ✅ rm/upgrade remove proposal files for the library
 
 **Remaining:**
-- [ ] Complete interactive prompts for `get` (library selection, overwrite confirmation)
+- [ ] Complete interactive prompts for `get` (overwrite confirmation)
 - [ ] Integrate mode into kernel execution logic (credential selection, policy enforcement)
 
 ### Phase 2: Kernel and Contracts
@@ -147,27 +167,21 @@ go test ./...
    - Timeout configuration
    - No third-party REST client (stdlib only)
 
-### Phase 4: Promotion and Proposals
+### Phase 4: IDE-First Proposals and Kernel Validation
 
-**Status:** 📋 Planned
+**Status:** ✅ Core implemented
 
-**To implement:**
+**Implemented:**
 
-1. **`swytchcode propose` command**
-   - Generate proposal files under `.swytchcode/proposals/`
-   - Read Wrekenfile method definition
-   - Infer/generate I/O schema
-   - Write proposal JSON (does not modify `tooling.json`)
+1. **`swytchcode validate <proposal>`** — Proof, no side effects. Validates structural correctness, kernel-owned fields (no version/mode/registry_url), tooling_fragment.tools, integrations with explicit version; optional compatibility with installed versions. Structured JSON output (valid + message, or errors).
 
-2. **`swytchcode apply` command**
-   - Validate proposal file
-   - Apply proposal to `tooling.json`
-   - Only command that mutates `tooling.json`
-   - Archive or delete proposal after apply
+2. **`swytchcode apply <proposal>`** — Authorization. Only command that mutates `tooling.json` from proposals. Reuses same validation as validate; merges tools and optional integrations; archives to `proposals/applied/`.
 
-3. **Verified workflows support**
-   - `swytchcode add workflow <name>` for verified workflows
-   - Direct application (no proposal step)
+3. **`swytchcode add workflow <id>`** — Verified workflows from registry; direct merge into tooling.json (no proposal step).
+
+4. **`swytchcode add integration <name>@<version>`** — Pin integration version in tooling.json; no fetch.
+
+**IDE-first model:** IDEs discover (list, describe), generate proposals, then user runs `validate` → `apply`. No proposal is ever auto-applied. See README and DESIGN.md for workflow validity and authority boundaries.
 
 ---
 
@@ -207,10 +221,15 @@ apiKey := promptUser()           // NO
 
 ### 3. tooling.json is Write-Protected
 
+Only `apply` (and `add integration` / `add workflow`) mutate `tooling.json`. Apply reuses the same validation as `validate` (validateProposalContent); proposals must not contain kernel-owned fields (version, mode, registry_url).
+
 ```go
-// ✅ CORRECT - Only via apply command
+// ✅ CORRECT - Only via apply (after validation) or add integration / add workflow
 func ApplyProposal(proposalPath string) error {
-    // Validate, then write to tooling.json
+    if errs := validateProposalContent(proposal, projectRoot); len(errs) > 0 {
+        return errs[0]
+    }
+    // Merge tools and integrations into tooling.json
 }
 
 // ❌ WRONG - Never modify directly from get/init/etc
@@ -294,6 +313,7 @@ Before any PR is merged, ensure:
 When reviewing PRs, verify:
 
 - [ ] No prompts in `exec` command
+- [ ] `exec` never calls the registry (local tooling.json + Wrekenfiles only)
 - [ ] No SDK logic in thin clients (if adding client code)
 - [ ] No editor logic at runtime
 - [ ] Env-only auth (no config files for secrets)
@@ -302,6 +322,8 @@ When reviewing PRs, verify:
 - [ ] Works without TTY
 - [ ] `get` never modifies `tooling.json`
 - [ ] Raw methods require explicit opt-in
+- [ ] Proposals cannot contain version, mode, or registry_url (kernel-owned)
+- [ ] Apply reuses validateProposalContent (same checks as validate)
 - [ ] Single shared HTTP client (if adding HTTP code)
 - [ ] No third-party REST client in kernel
 
@@ -351,10 +373,12 @@ if util.IsInteractive() {
 
 If you need to add a new command:
 
-1. **Determine interaction mode:**
-   - Setup/setup → may be interactive (e.g. `init`, `get`)
-   - Diagnostic → may be interactive (e.g. `list`, `describe`)
-   - Execution → **never interactive** (only `exec`)
+1. **Determine interaction mode and role:**
+   - Setup → may be interactive (e.g. `init`, `get`)
+   - Discovery/inspection → no side effects (e.g. `list`, `describe`, `validate`)
+   - Authorization → mutates tooling.json only (e.g. `apply`); never interactive
+   - Execution → **never interactive** (only `exec`); never calls registry
+   - Setup/cache → e.g. `bootstrap` (install from tooling.json)
 
 2. **Create command file:**
    ```go
@@ -386,9 +410,15 @@ If you need to add a new command:
 ```go
 // internal/tooling/schema.go (to be created)
 type Tooling struct {
-    Version string             `json:"version"`
-    Mode    string             `json:"mode"` // "production" | "sandbox"
-    Tools   map[string]ToolDef `json:"tools"`
+    Version      string                       `json:"version"`       // kernel-owned, schema version only
+    Mode         string                       `json:"mode"`          // "production" | "sandbox"
+    RegistryURL  string                       `json:"registry_url"`  // kernel-owned; init sets only when absent
+    Integrations map[string]IntegrationPin    `json:"integrations"`  // exact versions only, no "latest"
+    Tools        map[string]ToolDef           `json:"tools"`
+}
+
+type IntegrationPin struct {
+    Version string `json:"version"` // exact, e.g. "2025-01-10"
 }
 
 type ToolDef struct {
@@ -431,16 +461,20 @@ type Method struct {
 
 Before shipping v1, ensure:
 
-- ✅ `swytchcode exec` fully deterministic
+- ✅ `swytchcode exec` fully deterministic and never calls the registry
 - ✅ Works in Docker scratch image
 - ✅ Works in GitHub Actions
 - ✅ Thin client can be written in <50 LOC
-- ✅ No interactive code path in kernel
+- ✅ No interactive code path in kernel (exec, validate, apply, bootstrap)
 - ✅ Editor configs affect IDEs only
 - ✅ One kernel binary only
+- ✅ IDE-first flow: validate → apply; no proposal auto-applied
+- ✅ Integration version pinning in tooling.json; bootstrap installs exact versions
+- ✅ `swytchcode config` shows effective config and registry_url source
 
 ---
 
 **Remember:** You are building a kernel, not a helper CLI.  
+**IDEs propose intent; the kernel proves correctness and executes.**  
 **init and get → human-friendly**  
 **exec → machine-only, deterministic**

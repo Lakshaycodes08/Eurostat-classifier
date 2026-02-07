@@ -1,3 +1,4 @@
+// executor.go runs a single tool invocation: resolves the tool, validates input, and returns JSON output (or structured error).
 package kernel
 
 import (
@@ -15,6 +16,12 @@ type ExecRequest struct {
 }
 
 // Execute is the single entrypoint used by the CLI `exec` command.
+//
+// Invariant: tooling.json pins what is trusted. The registry supplies how it works.
+// bootstrap reconciles the two. exec only executes.
+//
+// exec must NEVER call the registry. All data comes from local tooling.json and Wrekenfiles
+// only. This ensures CI determinism, offline execution, and security boundaries.
 //
 // Decision tree:
 //   - If tool starts with "raw.":

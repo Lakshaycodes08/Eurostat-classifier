@@ -1,3 +1,4 @@
+// validator.go will validate Wrekenfile structure and schemas so invalid files fail fast.
 package wreken
 
 // This file will contain validation logic for:

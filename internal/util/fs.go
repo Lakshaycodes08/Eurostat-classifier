@@ -1,3 +1,4 @@
+// fs.go provides directory creation and project-root resolution for the CLI and kernel.
 package util
 
 import (

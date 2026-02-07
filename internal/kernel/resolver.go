@@ -1,3 +1,4 @@
+// resolver.go will resolve a tool ID (e.g. stripe.createCustomer) to a Wrekenfile entry and tooling.json metadata.
 package kernel
 
 // This file will contain logic to resolve a tool string like
