@@ -75,53 +75,86 @@ var getCmd = &cobra.Command{
 			return errors.New("library name required")
 		}
 
+		// Use library argument as project_name for API call
+		projectName := library
+
+		// Fetch all bundles for this project
+		bundlesResp, err := regClient.GetIntegrationBundles(ctx, projectName)
+		if err != nil {
+			return fmt.Errorf("fetch integration bundles: %w", err)
+		}
+
+		if bundlesResp == nil || len(bundlesResp.Bundles) == 0 {
+			return fmt.Errorf("no bundles found for project %q", projectName)
+		}
+
+		// Create project-specific directory: wrekenfiles/{project_name}/
 		swytchDir := filepath.Join(projectRoot, ".swytchcode")
-		wrekenDir := filepath.Join(swytchDir, "wrekenfiles")
-		if err := util.EnsureDir(wrekenDir, 0o755); err != nil {
+		projectWrekenDir := filepath.Join(swytchDir, "wrekenfiles", projectName)
+		if err := util.EnsureDir(projectWrekenDir, 0o755); err != nil {
 			return fmt.Errorf("create wrekenfiles directory: %w", err)
 		}
 
-		wrekenPath := filepath.Join(wrekenDir, library+".yaml")
+		// Save each bundle to wrekenfiles/{project_name}/{integration}.yaml
+		savedCount := 0
+		for _, bundle := range bundlesResp.Bundles {
+			if bundle.Integration == "" {
+				return fmt.Errorf("bundle has empty integration name")
+			}
+			if bundle.Version == "" {
+				return fmt.Errorf("bundle for integration %q has empty version", bundle.Integration)
+			}
 
-		// Check if file already exists
-		exists := false
-		if _, err := os.Stat(wrekenPath); err == nil {
-			exists = true
-			if !getAutoYes {
-				if interactive {
-					// TODO: Implement interactive prompt for overwrite confirmation
-					return errors.New("Wrekenfile already exists; use --yes to overwrite (interactive confirmation not yet implemented)")
+			wrekenPath := filepath.Join(projectWrekenDir, bundle.Integration+".yaml")
+
+			// Check if file already exists
+			exists := false
+			if _, err := os.Stat(wrekenPath); err == nil {
+				exists = true
+				if !getAutoYes {
+					if interactive {
+						// TODO: Implement interactive prompt for overwrite confirmation
+						return fmt.Errorf("Wrekenfile %q already exists; use --yes to overwrite (interactive confirmation not yet implemented)", wrekenPath)
+					} else {
+						return fmt.Errorf("Wrekenfile %q already exists; use --yes to overwrite", wrekenPath)
+					}
+				}
+			}
+
+			// Validate content is not empty
+			contentStr := bundle.Files.Wreken.Content
+			if contentStr == "" {
+				return fmt.Errorf("bundle for integration %q has empty Wrekenfile content (version: %q)", bundle.Integration, bundle.Version)
+			}
+
+			// Decode base64 content and write to file
+			wrekenBytes := util.DecodeBase64OrRaw(contentStr)
+			if len(wrekenBytes) == 0 {
+				return fmt.Errorf("decoded Wrekenfile content is empty for integration %q (original content length: %d)", bundle.Integration, len(contentStr))
+			}
+
+			if err := os.WriteFile(wrekenPath, wrekenBytes, 0o644); err != nil {
+				return fmt.Errorf("write Wrekenfile %q: %w", wrekenPath, err)
+			}
+
+			// Record installed version in manifest
+			if err := updateWrekenManifest(projectRoot, bundle.Integration, bundle.Version); err != nil {
+				return fmt.Errorf("update wreken manifest: %w", err)
+			}
+
+			savedCount++
+
+			if interactive {
+				if exists {
+					fmt.Printf("Updated Wrekenfile for %s/%s (version %s)\n", projectName, bundle.Integration, bundle.Version)
 				} else {
-					return errors.New("Wrekenfile already exists; use --yes to overwrite")
+					fmt.Printf("Added Wrekenfile for %s/%s (version %s)\n", projectName, bundle.Integration, bundle.Version)
 				}
 			}
 		}
 
-		// Fetch bundle from registry
-		bundle, err := regClient.GetIntegrationBundle(ctx, library)
-		if err != nil {
-			return fmt.Errorf("fetch integration bundle: %w", err)
-		}
-
-		// Write Wrekenfile (YAML); decode base64 if the API returned encoded content
-		wrekenBytes := util.DecodeBase64OrRaw(bundle.Files.Wreken.Content)
-		if err := os.WriteFile(wrekenPath, wrekenBytes, 0o644); err != nil {
-			return fmt.Errorf("write Wrekenfile: %w", err)
-		}
-
-		// Record installed version in manifest (get is for exploration; tooling.json pins are set via add integration / apply)
-		if err := updateWrekenManifest(projectRoot, library, bundle.Version); err != nil {
-			return fmt.Errorf("update wreken manifest: %w", err)
-		}
-
-		// TODO: Validate schema via internal/wreken (once validator is implemented)
-
 		if interactive {
-			if exists {
-				fmt.Printf("Updated Wrekenfile for %s (version %s)\n", library, bundle.Version)
-			} else {
-				fmt.Printf("Added Wrekenfile for %s (version %s)\n", library, bundle.Version)
-			}
+			fmt.Printf("Saved %d bundle(s) for project %q\n", savedCount, projectName)
 		}
 
 		return nil

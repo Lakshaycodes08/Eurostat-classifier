@@ -3,6 +3,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -68,11 +69,44 @@ var upgradeCmd = &cobra.Command{
 			}
 		}
 
+		// Load project_name from tooling.json, or use library name as fallback
+		toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
+		var tooling map[string]interface{}
+		var projectName string
+		if data, err := os.ReadFile(toolingPath); err == nil {
+			if err := json.Unmarshal(data, &tooling); err == nil {
+				if name, ok := tooling["project_name"].(string); ok && name != "" {
+					projectName = name
+				}
+			}
+		}
+		// Fallback to library name if project_name not set (common case: project_name matches library name)
+		if projectName == "" {
+			projectName = library
+		}
+
 		// Fetch latest bundle from registry (base URL from tooling.json or env)
 		regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
 		ctx := context.Background()
 
-		bundle, err := regClient.GetIntegrationBundle(ctx, library)
+		// Fetch latest version from integrations list, then fetch bundle
+		listResp, err := regClient.ListIntegrations(ctx)
+		if err != nil {
+			return fmt.Errorf("fetch available integrations: %w", err)
+		}
+		
+		var latestVersion string
+		for _, integration := range listResp.Integrations {
+			if integration.ID == library {
+				latestVersion = integration.LatestVersion
+				break
+			}
+		}
+		if latestVersion == "" {
+			return fmt.Errorf("integration %q not found", library)
+		}
+
+		bundle, err := regClient.GetIntegrationBundleVersion(ctx, projectName, library, latestVersion)
 		if err != nil {
 			return fmt.Errorf("fetch integration bundle: %w", err)
 		}

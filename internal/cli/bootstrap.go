@@ -35,15 +35,34 @@ var bootstrapCmd = &cobra.Command{
 			return fmt.Errorf("tooling.json not found; run 'swytchcode init' first: %w", err)
 		}
 
-		var tooling struct {
-			Integrations map[string]struct {
-				Version string `json:"version"`
-			} `json:"integrations"`
-		}
+		var tooling map[string]interface{}
 		if err := json.Unmarshal(data, &tooling); err != nil {
 			return fmt.Errorf("parse tooling.json: %w", err)
 		}
-		if tooling.Integrations == nil {
+		
+		integrationsRaw, _ := tooling["integrations"].(map[string]interface{})
+		
+		// Load project_name from tooling.json
+		// Note: For bootstrap, we need project_name for each integration, but we don't have a single library name.
+		// So we require it to be set in tooling.json (or could derive from first integration, but that's fragile).
+		var projectName string
+		if name, ok := tooling["project_name"].(string); ok && name != "" {
+			projectName = name
+		}
+		if projectName == "" {
+			// For bootstrap, we can't use library name as fallback since we're processing multiple integrations.
+			// Try to derive from first integration name as a reasonable default.
+			if integrationsRaw != nil {
+				for name := range integrationsRaw {
+					projectName = name
+					break
+				}
+			}
+			if projectName == "" {
+				return fmt.Errorf("project_name not found in tooling.json and no integrations to derive it from; set project_name in tooling.json or run 'swytchcode init'")
+			}
+		}
+		if integrationsRaw == nil {
 			return nil // no integrations to bootstrap
 		}
 
@@ -62,8 +81,16 @@ var bootstrapCmd = &cobra.Command{
 			return fmt.Errorf("create wrekenfiles directory: %w", err)
 		}
 
-		for name, spec := range tooling.Integrations {
-			required := spec.Version
+		for name, specRaw := range integrationsRaw {
+			spec, ok := specRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			required, ok := spec["version"].(string)
+			if !ok || required == "" {
+				writeBootstrapError(os.Stderr, fmt.Sprintf("Integration %q in tooling.json has no version", name))
+				return fmt.Errorf("integration %q has no version in tooling.json", name)
+			}
 			if required == "" {
 				writeBootstrapError(os.Stderr, fmt.Sprintf("Integration %q in tooling.json has no version", name))
 				return fmt.Errorf("integration %q has no version in tooling.json", name)
@@ -72,7 +99,7 @@ var bootstrapCmd = &cobra.Command{
 			current, ok := installed[name]
 			if !ok {
 				// Not installed: fetch exact version from registry
-				bundle, err := regClient.GetIntegrationBundleVersion(ctx, name, required)
+				bundle, err := regClient.GetIntegrationBundleVersion(ctx, projectName, name, required)
 				if err != nil {
 					writeBootstrapError(os.Stderr, fmt.Sprintf("Integration %q@%s not installed. Run `swytchcode bootstrap`.", name, required))
 					return fmt.Errorf("fetch %s@%s: %w", name, required, err)

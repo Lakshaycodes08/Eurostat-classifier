@@ -3,6 +3,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -53,6 +54,12 @@ func writeWrekenManifest(projectRoot string, installed map[string]string) error 
 
 // updateWrekenManifest sets one integration's installed version and saves the manifest.
 func updateWrekenManifest(projectRoot, integration, version string) error {
+	if integration == "" {
+		return fmt.Errorf("integration name cannot be empty")
+	}
+	if version == "" {
+		return fmt.Errorf("version cannot be empty for integration %q", integration)
+	}
 	m, err := readWrekenManifest(projectRoot)
 	if err != nil {
 		return err

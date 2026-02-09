@@ -1,4 +1,4 @@
-// api.go defines types and HTTP calls for the registry (list integrations, get bundle, list workflows).
+// api.go defines types and HTTP calls for the registry (list integrations, get bundle, list workflows, list methods).
 package registry
 
 import (
@@ -11,11 +11,9 @@ import (
 
 // Integration represents a single integration from the list.
 type Integration struct {
-	ID                string   `json:"id"`
-	Title             string   `json:"title"`
-	AuthTypes         []string `json:"auth_types"`
-	VerifiedWorkflows bool     `json:"verified_workflows"`
-	LatestVersion     string   `json:"latest_version"`
+	ID           string `json:"id"`
+	LatestVersion string `json:"latest_version"`
+	ProjectUUID  string `json:"project_uuid"`
 }
 
 // ListIntegrationsResponse is the response from GET /integrations.
@@ -23,7 +21,7 @@ type ListIntegrationsResponse struct {
 	Integrations []Integration `json:"integrations"`
 }
 
-// IntegrationBundle represents the bundle response from GET /integrations/:id/bundle.
+// IntegrationBundle represents a single bundle in the bundles array.
 type IntegrationBundle struct {
 	Integration string `json:"integration"`
 	Version     string `json:"version"`
@@ -39,29 +37,49 @@ type IntegrationBundle struct {
 	} `json:"files"`
 }
 
-// Workflow represents a workflow from the list.
-type Workflow struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Risk        struct {
-		Writes bool   `json:"writes"`
-		Auth   string `json:"auth"`
-	} `json:"risk"`
+// IntegrationBundlesResponse represents the response from GET /integrations/{project_name}/bundle.
+type IntegrationBundlesResponse struct {
+	ProjectName string             `json:"project_name"`
+	Bundles     []IntegrationBundle `json:"bundles"`
 }
 
-// ListWorkflowsResponse is the response from GET /integrations/:id/workflows.
+// Workflow represents a workflow from the list.
+type Workflow struct {
+	WorkflowUUID string `json:"workflow_uuid"`
+	Title        string `json:"title"`
+}
+
+// ListWorkflowsResponse is the response from GET /workflows?project_uuid=...
 type ListWorkflowsResponse struct {
 	Workflows []Workflow `json:"workflows"`
 }
 
 // WorkflowDefinition represents a verified workflow definition.
 type WorkflowDefinition struct {
-	WorkflowID      string                 `json:"workflow_id"`
-	Version         string                 `json:"version"`
-	ToolingFragment struct {
-		Tools map[string]interface{} `json:"tools"`
-	} `json:"tooling_fragment"`
+	WorkflowID string                 `json:"workflow_id"`
+	Title      string                 `json:"title"`
+	Version    string                 `json:"version"`
+	Steps      []map[string]interface{} `json:"steps"`
+}
+
+// Method represents a method from the list.
+type Method struct {
+	MethodUUID string `json:"method_uuid"`
+	MethodName string `json:"method_name"`
+}
+
+// ListMethodsResponse is the response from GET /methods?project_uuid=...
+type ListMethodsResponse struct {
+	Methods []Method `json:"methods"`
+}
+
+// MethodDefinition represents a method definition.
+type MethodDefinition struct {
+	MethodUUID string                 `json:"method_uuid"`
+	LibraryUUID string                `json:"library_uuid"`
+	MethodName string                 `json:"method_name"`
+	Details    map[string]interface{} `json:"details"` // Can be null
+	Tags       []string               `json:"tags"`
 }
 
 // ErrorResponse represents an error response from the API.
@@ -89,9 +107,10 @@ func (c *Client) ListIntegrations(ctx context.Context) (*ListIntegrationsRespons
 	return &result, nil
 }
 
-// GetIntegrationBundle fetches the integration bundle (Wrekenfile + manifest).
-func (c *Client) GetIntegrationBundle(ctx context.Context, integrationID string) (*IntegrationBundle, error) {
-	path := fmt.Sprintf("/integrations/%s/bundle", integrationID)
+// GetIntegrationBundles fetches all integration bundles for a project.
+// Route: GET /integrations/{project_name}/bundle
+func (c *Client) GetIntegrationBundles(ctx context.Context, projectName string) (*IntegrationBundlesResponse, error) {
+	path := fmt.Sprintf("/integrations/%s/bundle", url.PathEscape(projectName))
 	resp, err := c.Get(ctx, path)
 	if err != nil {
 		return nil, err
@@ -99,61 +118,74 @@ func (c *Client) GetIntegrationBundle(ctx context.Context, integrationID string)
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("integration %q not found", integrationID)
+		return nil, fmt.Errorf("project %q not found", projectName)
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleError(resp)
 	}
 
-	var bundle IntegrationBundle
-	if err := json.NewDecoder(resp.Body).Decode(&bundle); err != nil {
+	var result IntegrationBundlesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	return &bundle, nil
+	return &result, nil
 }
 
-// GetIntegrationBundleVersion fetches the integration bundle at an exact version (for bootstrap).
-// Use this for deterministic installs; do not use "latest" at exec or bootstrap.
-func (c *Client) GetIntegrationBundleVersion(ctx context.Context, integrationID, version string) (*IntegrationBundle, error) {
-	path := fmt.Sprintf("/integrations/%s/bundle", integrationID)
-	if version != "" {
-		path += "?version=" + url.QueryEscape(version)
+// GetIntegrationBundleVersion finds a specific integration bundle from the bundles response.
+// This is a helper that filters GetIntegrationBundles by integration ID and version.
+// If exact match fails, tries to match by integration ID only (ignoring version).
+// If still no match and there's only one bundle, returns that bundle.
+func (c *Client) GetIntegrationBundleVersion(ctx context.Context, projectName, integrationID, version string) (*IntegrationBundle, error) {
+	bundlesResp, err := c.GetIntegrationBundles(ctx, projectName)
+	if err != nil {
+		return nil, err
 	}
+
+	if len(bundlesResp.Bundles) == 0 {
+		return nil, fmt.Errorf("no bundles found for project %q", projectName)
+	}
+
+	// First try exact match: integration ID and version
+	for _, bundle := range bundlesResp.Bundles {
+		if bundle.Integration == integrationID && bundle.Version == version {
+			return &bundle, nil
+		}
+	}
+
+	// If no exact match, try matching by integration ID only
+	for _, bundle := range bundlesResp.Bundles {
+		if bundle.Integration == integrationID {
+			return &bundle, nil
+		}
+	}
+
+	// If still no match and there's only one bundle, use it (common case: project_name matches library name)
+	if len(bundlesResp.Bundles) == 1 {
+		bundle := bundlesResp.Bundles[0]
+		// Verify the bundle has basic fields populated
+		if bundle.Integration == "" && bundle.Version == "" {
+			return nil, fmt.Errorf("bundle in response appears to be empty or malformed")
+		}
+		return &bundle, nil
+	}
+
+	return nil, fmt.Errorf("integration %q version %q not found in project %q (found %d bundles)", integrationID, version, projectName, len(bundlesResp.Bundles))
+}
+
+// ListWorkflows fetches verified workflows for a project.
+// Route: GET /workflows?project_uuid=...
+func (c *Client) ListWorkflows(ctx context.Context, projectUUID string) (*ListWorkflowsResponse, error) {
+	path := fmt.Sprintf("/workflows?project_uuid=%s", url.QueryEscape(projectUUID))
 	resp, err := c.Get(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("integration %q version %q not found", integrationID, version)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleError(resp)
-	}
-
-	var bundle IntegrationBundle
-	if err := json.NewDecoder(resp.Body).Decode(&bundle); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-
-	return &bundle, nil
-}
-
-// ListWorkflows fetches verified workflows for an integration.
-func (c *Client) ListWorkflows(ctx context.Context, integrationID string) (*ListWorkflowsResponse, error) {
-	path := fmt.Sprintf("/integrations/%s/workflows", integrationID)
-	resp, err := c.Get(ctx, path)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("integration %q not found", integrationID)
+	if resp.StatusCode == http.StatusBadRequest {
+		return nil, fmt.Errorf("invalid project_uuid: %s", projectUUID)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -168,9 +200,10 @@ func (c *Client) ListWorkflows(ctx context.Context, integrationID string) (*List
 	return &result, nil
 }
 
-// GetWorkflow fetches a verified workflow definition.
-func (c *Client) GetWorkflow(ctx context.Context, workflowID string) (*WorkflowDefinition, error) {
-	path := fmt.Sprintf("/workflows/%s", workflowID)
+// GetWorkflow fetches a verified workflow definition by workflow_uuid.
+// Route: GET /workflows/:workflow_uuid
+func (c *Client) GetWorkflow(ctx context.Context, workflowUUID string) (*WorkflowDefinition, error) {
+	path := fmt.Sprintf("/workflows/%s", url.PathEscape(workflowUUID))
 	resp, err := c.Get(ctx, path)
 	if err != nil {
 		return nil, err
@@ -178,7 +211,7 @@ func (c *Client) GetWorkflow(ctx context.Context, workflowID string) (*WorkflowD
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("workflow %q not found", workflowID)
+		return nil, fmt.Errorf("workflow %q not found", workflowUUID)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -191,6 +224,58 @@ func (c *Client) GetWorkflow(ctx context.Context, workflowID string) (*WorkflowD
 	}
 
 	return &workflow, nil
+}
+
+// ListMethods fetches methods for a project.
+// Route: GET /methods?project_uuid=...
+func (c *Client) ListMethods(ctx context.Context, projectUUID string) (*ListMethodsResponse, error) {
+	path := fmt.Sprintf("/methods?project_uuid=%s", url.QueryEscape(projectUUID))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusBadRequest {
+		return nil, fmt.Errorf("invalid project_uuid: %s", projectUUID)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var result ListMethodsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// GetMethod fetches a method definition by method_uuid.
+// Route: GET /methods/:method_uuid
+func (c *Client) GetMethod(ctx context.Context, methodUUID string) (*MethodDefinition, error) {
+	path := fmt.Sprintf("/methods/%s", url.PathEscape(methodUUID))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("method %q not found", methodUUID)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var method MethodDefinition
+	if err := json.NewDecoder(resp.Body).Decode(&method); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	return &method, nil
 }
 
 // handleError attempts to parse an error response from the API.

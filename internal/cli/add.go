@@ -102,14 +102,8 @@ var addWorkflowCmd = &cobra.Command{
 		regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
 		ctx := context.Background()
 
-		workflow, err := regClient.GetWorkflow(ctx, workflowID)
-		if err != nil {
-			return fmt.Errorf("fetch workflow: %w", err)
-		}
-
+		// Load project_uuid from tooling.json
 		toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
-
-		// Load existing tooling.json
 		var tooling map[string]interface{}
 		if data, err := os.ReadFile(toolingPath); err == nil {
 			if err := json.Unmarshal(data, &tooling); err != nil {
@@ -118,6 +112,19 @@ var addWorkflowCmd = &cobra.Command{
 		} else {
 			// Create new if doesn't exist
 			tooling = make(map[string]interface{})
+		}
+
+		var projectUUID string
+		if uuid, ok := tooling["project_uuid"].(string); ok && uuid != "" {
+			projectUUID = uuid
+		}
+		if projectUUID == "" {
+			return fmt.Errorf("project_uuid not found in tooling.json; run 'swytchcode init' first")
+		}
+
+		workflow, err := regClient.GetWorkflow(ctx, workflowID)
+		if err != nil {
+			return fmt.Errorf("fetch workflow: %w", err)
 		}
 
 		// Ensure tools map exists
@@ -130,10 +137,19 @@ var addWorkflowCmd = &cobra.Command{
 			return fmt.Errorf("invalid tooling.json: tools must be an object")
 		}
 
-		// Merge workflow tools into tooling.json
-		// workflow.ToolingFragment.Tools is already map[string]interface{}
-		for toolID, toolDef := range workflow.ToolingFragment.Tools {
-			tools[toolID] = toolDef
+		// Note: The new API returns workflow.steps instead of tooling_fragment.tools
+		// For now, we'll need to convert steps to tools format or handle it differently
+		// This is a breaking change - workflows now return steps array, not tooling_fragment
+		// TODO: Update this to handle the new workflow.steps structure
+		// For now, we'll create a placeholder tool from the workflow
+		if len(workflow.Steps) > 0 {
+			// Create a tool ID from workflow_id
+			toolID := workflow.WorkflowID
+			tools[toolID] = map[string]interface{}{
+				"title": workflow.Title,
+				"version": workflow.Version,
+				"steps": workflow.Steps,
+			}
 		}
 
 		// Write updated tooling.json
