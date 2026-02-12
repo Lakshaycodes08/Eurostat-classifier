@@ -47,9 +47,10 @@ type IntegrationBundlesResponse struct {
 type Workflow struct {
 	WorkflowUUID string `json:"workflow_uuid"`
 	Title        string `json:"title"`
+	CanonicalID  string `json:"canonical_id"`
 }
 
-// ListWorkflowsResponse is the response from GET /workflows?project_uuid=...
+// ListWorkflowsResponse is the response from GET /workflows?project_name=...
 type ListWorkflowsResponse struct {
 	Workflows []Workflow `json:"workflows"`
 }
@@ -64,8 +65,9 @@ type WorkflowDefinition struct {
 
 // Method represents a method from the list.
 type Method struct {
-	MethodUUID string `json:"method_uuid"`
-	MethodName string `json:"method_name"`
+	MethodUUID  string `json:"method_uuid"`
+	MethodName  string `json:"method_name"`
+	CanonicalID string `json:"canonical_id"`
 }
 
 // ListMethodsResponse is the response from GET /methods?project_uuid=...
@@ -175,18 +177,14 @@ func (c *Client) GetIntegrationBundleVersion(ctx context.Context, projectName, i
 }
 
 // ListWorkflows fetches verified workflows for a project.
-// Route: GET /workflows?project_uuid=...
-func (c *Client) ListWorkflows(ctx context.Context, projectUUID string) (*ListWorkflowsResponse, error) {
-	path := fmt.Sprintf("/workflows?project_uuid=%s", url.QueryEscape(projectUUID))
+// Route: GET /workflows?project_name=...
+func (c *Client) ListWorkflows(ctx context.Context, projectName string) (*ListWorkflowsResponse, error) {
+	path := fmt.Sprintf("/workflows?project_name=%s", url.QueryEscape(projectName))
 	resp, err := c.Get(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusBadRequest {
-		return nil, fmt.Errorf("invalid project_uuid: %s", projectUUID)
-	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleError(resp)
@@ -227,18 +225,14 @@ func (c *Client) GetWorkflow(ctx context.Context, workflowUUID string) (*Workflo
 }
 
 // ListMethods fetches methods for a project.
-// Route: GET /methods?project_uuid=...
-func (c *Client) ListMethods(ctx context.Context, projectUUID string) (*ListMethodsResponse, error) {
-	path := fmt.Sprintf("/methods?project_uuid=%s", url.QueryEscape(projectUUID))
+// Route: GET /methods?project_name=...
+func (c *Client) ListMethods(ctx context.Context, projectName string) (*ListMethodsResponse, error) {
+	path := fmt.Sprintf("/methods?project_name=%s", url.QueryEscape(projectName))
 	resp, err := c.Get(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusBadRequest {
-		return nil, fmt.Errorf("invalid project_uuid: %s", projectUUID)
-	}
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, c.handleError(resp)

@@ -3,6 +3,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -17,6 +18,7 @@ var (
 	getAutoYes        bool
 	getNonInteractive bool
 )
+
 
 // getCmd implements `swytchcode get`.
 //
@@ -88,8 +90,13 @@ var getCmd = &cobra.Command{
 			return fmt.Errorf("no bundles found for project %q", projectName)
 		}
 
-		// Create project-specific directory: wrekenfiles/{project_name}/
+		// Create base .swytchcode directories
 		swytchDir := filepath.Join(projectRoot, ".swytchcode")
+		if err := util.EnsureDir(swytchDir, 0o755); err != nil {
+			return fmt.Errorf("create .swytchcode directory: %w", err)
+		}
+
+		// Create project-specific directory: wrekenfiles/{project_name}/
 		projectWrekenDir := filepath.Join(swytchDir, "wrekenfiles", projectName)
 		if err := util.EnsureDir(projectWrekenDir, 0o755); err != nil {
 			return fmt.Errorf("create wrekenfiles directory: %w", err)
@@ -153,8 +160,64 @@ var getCmd = &cobra.Command{
 			}
 		}
 
+		// Also fetch and store workflows and methods for this project.
+		// These are saved as JSON under:
+		//   .swytchcode/workflows/{project_name}/{integration}.json
+		//   .swytchcode/methods/{project_name}/{integration}.json
+		//
+		// For now we associate the responses with the first integration for the project.
+		primaryIntegration := bundlesResp.Bundles[0].Integration
+		if primaryIntegration == "" {
+			return fmt.Errorf("primary integration name is empty for project %q", projectName)
+		}
+
+		// Ensure workflows/methods directories exist
+		projectWorkflowsDir := filepath.Join(swytchDir, "workflows", projectName)
+		if err := util.EnsureDir(projectWorkflowsDir, 0o755); err != nil {
+			return fmt.Errorf("create workflows directory: %w", err)
+		}
+		projectMethodsDir := filepath.Join(swytchDir, "methods", projectName)
+		if err := util.EnsureDir(projectMethodsDir, 0o755); err != nil {
+			return fmt.Errorf("create methods directory: %w", err)
+		}
+
+		// Fetch workflows
+		workflowsResp, err := regClient.ListWorkflows(ctx, projectName)
+		if err != nil {
+			return fmt.Errorf("fetch workflows for project %q: %w", projectName, err)
+		}
+		if workflowsResp != nil {
+			workflowsPath := filepath.Join(projectWorkflowsDir, primaryIntegration+".json")
+			// Use API response directly (includes canonical_id from API)
+			data, err := json.MarshalIndent(workflowsResp, "", "  ")
+			if err != nil {
+				return fmt.Errorf("marshal workflows response: %w", err)
+			}
+			if err := os.WriteFile(workflowsPath, data, 0o644); err != nil {
+				return fmt.Errorf("write workflows file %q: %w", workflowsPath, err)
+			}
+		}
+
+		// Fetch methods
+		methodsResp, err := regClient.ListMethods(ctx, projectName)
+		if err != nil {
+			return fmt.Errorf("fetch methods for project %q: %w", projectName, err)
+		}
+		if methodsResp != nil {
+			methodsPath := filepath.Join(projectMethodsDir, primaryIntegration+".json")
+			// Use API response directly (includes canonical_id from API)
+			data, err := json.MarshalIndent(methodsResp, "", "  ")
+			if err != nil {
+				return fmt.Errorf("marshal methods response: %w", err)
+			}
+			if err := os.WriteFile(methodsPath, data, 0o644); err != nil {
+				return fmt.Errorf("write methods file %q: %w", methodsPath, err)
+			}
+		}
+
 		if interactive {
 			fmt.Printf("Saved %d bundle(s) for project %q\n", savedCount, projectName)
+			fmt.Printf("Saved workflows and methods for project %q under .swytchcode/workflows and .swytchcode/methods\n", projectName)
 		}
 
 		return nil
