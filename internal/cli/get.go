@@ -19,7 +19,6 @@ var (
 	getNonInteractive bool
 )
 
-
 // getCmd implements `swytchcode get`.
 //
 // Interaction rules:
@@ -90,19 +89,57 @@ var getCmd = &cobra.Command{
 			return fmt.Errorf("no bundles found for project %q", projectName)
 		}
 
-		// Create base .swytchcode directories
+		// Create base .swytchcode directory and integrations subdirectory
 		swytchDir := filepath.Join(projectRoot, ".swytchcode")
 		if err := util.EnsureDir(swytchDir, 0o755); err != nil {
 			return fmt.Errorf("create .swytchcode directory: %w", err)
 		}
-
-		// Create project-specific directory: wrekenfiles/{project_name}/
-		projectWrekenDir := filepath.Join(swytchDir, "wrekenfiles", projectName)
-		if err := util.EnsureDir(projectWrekenDir, 0o755); err != nil {
-			return fmt.Errorf("create wrekenfiles directory: %w", err)
+		integrationsDir := filepath.Join(swytchDir, "integrations")
+		if err := util.EnsureDir(integrationsDir, 0o755); err != nil {
+			return fmt.Errorf("create integrations directory: %w", err)
 		}
 
-		// Save each bundle to wrekenfiles/{project_name}/{integration}.yaml
+		// Fetch integration details to get endpoints
+		integrationsResp, err := regClient.ListIntegrations(ctx)
+		if err != nil {
+			return fmt.Errorf("fetch integrations: %w", err)
+		}
+
+		// Build a map of integration ID -> endpoints for quick lookup
+		integrationEndpoints := make(map[string]struct {
+			sandbox    string
+			production string
+		})
+		for _, integration := range integrationsResp.Integrations {
+			integrationEndpoints[integration.ID] = struct {
+				sandbox    string
+				production string
+			}{
+				sandbox:    integration.SandboxEndpoint,
+				production: integration.ProductionEndpoint,
+			}
+		}
+
+		// Fetch workflows and methods for this project (needed for counts and manifest)
+		workflowsResp, err := regClient.ListWorkflows(ctx, projectName)
+		if err != nil {
+			return fmt.Errorf("fetch workflows for project %q: %w", projectName, err)
+		}
+		methodsResp, err := regClient.ListMethods(ctx, projectName)
+		if err != nil {
+			return fmt.Errorf("fetch methods for project %q: %w", projectName, err)
+		}
+
+		methodsCount := 0
+		workflowsCount := 0
+		if methodsResp != nil {
+			methodsCount = len(methodsResp.Methods)
+		}
+		if workflowsResp != nil {
+			workflowsCount = len(workflowsResp.Workflows)
+		}
+
+		// Save each bundle to .swytchcode/integrations/{project}/{library}/{version}/ structure
 		savedCount := 0
 		for _, bundle := range bundlesResp.Bundles {
 			if bundle.Integration == "" {
@@ -112,29 +149,37 @@ var getCmd = &cobra.Command{
 				return fmt.Errorf("bundle for integration %q has empty version", bundle.Integration)
 			}
 
-			wrekenPath := filepath.Join(projectWrekenDir, bundle.Integration+".yaml")
+			// Create versioned directory: .swytchcode/integrations/{project}/{library}/{version}/
+			versionedDir := filepath.Join(integrationsDir, projectName, bundle.Integration, bundle.Version)
+			if err := util.EnsureDir(versionedDir, 0o755); err != nil {
+				return fmt.Errorf("create versioned directory: %w", err)
+			}
 
-			// Check if file already exists
+			wrekenPath := filepath.Join(versionedDir, "wrekenfile.yaml")
+			methodsPath := filepath.Join(versionedDir, "methods.json")
+			workflowsPath := filepath.Join(versionedDir, "workflows.json")
+
+			// Check if directory already exists
 			exists := false
-			if _, err := os.Stat(wrekenPath); err == nil {
-				exists = true
-				if !getAutoYes {
-					if interactive {
-						// TODO: Implement interactive prompt for overwrite confirmation
-						return fmt.Errorf("Wrekenfile %q already exists; use --yes to overwrite (interactive confirmation not yet implemented)", wrekenPath)
-					} else {
-						return fmt.Errorf("Wrekenfile %q already exists; use --yes to overwrite", wrekenPath)
+			if _, err := os.Stat(versionedDir); err == nil {
+				if _, err := os.Stat(wrekenPath); err == nil {
+					exists = true
+					if !getAutoYes {
+						if interactive {
+							return fmt.Errorf("Version %q for %s/%s already exists; use --yes to overwrite (interactive confirmation not yet implemented)", bundle.Version, projectName, bundle.Integration)
+						} else {
+							return fmt.Errorf("Version %q for %s/%s already exists; use --yes to overwrite", bundle.Version, projectName, bundle.Integration)
+						}
 					}
 				}
 			}
 
-			// Validate content is not empty
+			// Validate and write Wrekenfile
 			contentStr := bundle.Files.Wreken.Content
 			if contentStr == "" {
 				return fmt.Errorf("bundle for integration %q has empty Wrekenfile content (version: %q)", bundle.Integration, bundle.Version)
 			}
 
-			// Decode base64 content and write to file
 			wrekenBytes := util.DecodeBase64OrRaw(contentStr)
 			if len(wrekenBytes) == 0 {
 				return fmt.Errorf("decoded Wrekenfile content is empty for integration %q (original content length: %d)", bundle.Integration, len(contentStr))
@@ -144,80 +189,86 @@ var getCmd = &cobra.Command{
 				return fmt.Errorf("write Wrekenfile %q: %w", wrekenPath, err)
 			}
 
-			// Record installed version in manifest
-			if err := updateWrekenManifest(projectRoot, bundle.Integration, bundle.Version); err != nil {
-				return fmt.Errorf("update wreken manifest: %w", err)
+			// Write methods.json (only for this library's version)
+			// Filter methods by library if needed, or save all methods for the project
+			// For now, save all methods for the project (they're project-scoped)
+			if methodsResp != nil {
+				data, err := json.MarshalIndent(methodsResp, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshal methods response: %w", err)
+				}
+				if err := os.WriteFile(methodsPath, data, 0o644); err != nil {
+					return fmt.Errorf("write methods file %q: %w", methodsPath, err)
+				}
+			}
+
+			// Write workflows.json
+			if workflowsResp != nil {
+				data, err := json.MarshalIndent(workflowsResp, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshal workflows response: %w", err)
+				}
+				if err := os.WriteFile(workflowsPath, data, 0o644); err != nil {
+					return fmt.Errorf("write workflows file %q: %w", workflowsPath, err)
+				}
+			}
+
+			// Update manifest.json with project.library entry
+			projectLibrary := fmt.Sprintf("%s.%s", projectName, bundle.Integration)
+			
+			// Extract endpoints from ListIntegrations response
+			sandboxEndpoint := ""
+			productionEndpoint := ""
+			if endpoints, ok := integrationEndpoints[bundle.Integration]; ok {
+				sandboxEndpoint = endpoints.sandbox
+				productionEndpoint = endpoints.production
+			}
+			
+			// If endpoints not found, try bundle manifest content as fallback
+			if sandboxEndpoint == "" && bundle.Files.Manifest.Content != nil {
+				if sandboxRaw, ok := bundle.Files.Manifest.Content["sandbox_endpoint"]; ok {
+					if sandboxStr, ok := sandboxRaw.(string); ok {
+						sandboxEndpoint = sandboxStr
+					}
+				}
+			}
+			if productionEndpoint == "" && bundle.Files.Manifest.Content != nil {
+				if prodRaw, ok := bundle.Files.Manifest.Content["production_endpoint"]; ok {
+					if prodStr, ok := prodRaw.(string); ok {
+						productionEndpoint = prodStr
+					}
+				}
+			}
+			
+			// Final fallback: use registry endpoint if still empty
+			regConfig := registry.ConfigFromProjectRoot(projectRoot)
+			registryEndpoint := regConfig.BaseURL
+			if sandboxEndpoint == "" {
+				sandboxEndpoint = registryEndpoint
+			}
+			if productionEndpoint == "" {
+				productionEndpoint = registryEndpoint
+			}
+			
+			// TODO: Extract auth info from bundle or API - for now use empty
+			auth := make(map[string]interface{})
+			if err := updateManifestEntry(projectRoot, projectLibrary, bundle.Version, sandboxEndpoint, productionEndpoint, methodsCount, workflowsCount, auth); err != nil {
+				return fmt.Errorf("update manifest: %w", err)
 			}
 
 			savedCount++
 
 			if interactive {
 				if exists {
-					fmt.Printf("Updated Wrekenfile for %s/%s (version %s)\n", projectName, bundle.Integration, bundle.Version)
+					fmt.Printf("Updated %s/%s@%s (wrekenfile.yaml, methods.json, workflows.json)\n", projectName, bundle.Integration, bundle.Version)
 				} else {
-					fmt.Printf("Added Wrekenfile for %s/%s (version %s)\n", projectName, bundle.Integration, bundle.Version)
+					fmt.Printf("Added %s/%s@%s (wrekenfile.yaml, methods.json, workflows.json)\n", projectName, bundle.Integration, bundle.Version)
 				}
-			}
-		}
-
-		// Also fetch and store workflows and methods for this project.
-		// These are saved as JSON under:
-		//   .swytchcode/workflows/{project_name}/{integration}.json
-		//   .swytchcode/methods/{project_name}/{integration}.json
-		//
-		// For now we associate the responses with the first integration for the project.
-		primaryIntegration := bundlesResp.Bundles[0].Integration
-		if primaryIntegration == "" {
-			return fmt.Errorf("primary integration name is empty for project %q", projectName)
-		}
-
-		// Ensure workflows/methods directories exist
-		projectWorkflowsDir := filepath.Join(swytchDir, "workflows", projectName)
-		if err := util.EnsureDir(projectWorkflowsDir, 0o755); err != nil {
-			return fmt.Errorf("create workflows directory: %w", err)
-		}
-		projectMethodsDir := filepath.Join(swytchDir, "methods", projectName)
-		if err := util.EnsureDir(projectMethodsDir, 0o755); err != nil {
-			return fmt.Errorf("create methods directory: %w", err)
-		}
-
-		// Fetch workflows
-		workflowsResp, err := regClient.ListWorkflows(ctx, projectName)
-		if err != nil {
-			return fmt.Errorf("fetch workflows for project %q: %w", projectName, err)
-		}
-		if workflowsResp != nil {
-			workflowsPath := filepath.Join(projectWorkflowsDir, primaryIntegration+".json")
-			// Use API response directly (includes canonical_id from API)
-			data, err := json.MarshalIndent(workflowsResp, "", "  ")
-			if err != nil {
-				return fmt.Errorf("marshal workflows response: %w", err)
-			}
-			if err := os.WriteFile(workflowsPath, data, 0o644); err != nil {
-				return fmt.Errorf("write workflows file %q: %w", workflowsPath, err)
-			}
-		}
-
-		// Fetch methods
-		methodsResp, err := regClient.ListMethods(ctx, projectName)
-		if err != nil {
-			return fmt.Errorf("fetch methods for project %q: %w", projectName, err)
-		}
-		if methodsResp != nil {
-			methodsPath := filepath.Join(projectMethodsDir, primaryIntegration+".json")
-			// Use API response directly (includes canonical_id from API)
-			data, err := json.MarshalIndent(methodsResp, "", "  ")
-			if err != nil {
-				return fmt.Errorf("marshal methods response: %w", err)
-			}
-			if err := os.WriteFile(methodsPath, data, 0o644); err != nil {
-				return fmt.Errorf("write methods file %q: %w", methodsPath, err)
 			}
 		}
 
 		if interactive {
 			fmt.Printf("Saved %d bundle(s) for project %q\n", savedCount, projectName)
-			fmt.Printf("Saved workflows and methods for project %q under .swytchcode/workflows and .swytchcode/methods\n", projectName)
 		}
 
 		return nil
@@ -228,4 +279,3 @@ func init() {
 	getCmd.Flags().BoolVar(&getAutoYes, "yes", false, "auto-confirm overwrite in non-interactive mode")
 	getCmd.Flags().BoolVar(&getNonInteractive, "non-interactive", false, "disable prompts; suitable for CI")
 }
-

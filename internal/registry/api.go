@@ -11,9 +11,11 @@ import (
 
 // Integration represents a single integration from the list.
 type Integration struct {
-	ID           string `json:"id"`
-	LatestVersion string `json:"latest_version"`
-	ProjectUUID  string `json:"project_uuid"`
+	ID               string `json:"id"`
+	LatestVersion    string `json:"latest_version"`
+	ProjectUUID      string `json:"project_uuid"`
+	SandboxEndpoint  string `json:"sandbox_endpoint"`
+	ProductionEndpoint string `json:"production_endpoint"`
 }
 
 // ListIntegrationsResponse is the response from GET /integrations.

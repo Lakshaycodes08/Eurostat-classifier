@@ -77,11 +77,10 @@ var initCmd = &cobra.Command{
 		if err := util.EnsureDir(swytchDir, 0o755); err != nil {
 			return fmt.Errorf("create .swytchcode directory: %w", err)
 		}
-		if err := util.EnsureDir(filepath.Join(swytchDir, "wrekenfiles"), 0o755); err != nil {
-			return fmt.Errorf("create wrekenfiles directory: %w", err)
-		}
-		if err := util.EnsureDir(filepath.Join(swytchDir, "proposals"), 0o755); err != nil {
-			return fmt.Errorf("create proposals directory: %w", err)
+		// Create integrations directory where all integration data (wrekenfile, methods, workflows)
+		// will be stored by swytchcode get.
+		if err := util.EnsureDir(filepath.Join(swytchDir, "integrations"), 0o755); err != nil {
+			return fmt.Errorf("create integrations directory: %w", err)
 		}
 
 		// Create or update tooling.json with mode

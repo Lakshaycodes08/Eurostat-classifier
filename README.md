@@ -2,7 +2,7 @@
 
 ## Swytchcode Kernel (Go skeleton)
 
-Swytchcode is the **execution kernel** for tools. Editors, agents, and languages are **guests** that must call `swytch exec` instead of doing their own SDK logic.
+Swytchcode is the **execution kernel** for tools. Editors, agents, and languages are **guests** that must call `swytchcode exec` instead of doing their own SDK logic.
 
 This repo contains a **minimal, opinionated Go skeleton** for that kernel, ready for a Go developer to extend.
 
@@ -35,7 +35,8 @@ See **[DESIGN.md § Key Invariants (canonical list)](./DESIGN.md#key-invariants-
 | `upgrade`         | ✅            |
 | `list`            | ❌ (local only) |
 | `describe`        | ❌            |
-| `add workflow`    | ✅            |
+| `add`             | ❌ (reads local methods.json/workflows.json) |
+| `add integration` | ❌ (adds version only) |
 | `apply`           | ❌            |
 | **`exec`**        | **❌ never**  |
 | **`bootstrap`**   | ✅ (exact versions only) |
@@ -134,7 +135,7 @@ This guarantees deterministic behavior across developers, CI, and production.
 |---------------|-----------------------------------------------|---------------------|
 | **Setup**     | `init`, `get`, `bootstrap`                     | ✅ project / cache  |
 | **Discovery** | `list`, `describe`                            | ❌                  |
-| **Authorization** | `validate`, `apply`, `add integration`, `add workflow` | ✅ tooling.json only (apply/add) |
+| **Authorization** | `validate`, `apply`, `add`, `add integration` | ✅ tooling.json only (apply/add) |
 | **Execution** | `exec`                                        | ✅ external APIs    |
 
 *(Other commands: `rm`, `upgrade`, `mode`, `config` — see Commands and behavior below.)*
@@ -147,6 +148,9 @@ This project is structured as a single Go module with a `swytchcode` CLI:
 
 - **`cmd/swytchcode/`**: CLI entrypoint
 - **`internal/cli/`**: Cobra commands (`init`, `get`, `exec`, `rm`, `upgrade`, `list`, `describe`, `mode`, `config`, `add`, `apply`, `validate`, `bootstrap`)
+  - `add.go` — Implements `add` command (searches methods.json/workflows.json) and `add integration` subcommand
+  - `get.go` — Fetches integration bundles and saves to versioned directory structure
+  - `manifest.go` — Manages `.swytchcode/integrations/manifest.json` registry manifest
 - **`internal/kernel/`**: Execution kernel (deterministic, non-interactive)
 - **`internal/wreken/`**: Wrekenfile loading and validation
 - **`internal/tooling/`**: `tooling.json` contract loader
@@ -155,6 +159,15 @@ This project is structured as a single Go module with a `swytchcode` CLI:
 
 The `.swytchcode/` directory is created by `swytchcode init`.
 It may be uncommitted in local development, but must exist in CI and production.
+
+**Directory structure:**
+- `.swytchcode/tooling.json` — Project configuration (integrations, tools, mode, registry URL)
+- `.swytchcode/integrations/` — Integration data (created by `init`)
+  - `manifest.json` — Registry manifest tracking installed `project.library` versions. Each entry contains `version`, `sandbox_endpoint`, `production_endpoint`, `methods` count, `workflows` count, and optional `auth` info.
+  - `{project}/{library}/{version}/` — Versioned integration directories
+    - `wrekenfile.yaml` — Wrekenfile spec (base64-decoded from API) containing `METHODS:` section
+    - `methods.json` — Methods list for this integration version (contains canonical_ids)
+    - `workflows.json` — Workflows list for this integration version (contains canonical_ids)
 
 ---
 
@@ -171,20 +184,30 @@ Swytchcode intentionally separates **execution contracts** from **execution impl
 
 If it affects *what a tool is allowed to do*, it belongs in `tooling.json`.
 
-Example structure (created by `swytchcode init` and `swytchcode add integration`):
+Example structure (created by `swytchcode init` and `swytchcode add`):
 ```json
 {
   "version": "1.0",
   "mode": "production",
   "registry_url": "https://registry.swytchcode.com",
   "integrations": {
-    "stripe": { "version": "2025-01-10" },
-    "github": { "version": "2025-01-05" }
+    "weaviate.lyrid": { "version": "v1" },
+    "stripe.api": { "version": "2025-01-10" }
   },
   "tools": {
-    "stripe.createCustomer": {
-      "library": "stripe",
-      "operation": "createCustomer"
+    "api.cluster.create": {
+      "summary": "Create a new cluster instance",
+      "integration": "weaviate.lyrid@v1",
+      "type": "method",
+      "desc": "Create a new cluster instance",
+      "inputs": [
+        {
+          "Authorization": {
+            "LOCATION": "header",
+            "TYPE": "STRING"
+          }
+        }
+      ]
     }
   }
 }
@@ -193,7 +216,8 @@ Example structure (created by `swytchcode init` and `swytchcode add integration`
 - **version** — **Tooling.json schema version only** (set once by init). Not integration version, registry version, or workflow version. Owned by the kernel; proposals must not set or override it.
 - **mode** — Execution mode: `production` or `sandbox`.
 - **registry_url** — Base URL for the registry API (integrations, workflows, proposals). Set by init **only when not already present** (init never overwrites an existing `registry_url`). Overridable at runtime by `SWYTCHCODE_REGISTRY_URL` (env wins); override is **never persisted** — use `swytchcode config` to see effective value and source.
-- **integrations** — Pins which integration versions the project trusts. Exact versions only (no ranges, no `"latest"`). Set via `swytchcode add integration <name>@<version>`, or by applying proposals that include an `integrations` block with explicit versions. The registry decides what versions exist; the project decides which versions it uses. See **Integration versions (determinism guarantee)** below.
+- **integrations** — Pins which integration versions the project trusts. Keys are `project.library` format (e.g., `"weaviate.lyrid"`). Exact versions only (no ranges, no `"latest"`). Set via `swytchcode add integration <project>@<library>.<version>`, or by applying proposals that include an `integrations` block with explicit versions. The registry decides what versions exist; the project decides which versions it uses. See **Integration versions (determinism guarantee)** below.
+- **tools** — Unified map of all trusted tools (methods and workflows), keyed by `canonical_id`. Each tool entry includes `summary`, `integration` (project.library@version format), `type` ("method" or "workflow"), `desc`, and `inputs` (input schema). **Note:** Transport details (HTTP method, endpoint, headers) are stored in Wrekenfiles, not in `tooling.json`. Base URL comes from `manifest.json` based on `mode`. Set via `swytchcode add <canonical_id>`.
 
 #### Wrekenfiles (implementation details)
 - Define **how an SDK method is executed**.
@@ -221,8 +245,8 @@ Swytchcode requires **explicit integration version pinning**. No implicit “lat
 ```json
 {
   "integrations": {
-    "stripe": { "version": "2025-01-10" },
-    "github": { "version": "2025-01-05" }
+    "weaviate.lyrid": { "version": "v1" },
+    "stripe.api": { "version": "2025-01-10" }
   }
 }
 ```
@@ -237,9 +261,12 @@ This guarantees reproducible behavior across developers, CI, and production.
 
 **How versions enter tooling.json (explicit only):**
 
-1. **`swytchcode add integration <name>@<version>`** — Writes/updates the `integrations` section. Does not fetch. Reviewable and commit-worthy.
-2. **`swytchcode apply`** — If a proposal includes an `integrations` block, apply merges it into tooling.json. Every integration in the proposal must have an explicit `version`; otherwise apply fails.
-3. **Manual edit** — Always allowed.
+1. **`swytchcode add integration <project>@<library>.<version>`** — Writes/updates the `integrations` section with `project.library` key. Does not fetch. Reviewable and commit-worthy.
+2. **`swytchcode add <canonical_id>`** — When adding a tool, if the integration is not already in `tooling.json`, it will be automatically added to the `integrations` section. This is for tracking purposes; the integration must still be fetched via `swytchcode get` first. Searches `methods.json` and `workflows.json` files across all fetched integrations.
+3. **`swytchcode apply`** — If a proposal includes an `integrations` block, apply merges it into tooling.json. Every integration in the proposal must have an explicit `version`; otherwise apply fails.
+4. **Manual edit** — Always allowed.
+
+**Note:** `swytchcode add` searches **all fetched integrations** (via `swytchcode get`) by reading `methods.json` and `workflows.json` files. When adding a tool, the integration is automatically added to `tooling.json`'s `integrations` section for tracking. However, for execution via `swytchcode exec`, integrations must be installed via `swytchcode bootstrap`.
 
 **Invariant (write this in code comments):**  
 *tooling.json pins **what is trusted**. The registry supplies **how it works**. `bootstrap` reconciles the two. `exec` only executes.*
@@ -368,7 +395,7 @@ In the IDE-first flow, the IDE discovers methods (`list`, `describe`), generates
 
 ### Non‑negotiable principles
 
-See **[DESIGN.md § Key Invariants (canonical list)](./DESIGN.md#key-invariants-canonical-list)** for the full list. Summary: single execution path (`swytch exec` only); deterministic I/O; exec never interactive; setup only is interactive; editor-agnostic at runtime; env-only auth (exec never initiates auth); stable exit codes. If an implementation choice violates these, it is wrong.
+See **[DESIGN.md § Key Invariants (canonical list)](./DESIGN.md#key-invariants-canonical-list)** for the full list. Summary: single execution path (`swytchcode exec` only); deterministic I/O; exec never interactive; setup only is interactive; editor-agnostic at runtime; user-provided inputs (exec never initiates auth, no env vars); stable exit codes. If an implementation choice violates these, it is wrong.
 
 ---
 
@@ -415,7 +442,8 @@ The following are locked design decisions. When implementing or discussing later
 
 #### 5. Method naming (canonical IDs vs titles)
 
-- **Executable tool names** are **canonical IDs**: lowercase, dot-separated, stable (e.g. `stripe.createCustomer`, `openai.responses.create`). No spaces, no punctuation except `.` and `_`. Used in `exec`, CI, thin clients, and agents.
+- **Executable tool names** are **canonical IDs**: lowercase, dot-separated, stable (e.g. `api.cluster.create`, `weaviate.api.cluster.list`). Format: `<namespace>.<resource>.<action>`. No spaces, no punctuation except `.` and `_`. Used in `exec`, CI, thin clients, and agents.
+- **Canonical IDs are provided by the API** and stored in wrekenfiles as keys in the `INTERFACES` section. The CLI uses API-provided canonical IDs; it does not generate them.
 - **Titles and descriptions** are **metadata only** (e.g. `"title": "Create Stripe Customer"`). They are for discovery and editors; they are never parsed, matched, or executed. Titles can change; IDs must not.
 
 #### 6. Promotion and proposals (validate → apply)
@@ -429,7 +457,7 @@ The following are locked design decisions. When implementing or discussing later
 
 #### 7. Verified vs custom workflows
 
-- **Verified workflows** (backend-owned, curated) may be **applied directly** (e.g. `swytchcode add workflow stripe.customer-onboarding`). They are trusted; no proposal step.
+- **Verified workflows** (backend-owned, curated) may be **added directly** via `swytchcode add <canonical_id>` (e.g. `swytchcode add api.cluster.onboard`). They are trusted; no proposal step required.
 - **Custom workflows** (user-assembled, agent-assembled, or backend-generated but not in the verified catalog) are **never auto-applied**. They must be written as **proposals** (e.g. `.swytchcode/proposals/workflow.<name>.json`). Only after explicit **apply** do they become part of `tooling.json`.
 - **Rule:** Custom workflows are always proposed, never applied automatically — even if machine-generated.
 
@@ -492,25 +520,24 @@ The following are locked design decisions. When implementing or discussing later
     - `--non-interactive`: Disable prompts (required for CI)
   - **Responsibilities**:
     - Detect project root.
-    - Create `.swytchcode/`.
-    - Write `tooling.json` with mode configuration.
+    - Create `.swytchcode/` and `.swytchcode/integrations/` directories.
+    - Write `tooling.json` with mode configuration (empty `integrations` and `tools` maps).
     - Write editor‑specific configs via `internal/editors/*` (Cursor, VS Code, Claude), if editor ≠ `none`. For Cursor: create **`.cursor/rules/swytchcode.mdc`** with **JSON content** (not prose), instructing Cursor to always call the thin client, never plan tools, and always defer execution to `swytchcode exec`.
 
-- **`swytchcode get <library>`**
-  - **Purpose**: Fetch and install integration capability (Wrekenfile) for a library. **Does not enable tools** — that is promotion into `tooling.json`.
+- **`swytchcode get <project_name>`**
+  - **Purpose**: Fetch and install integration capability (Wrekenfile, methods, workflows) for a project. **Does not enable tools** — that is promotion into `tooling.json`.
   - **Rule**: **get installs capability; it never grants permission.** Get must **never** modify `tooling.json`.
-  - **Sharp rule:** **`swytchcode get` is exploratory only.** Nothing fetched by get is ever trusted until pinned in `tooling.json` and installed via `bootstrap`.
+  - **Sharp rule:** **`swytchcode get` is exploratory only.** Nothing fetched by get is executable until added to `tooling.json` (via `add`) and installed via `bootstrap`. The `add` command searches all fetched integrations by reading `methods.json` and `workflows.json` files.
   - **Invariant:** `swytchcode get` installs integration capability only. It must never modify `tooling.json` or enable tools.
   - **Human / TTY**:
-    - With no args, `swytchcode get` may prompt to select a library and confirm overwrites.
+    - With no args, `swytchcode get` may prompt to select a project and confirm overwrites.
   - **CI / non‑interactive**:
-    - Should be usable as: `swytchcode get stripe --yes --non-interactive`.
+    - Should be usable as: `swytchcode get weaviate --yes --non-interactive`.
     - If overwrite is needed and `--yes` is missing → fail, do not prompt.
   - **Responsibilities**:
-    - Resolve library → registry endpoint.
-    - Fetch Wrekenfile JSON/YAML (and optional manifest/metadata).
-    - Validate schema.
-    - Save to `.swytchcode/wrekenfiles/<library>.json` (or `.swytchcode/integrations/<library>/wreken.yaml` per your layout).
+    - Fetch all integration bundles for the project from registry.
+    - For each bundle, save to `.swytchcode/integrations/{project}/{library}/{version}/wrekenfile.yaml`, `methods.json`, and `workflows.json`.
+    - Create/update `.swytchcode/integrations/manifest.json` with `project.library` entries (version, endpoint, methods count, workflows count, auth).
     - Never execute tools, never touch `tooling.json`, never run OAuth or fetch secrets.
 
 - **`swytchcode rm <library>`**
@@ -526,7 +553,7 @@ The following are locked design decisions. When implementing or discussing later
     - Treat missing specs as a deterministic error (no “best effort”).
 
 - **`swytchcode upgrade <library>`**
-  - **Purpose**: Refresh an existing Wrekenfile spec from the registry. **Local convenience only; never used in CI or automation.** For reproducible builds, pin versions in `tooling.json` and use `bootstrap`; use `add integration <name>@<version>` to change versions.
+  - **Purpose**: Refresh an existing Wrekenfile spec from the registry. **Local convenience only; never used in CI or automation.** For reproducible builds, track versions in `tooling.json` and use `bootstrap`; use `add integration <project>@<library>.<version>` to change versions.
   - **Human / TTY**:
     - May prompt before overwriting the existing spec (once implemented).
     - For now, requires `--yes` to indicate an intentional upgrade.
@@ -607,81 +634,116 @@ The following are locked design decisions. When implementing or discussing later
   - **Usage**: `swytchcode apply .swytchcode/proposals/foo.json`
   - **Rules**: Fails if proposal is invalid (run `validate` first). Deterministic and reviewable. No proposal is ever auto-applied.
 
-- **`swytchcode add integration <name>@<version>`**
-  - **Purpose**: Pin an integration version in `tooling.json` (explicit, reviewable). Does **not** fetch; use `swytchcode bootstrap` to install.
-  - Example: `swytchcode add integration stripe@2025-01-10`.
+- **`swytchcode add integration <project>@<library>.<version>`**
+  - **Purpose**: Add an integration version to `tooling.json` (explicit, reviewable). Does **not** fetch; use `swytchcode bootstrap` to install.
+  - Example: `swytchcode add integration weaviate@lyrid.v1`.
+  - Adds entry with `project.library` key (e.g., `"weaviate.lyrid"`).
   - No “latest”; exact version only.
 
+- **`swytchcode add [integration_spec] <canonical_id>`**
+  - **Purpose**: Add a tool (method or workflow) to `tooling.json` by canonical ID. Automatically detects whether it's a method or workflow by searching `methods.json` and `workflows.json` files.
+  - **Supports two modes**:
+    - **Mode 1 (canonical ID only)**: `swytchcode add api.cluster.create` — Searches all fetched integrations, handles ambiguity (prompt in TTY, error in CI).
+    - **Mode 2 (explicit scoped)**: `swytchcode add weaviate@lyrid.v1 api.cluster.create` — Deterministic, CI-safe. Requires integration to be fetched first (via `swytchcode get`).
+  - **Behavior**:
+    - Searches `methods.json` and `workflows.json` files across all integrations in `.swytchcode/integrations/` directory (fetched via `swytchcode get`).
+    - Determines tool type (method or workflow) based on which file contains the canonical_id.
+    - Reads wrekenfile from `.swytchcode/integrations/{project}/{library}/{version}/wrekenfile.yaml` to get full tool details.
+    - Finds tool by `canonical_id` key in `METHODS:` section of wrekenfile.
+    - Adds to unified `tools` map in `tooling.json` with `type` ("method" or "workflow"), `integration: "project.library"`, `source`, and all wrekenfile fields.
+    - Automatically adds integration to `integrations` section if not already present (for tracking).
+  - **Error conditions**:
+    - Not found: "Canonical ID 'X' not found in any fetched integrations. Run: swytchcode get <project>"
+    - Integration not fetched (scoped mode): "Integration weaviate@lyrid.v1 not found. Run: swytchcode get weaviate"
+    - Ambiguity (non-interactive): "Ambiguous canonical ID. Found in N integrations. Use: swytchcode add <integration@version> <canonical_id>"
+
 - **`swytchcode bootstrap`**
-  - **Purpose**: Install exact integration versions declared in `tooling.json`. Reads `integrations`, fetches missing at that version, fails on version mismatch.
+  - **Purpose**: Install exact integration versions declared in `tooling.json`. Reads `integrations` (keys are `project.library`), fetches missing at that version, fails on version mismatch.
+  - Saves to `.swytchcode/integrations/{project}/{library}/{version}/` structure.
   - Never installs “latest”; never mutates `tooling.json`; never runs during exec. CI-safe and deterministic.
 
-- **`swytchcode exec`**
-  - **Purpose**: The **only** execution path for tools.
-  - **Input**: JSON on stdin, e.g.
-
-    ```json
-    {
-      "tool": "stripe.createCustomer",
-      "args": {
-        "email": "test@example.com"
-      }
-    }
-    ```
-
-  - **Behavior** (always non‑interactive):
-    - Read and parse stdin JSON.
-    - If tool starts with `raw.`:
-      - Require `--allow-raw` flag
-      - If missing → fail with exit code 1
-      - Resolve directly via Wrekenfile (bypass `tooling.json`)
-    - Else (verified tool):
-      - Load `tooling.json`
-      - Resolve tool → Wrekenfile
-      - Validate input schema
-    - Load env‑based credentials.
-    - Apply policy (retries, idempotency).
-    - Execute SDK call.
-    - Normalize and write JSON output to stdout on success.
-    - Write JSON error to stderr on failure.
+- **`swytchcode exec [canonical_id]`**
+  - **Purpose**: The **only** execution path for tools. Pure, deterministic, non-interactive, and offline-capable.
+  - **Supports two input modes**:
+    - **CLI args**: `swytchcode exec api.cluster.create --body file.json --input Authorization="Bearer token"`
+    - **JSON stdin**: `echo '{"tool":"api.cluster.create","args":{...}}' | swytchcode exec`
+  - **Execution pipeline** (always non-interactive, never calls registry):
+    1. Parse request (from CLI args or JSON stdin)
+    2. Load `tooling.json` and resolve tool entry
+    3. Parse `integration` field (project.library@version format)
+    4. Load integration bundle from `.swytchcode/integrations/{project}/{library}/{version}/wrekenfile.yaml`
+    5. Resolve method from Wreken `METHODS:` section by `canonical_id`
+    6. Get base URL from `manifest.json` based on `mode` (sandbox_endpoint or production_endpoint)
+    7. Validate input schema against `tooling.json` inputs
+    8. Build HTTP request (method from Wreken, URL = baseURL + endpoint, headers, body from args)
+    9. Execute HTTP request (or dry-run)
+    10. Output JSON response (normalized or raw)
   - **Flags**:
     - `--allow-raw`: Required for executing raw methods (disabled by default)
-  - **Executing raw methods (explicit opt-in)**:
-    Raw methods may be executed by explicitly opting in.
-
-    Example:
-    ```json
-    {
-      "tool": "raw.stripe.customers.search",
-      "args": { "query": "email:'test@example.com'" }
-    }
-    ```
-
-    This requires:
+    - `--dry-run`: Show what would be executed without making HTTP call
+    - `--body <file>`: Path to JSON file containing request body
+    - `--input <key=value>`: Input key=value pairs (can be specified multiple times)
+    - `--param <key=value>`: Query parameter key=value pairs (can be specified multiple times)
+    - `--raw`: Output raw HTTP response instead of normalized JSON
+  - **Input handling**:
+    - User provides all inputs directly (no env vars required)
+    - `--body` file is parsed as JSON and merged into args
+    - `--input` key=value pairs are added to args
+    - `--param` key=value pairs are used for query parameters and path parameter replacement
+    - Path parameters in endpoint (e.g., `/api/cluster/{id}`) are replaced from `--param` values
+  - **Base URL resolution**:
+    - Reads `mode` from `tooling.json` ("production" or "sandbox")
+    - Loads `manifest.json` and finds entry for `project.library`
+    - Uses `sandbox_endpoint` if mode is "sandbox", `production_endpoint` otherwise
+    - Full URL = baseURL + endpoint (from Wreken HTTP.ENDPOINT)
+  - **Output**:
+    - **Default**: Normalized JSON with `status_code` and `data` fields
+    - **--raw**: Raw HTTP response with `status_code`, `status`, `headers`, and `body` (string)
+    - **--dry-run**: JSON showing `method`, `url`, `headers`, and `body` that would be sent
+  - **Examples**:
     ```bash
-    swytchcode exec --allow-raw
+    # CLI args mode with body file
+    swytchcode exec api.serverless.credential.create --body credential.json --input Authorization="Bearer token123"
+    
+    # CLI args mode with query params
+    swytchcode exec api.cluster.get --param id=cluster-123 --input Authorization="Bearer token123"
+    
+    # JSON stdin mode
+    echo '{"tool":"api.cluster.create","args":{"body":{"name":"my-cluster"},"Authorization":"Bearer token123"}}' | swytchcode exec
+    
+    # Dry-run to see what would be executed
+    swytchcode exec api.cluster.create --body cluster.json --dry-run
+    
+    # Raw output mode
+    swytchcode exec api.cluster.get --param id=123 --raw
     ```
-
-    Rules:
-    - Raw execution is disabled by default
-    - CI must never allow raw execution implicitly
-    - Agents must never use raw methods unless explicitly configured
-    - There must be no silent fallback from verified → raw
+  - **Error conditions**:
+    - Tool not found in `tooling.json` → Exit code 2
+    - Integration bundle not installed → Exit code 2
+    - Method not found in Wreken → Exit code 2
+    - Base URL not found in manifest → Exit code 5
+    - Input validation failure → Exit code 1
+    - HTTP execution failure → Exit code 4
   - **Forbidden**:
-    - Prompts, spinners, or human‑oriented prose.
-    - Any branching on editor or language.
-    - Reading editor config files at runtime.
-    - Auto-promotion of raw methods to verified
-    - Silent fallback from verified to raw methods
+    - Registry calls (exec is offline-capable)
+    - Prompts, spinners, or human-oriented prose
+    - Mutating `tooling.json`
+    - Auto-discovery or auto-addition of tools
+    - Reading env vars for auth (user provides all inputs)
 
 ---
 
 ### Kernel responsibilities and exit codes
 
-The kernel lives under `internal/kernel/` and must own:
+The kernel lives under `internal/kernel/` and owns:
 
-- **Execution orchestration** (no retries in clients).
-- **Idempotency and policy** (e.g. safe retries).
+- **Tool resolution** — Resolves canonical_id to tooling.json entry and integration bundle
+- **Integration loading** — Loads wrekenfile.yaml and resolves method from METHODS section
+- **Base URL resolution** — Gets endpoint from manifest.json based on mode
+- **Input validation** — Validates input schema against tooling.json
+- **HTTP request building** — Constructs HTTP request from method definition and input args
+- **HTTP execution** — Executes HTTP requests with timeout and error handling
+- **Output formatting** — Normalizes or outputs raw HTTP responses as JSON
 - **Error mapping** into the following **stable exit codes**:
 
 | Code | Meaning                    |
@@ -689,7 +751,7 @@ The kernel lives under `internal/kernel/` and must own:
 | 0    | Success                    |
 | 1    | Invalid input              |
 | 2    | Tool not found             |
-| 3    | Auth missing/invalid       |
+| 3    | Auth missing/invalid       | (not currently used - user provides all inputs) |
 | 4    | SDK execution failure      |
 | 5    | Internal error             |
 
@@ -703,7 +765,7 @@ The kernel and CLI need to pull data from APIs (e.g. Wrekenfile registry, upstre
 
 #### Registry base URL
 
-The registry base URL is stored in **`tooling.json`** as **`registry_url`** (e.g. `https://localhost`). Init sets it **only when absent** (init never overwrites an existing `registry_url`). Commands that call the registry (`get`, `upgrade`, `add workflow`) use the effective URL (from tooling or env); **`SWYTCHCODE_REGISTRY_URL`** overrides at runtime when set. Environment variable overrides **must not be silently persisted** — the CLI never writes the env value back into `tooling.json`.
+The registry base URL is stored in **`tooling.json`** as **`registry_url`** (e.g. `https://localhost`). Init sets it **only when absent** (init never overwrites an existing `registry_url`). Commands that call the registry (`get`, `upgrade`) use the effective URL (from tooling or env); **`SWYTCHCODE_REGISTRY_URL`** overrides at runtime when set. Environment variable overrides **must not be silently persisted** — the CLI never writes the env value back into `tooling.json`.
 
 **See effective config:** run **`swytchcode config`**. Output is JSON, e.g.:
 
@@ -731,16 +793,15 @@ Rule: **No interactive or blocking behavior** when fetching data. All API calls 
 
 ### Authentication
 
-**Core rule (exec):** **`swytchcode exec` never initiates authentication.** No browser, no login prompts, no OAuth flow during exec. All secrets come from **environment variables**. Wrekenfiles declare which env var(s) each operation needs (e.g. `STRIPE_API_KEY`, `GITHUB_TOKEN`). Missing or empty → exit code 3 (auth error). This applies in every environment: local, CI, and production.
+**Core rule (exec):** **`swytchcode exec` never initiates authentication.** No browser, no login prompts, no OAuth flow during exec. **Users provide all inputs directly** via CLI args or JSON stdin (including auth headers like `Authorization`). No environment variable lookups are performed. This applies in every environment: local, CI, and production.
 
-#### How the kernel gets secrets
+#### How the kernel gets inputs
 
-- **Env-only:** The kernel reads credentials via `os.Getenv` / `util.GetEnvRequired`. No other source during exec.
-- **OAuth (user-completed):** The user completes OAuth (e.g. device flow or browser login) **outside** Swytchcode and provides the resulting token via an env var (e.g. `GITHUB_TOKEN`). The kernel only uses whatever is in env; it does not run the OAuth flow.
-- **OAuth (machine-to-machine):** If the Wrekenfile supports it, the kernel can obtain tokens using client ID and secret from env (e.g. `STRIPE_CLIENT_ID`, `STRIPE_CLIENT_SECRET`). That flow must be non-interactive (HTTP only), timeout-bound. No browser, no user interaction. Refresh tokens from env may be used in a non-interactive, HTTP-only way if specified.
-- **Other auth types:** API keys, bearer tokens, basic auth — one or two env vars per credential; names defined in Wrekenfile.
+- **User-provided inputs:** All inputs, including authentication credentials, are provided directly by the user via CLI args (`--input`, `--body`, `--param`) or JSON stdin (`args` field).
+- **No env vars:** The kernel does not read environment variables. Users must explicitly pass all required inputs.
+- **Auth headers:** Authentication is provided via input fields (e.g., `Authorization` header passed via `--input Authorization="Bearer token"` or in JSON args).
 
-**Summary:** Env-only, Wrekenfile-defined names, no prompts, no browser during exec.
+**Summary:** All inputs user-provided, no env var lookups, no prompts, no browser during exec.
 
 #### Optional: local dev helpers (OAuth login)
 
@@ -751,24 +812,23 @@ Optional **interactive auth** (e.g. `swytchcode auth login github`) is **local d
 ### Developer roadmap (what to implement next)
 
 - **CLI wiring**
-  - Complete remaining TODOs in `internal/cli/init.go`:
-    - Interactive prompts for editor and mode are implemented.
-    - Create `.swytchcode/` and `tooling.json` with mode configuration (done).
-    - Delegate editor configuration to `internal/editors/*` (done).
-    - Interactive mode works by default, with `--non-interactive` for CI (done).
-  - Extend `internal/cli/get.go` to:
-    - Support optional interactive prompts on TTY.
-    - Implement non‑interactive `--yes` behavior.
+  - `internal/cli/init.go`: Creates `.swytchcode/` and `.swytchcode/integrations/` directories (done).
+  - `internal/cli/get.go`: Fetches integration bundles and saves to `.swytchcode/integrations/{project}/{library}/{version}/` structure (done).
+  - `internal/cli/add.go`: Implements `add` command that searches `methods.json` and `workflows.json` files across all integrations (done).
+  - `internal/cli/manifest.go`: Manages `.swytchcode/integrations/manifest.json` registry manifest (done).
   - Complete `internal/cli/mode.go`:
-    - Integrate mode into kernel execution logic (credential selection, policy enforcement).
-    - Ensure mode affects SDK calls and environment variable selection.
+    - Mode is already integrated into kernel execution logic (base URL selection from manifest).
+    - Mode determines which endpoint (sandbox_endpoint or production_endpoint) is used from manifest.json.
+  - Update `internal/cli/bootstrap.go` to use new integrations directory structure (pending).
 
 - **Kernel and contracts**
-  - Flesh out `internal/kernel/*`:
-    - Tool resolution from `tooling.json` + Wrekenfiles.
-    - Schema validation and env‑based auth checks (see **Authentication** above).
-    - SDK invocation layer and error mapping to exit codes.
-  - Implement `internal/wreken/*` and `internal/tooling/*` loaders/validators.
+  - ✅ `internal/kernel/resolver.go` — Tool resolution from `tooling.json`
+  - ✅ `internal/kernel/bundle.go` — Integration bundle loading and method resolution from Wreken
+  - ✅ `internal/kernel/manifest.go` — Base URL resolution from manifest based on mode
+  - ✅ `internal/kernel/validator.go` — Input validation (basic implementation, full schema validation pending)
+  - ✅ `internal/kernel/request.go` — HTTP request building
+  - ✅ `internal/kernel/http_exec.go` — HTTP execution with dry-run and raw output support
+  - ✅ `internal/kernel/executor.go` — Main execution pipeline orchestrator
   - For registry/API calls: use a single shared `*http.Client` and stdlib only; see **API and data fetching** above.
 
 - **Promotion and proposals** (see **Design decisions and reference**)
@@ -776,7 +836,12 @@ Optional **interactive auth** (e.g. `swytchcode auth login github`) is **local d
   - Support verified workflows from backend (direct add) vs custom workflows (proposals only, explicit apply).
 
 - **Quality gates**
-  - Ensure `echo '{"tool":"x.y","args":{}}' | swytchcode exec` works:
+  - ✅ `swytchcode exec` works with both CLI args and JSON stdin
+  - ✅ Exec is pure, deterministic, non-interactive, and offline-capable
+  - ✅ Base URL resolution from manifest.json based on mode
+  - ✅ Dry-run mode implemented
+  - ✅ Raw output mode implemented
+  - Ensure `swytchcode exec` works:
     - In a Docker container.
     - In GitHub Actions or GitLab CI.
     - With no TTY, no `$HOME`, and no editor present.
