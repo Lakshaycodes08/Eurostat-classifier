@@ -25,9 +25,11 @@ type ListIntegrationsResponse struct {
 
 // IntegrationBundle represents a single bundle in the bundles array.
 type IntegrationBundle struct {
-	Integration string `json:"integration"`
-	Version     string `json:"version"`
-	Files       struct {
+	Integration        string `json:"integration"`
+	Version           string `json:"version"`
+	SandboxEndpoint   string `json:"sandbox_endpoint"`
+	ProductionEndpoint string `json:"production_endpoint"`
+	Files             struct {
 		Wreken struct {
 			Format  string `json:"format"`
 			Content string `json:"content"` // YAML content as string

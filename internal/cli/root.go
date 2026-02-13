@@ -24,16 +24,9 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(getCmd)
-	rootCmd.AddCommand(execCmd)
-	rootCmd.AddCommand(rmCmd)
-	rootCmd.AddCommand(upgradeCmd)
-	rootCmd.AddCommand(listCmd)
-	rootCmd.AddCommand(describeCmd)
-	rootCmd.AddCommand(modeCmd)
-	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(addCmd)
-	rootCmd.AddCommand(applyCmd)
-	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(bootstrapCmd)
+	rootCmd.AddCommand(listCmd)
 }
 

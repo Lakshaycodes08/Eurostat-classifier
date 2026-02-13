@@ -79,15 +79,23 @@ var getCmd = &cobra.Command{
 		// Use library argument as project_name for API call
 		projectName := library
 
+		// Show spinner while fetching bundles
+		spinner := util.NewSpinner(fmt.Sprintf("Fetching %s...", projectName))
+		spinner.Start()
+
 		// Fetch all bundles for this project
 		bundlesResp, err := regClient.GetIntegrationBundles(ctx, projectName)
 		if err != nil {
+			spinner.StopWithMessage(fmt.Sprintf("✗ Failed to fetch integration bundles: %v", err))
 			return fmt.Errorf("fetch integration bundles: %w", err)
 		}
 
 		if bundlesResp == nil || len(bundlesResp.Bundles) == 0 {
+			spinner.StopWithMessage(fmt.Sprintf("✗ No bundles found for project %q", projectName))
 			return fmt.Errorf("no bundles found for project %q", projectName)
 		}
+
+		spinner.StopWithMessage(fmt.Sprintf("✓ Found %d bundle(s)", len(bundlesResp.Bundles)))
 
 		// Create base .swytchcode directory and integrations subdirectory
 		swytchDir := filepath.Join(projectRoot, ".swytchcode")
@@ -99,36 +107,22 @@ var getCmd = &cobra.Command{
 			return fmt.Errorf("create integrations directory: %w", err)
 		}
 
-		// Fetch integration details to get endpoints
-		integrationsResp, err := regClient.ListIntegrations(ctx)
-		if err != nil {
-			return fmt.Errorf("fetch integrations: %w", err)
-		}
-
-		// Build a map of integration ID -> endpoints for quick lookup
-		integrationEndpoints := make(map[string]struct {
-			sandbox    string
-			production string
-		})
-		for _, integration := range integrationsResp.Integrations {
-			integrationEndpoints[integration.ID] = struct {
-				sandbox    string
-				production string
-			}{
-				sandbox:    integration.SandboxEndpoint,
-				production: integration.ProductionEndpoint,
-			}
-		}
-
 		// Fetch workflows and methods for this project (needed for counts and manifest)
+		spinner = util.NewSpinner("Fetching workflows and methods...")
+		spinner.Start()
+
 		workflowsResp, err := regClient.ListWorkflows(ctx, projectName)
 		if err != nil {
+			spinner.StopWithMessage(fmt.Sprintf("✗ Failed to fetch workflows: %v", err))
 			return fmt.Errorf("fetch workflows for project %q: %w", projectName, err)
 		}
 		methodsResp, err := regClient.ListMethods(ctx, projectName)
 		if err != nil {
+			spinner.StopWithMessage(fmt.Sprintf("✗ Failed to fetch methods: %v", err))
 			return fmt.Errorf("fetch methods for project %q: %w", projectName, err)
 		}
+
+		spinner.Stop()
 
 		methodsCount := 0
 		workflowsCount := 0
@@ -141,17 +135,23 @@ var getCmd = &cobra.Command{
 
 		// Save each bundle to .swytchcode/integrations/{project}/{library}/{version}/ structure
 		savedCount := 0
-		for _, bundle := range bundlesResp.Bundles {
+		for i, bundle := range bundlesResp.Bundles {
+			bundleSpinner := util.NewSpinner(fmt.Sprintf("Saving bundle %d/%d (%s@%s)...", i+1, len(bundlesResp.Bundles), bundle.Integration, bundle.Version))
+			bundleSpinner.Start()
+
 			if bundle.Integration == "" {
+				bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Bundle %d has empty integration name", i+1))
 				return fmt.Errorf("bundle has empty integration name")
 			}
 			if bundle.Version == "" {
+				bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Bundle %q has empty version", bundle.Integration))
 				return fmt.Errorf("bundle for integration %q has empty version", bundle.Integration)
 			}
 
 			// Create versioned directory: .swytchcode/integrations/{project}/{library}/{version}/
 			versionedDir := filepath.Join(integrationsDir, projectName, bundle.Integration, bundle.Version)
 			if err := util.EnsureDir(versionedDir, 0o755); err != nil {
+				bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to create directory: %v", err))
 				return fmt.Errorf("create versioned directory: %w", err)
 			}
 
@@ -165,6 +165,7 @@ var getCmd = &cobra.Command{
 				if _, err := os.Stat(wrekenPath); err == nil {
 					exists = true
 					if !getAutoYes {
+						bundleSpinner.Stop()
 						if interactive {
 							return fmt.Errorf("Version %q for %s/%s already exists; use --yes to overwrite (interactive confirmation not yet implemented)", bundle.Version, projectName, bundle.Integration)
 						} else {
@@ -177,15 +178,18 @@ var getCmd = &cobra.Command{
 			// Validate and write Wrekenfile
 			contentStr := bundle.Files.Wreken.Content
 			if contentStr == "" {
+				bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Bundle %q@%q has empty Wrekenfile content", bundle.Integration, bundle.Version))
 				return fmt.Errorf("bundle for integration %q has empty Wrekenfile content (version: %q)", bundle.Integration, bundle.Version)
 			}
 
 			wrekenBytes := util.DecodeBase64OrRaw(contentStr)
 			if len(wrekenBytes) == 0 {
+				bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Decoded Wrekenfile content is empty for %q@%q", bundle.Integration, bundle.Version))
 				return fmt.Errorf("decoded Wrekenfile content is empty for integration %q (original content length: %d)", bundle.Integration, len(contentStr))
 			}
 
 			if err := os.WriteFile(wrekenPath, wrekenBytes, 0o644); err != nil {
+				bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to write Wrekenfile: %v", err))
 				return fmt.Errorf("write Wrekenfile %q: %w", wrekenPath, err)
 			}
 
@@ -195,9 +199,11 @@ var getCmd = &cobra.Command{
 			if methodsResp != nil {
 				data, err := json.MarshalIndent(methodsResp, "", "  ")
 				if err != nil {
+					bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to marshal methods: %v", err))
 					return fmt.Errorf("marshal methods response: %w", err)
 				}
 				if err := os.WriteFile(methodsPath, data, 0o644); err != nil {
+					bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to write methods.json: %v", err))
 					return fmt.Errorf("write methods file %q: %w", methodsPath, err)
 				}
 			}
@@ -206,9 +212,11 @@ var getCmd = &cobra.Command{
 			if workflowsResp != nil {
 				data, err := json.MarshalIndent(workflowsResp, "", "  ")
 				if err != nil {
+					bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to marshal workflows: %v", err))
 					return fmt.Errorf("marshal workflows response: %w", err)
 				}
 				if err := os.WriteFile(workflowsPath, data, 0o644); err != nil {
+					bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to write workflows.json: %v", err))
 					return fmt.Errorf("write workflows file %q: %w", workflowsPath, err)
 				}
 			}
@@ -216,47 +224,25 @@ var getCmd = &cobra.Command{
 			// Update manifest.json with project.library entry
 			projectLibrary := fmt.Sprintf("%s.%s", projectName, bundle.Integration)
 			
-			// Extract endpoints from ListIntegrations response
-			sandboxEndpoint := ""
-			productionEndpoint := ""
-			if endpoints, ok := integrationEndpoints[bundle.Integration]; ok {
-				sandboxEndpoint = endpoints.sandbox
-				productionEndpoint = endpoints.production
-			}
-			
-			// If endpoints not found, try bundle manifest content as fallback
-			if sandboxEndpoint == "" && bundle.Files.Manifest.Content != nil {
-				if sandboxRaw, ok := bundle.Files.Manifest.Content["sandbox_endpoint"]; ok {
-					if sandboxStr, ok := sandboxRaw.(string); ok {
-						sandboxEndpoint = sandboxStr
-					}
-				}
-			}
-			if productionEndpoint == "" && bundle.Files.Manifest.Content != nil {
-				if prodRaw, ok := bundle.Files.Manifest.Content["production_endpoint"]; ok {
-					if prodStr, ok := prodRaw.(string); ok {
-						productionEndpoint = prodStr
-					}
-				}
-			}
-			
-			// Final fallback: use registry endpoint if still empty
-			regConfig := registry.ConfigFromProjectRoot(projectRoot)
-			registryEndpoint := regConfig.BaseURL
+			// Use endpoints directly from bundle (use http://localhost if empty)
+			sandboxEndpoint := bundle.SandboxEndpoint
+			productionEndpoint := bundle.ProductionEndpoint
 			if sandboxEndpoint == "" {
-				sandboxEndpoint = registryEndpoint
+				sandboxEndpoint = "http://localhost"
 			}
 			if productionEndpoint == "" {
-				productionEndpoint = registryEndpoint
+				productionEndpoint = "http://localhost"
 			}
 			
 			// TODO: Extract auth info from bundle or API - for now use empty
 			auth := make(map[string]interface{})
 			if err := updateManifestEntry(projectRoot, projectLibrary, bundle.Version, sandboxEndpoint, productionEndpoint, methodsCount, workflowsCount, auth); err != nil {
+				bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to update manifest: %v", err))
 				return fmt.Errorf("update manifest: %w", err)
 			}
 
 			savedCount++
+			bundleSpinner.StopWithMessage(fmt.Sprintf("✓ Saved %s/%s@%s", projectName, bundle.Integration, bundle.Version))
 
 			if interactive {
 				if exists {
@@ -268,7 +254,9 @@ var getCmd = &cobra.Command{
 		}
 
 		if interactive {
-			fmt.Printf("Saved %d bundle(s) for project %q\n", savedCount, projectName)
+			if savedCount > 0 {
+				fmt.Printf("Saved %d bundle(s) for project %q\n", savedCount, projectName)
+			}
 		}
 
 		return nil
