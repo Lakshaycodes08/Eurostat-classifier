@@ -260,21 +260,61 @@ Start the Model Context Protocol (MCP) server. Exposes swytchcode commands (`lis
 # Interactive mode (stdio transport, shows output)
 swytchcode mcp serve
 
-# Daemon mode (background, no output)
-swytchcode mcp serve --daemon
+# Daemon mode (background, no output, returns control immediately)
+swytchcode mcp serve -d
 
 # Daemon mode with log file
-swytchcode mcp serve --daemon --log-file /path/to/mcp.log
+swytchcode mcp serve -d --log-file /path/to/mcp.log
 
 # HTTP transport
 swytchcode mcp serve --transport http --port 3000
 
 # HTTP transport in daemon mode
-swytchcode mcp serve --transport http --port 3000 --daemon
+swytchcode mcp serve --transport http --port 3000 -d
 ```
 
+### `swytchcode mcp status`
+
+Check if the MCP server is running (daemon mode only).
+
+**Usage:**
+```bash
+swytchcode mcp status
+```
+
+**What it does:**
+- Checks for PID file at `.swytchcode/mcp.pid`
+- Verifies if the process is still running
+- Removes stale PID files if process is not running
+- Prints server status (running with PID, or not running)
+
+**Output:**
+- `"MCP server is running (PID: <pid>)"` — Server is running
+- `"MCP server is not running"` — No PID file found
+- `"MCP server is not running (stale PID file removed)"` — PID file existed but process was not running
+
+### `swytchcode mcp stop`
+
+Stop the running MCP server (daemon mode only).
+
+**Usage:**
+```bash
+swytchcode mcp stop
+```
+
+**What it does:**
+- Reads PID file at `.swytchcode/mcp.pid`
+- Sends SIGTERM signal to stop the server gracefully
+- Removes PID file after stopping
+- Only works for servers started in daemon mode
+
+**Error messages:**
+- `"MCP server is not running: %w"` — No PID file found or server not running
+- `"MCP server is not running (stale PID file removed)"` — PID file existed but process was not running
+- `"stop MCP server: %w"` — Failed to send stop signal
+
 **Flags:**
-- `--daemon` / `-d`: Run in daemon mode (background, no terminal output)
+- `-d`: Run in daemon mode (properly daemonized background process). The server runs in a new session, completely detached from the terminal. Returns control immediately. Creates PID file at `.swytchcode/mcp.pid` for `status` and `stop` commands. Requires `--transport http`.
 - `--log-file <path>`: Path to log file (only used in daemon mode; if not provided, logs are suppressed)
 - `--transport <type>`: Transport type (`stdio` or `http`), default: `stdio`
 - `--port <number>`: Port for HTTP transport, default: `3000`
@@ -286,8 +326,16 @@ swytchcode mcp serve --transport http --port 3000 --daemon
   - `swytchcode_add` — Add tools to tooling.json
   - `swytchcode_exec` — Execute tools
 - All tool output is captured and returned through the MCP protocol (not streamed to terminal)
-- In daemon mode: suppresses logs and returns control immediately (logs to file if `--log-file` provided)
-- Supports stdio transport (default) for direct process communication
+- In daemon mode (`-d`):
+  - Forks a new process that runs independently in the background
+  - **Unix/Linux/macOS**: Creates a new session (detached from terminal) so it survives parent process termination
+  - **Windows**: Runs as independent process that survives parent termination
+  - Returns control to terminal immediately
+  - Process continues running even if terminal is closed or parent process exits
+  - Logs to file if `--log-file` provided, otherwise output is discarded
+  - Requires `--transport http` (stdio transport cannot be used in daemon mode)
+  - **Cross-platform**: Works on Windows, Linux, and macOS
+- Supports stdio transport (default) for direct process communication (non-daemon mode only)
 - Supports HTTP transport with bearer token authentication
 
 **MCP Tools:**
@@ -317,7 +365,65 @@ swytchcode mcp serve --transport http --port 3000 --daemon
 - `"create MCP server: %w"` — Failed to create server
 - `"open log file: %w"` — Failed to open log file
 - `"register tools: %w"` — Failed to register MCP tools
+- `"write PID file: %w"` — Failed to write PID file in daemon mode
 - HTTP transport errors: `"missing Authorization header"`, `"invalid authorization token"`, `"method not allowed"`
+
+**Note:** In daemon mode (`-d`):
+- A PID file is created at `.swytchcode/mcp.pid` to track the running server process
+- **Unix/Linux/macOS**: The server process runs in a new session, completely detached from the terminal
+- **Windows**: The server process runs independently, detached from the parent terminal
+- The process will continue running even if:
+  - The parent process exits
+  - The terminal session closes
+  - You log out of the shell (Unix/Linux/macOS)
+- **Cross-platform support**: Daemon mode works on Windows, Linux, and macOS
+- Use `swytchcode mcp status` to check if the server is running
+- Use `swytchcode mcp stop` to gracefully stop the server (SIGTERM on Unix, process termination on Windows)
+- The server can only be stopped via `swytchcode mcp stop` or by killing the process directly
+
+---
+
+### `swytchcode mcp status`
+
+Check if the MCP server is running (daemon mode only).
+
+**Usage:**
+```bash
+swytchcode mcp status
+```
+
+**What it does:**
+- Checks for PID file at `.swytchcode/mcp.pid`
+- Verifies if the process is still running
+- Removes stale PID files if process is not running
+- Prints server status (running with PID, or not running)
+
+**Output:**
+- `"MCP server is running (PID: <pid>)"` — Server is running
+- `"MCP server is not running"` — No PID file found
+- `"MCP server is not running (stale PID file removed)"` — PID file existed but process was not running
+
+---
+
+### `swytchcode mcp stop`
+
+Stop the running MCP server (daemon mode only).
+
+**Usage:**
+```bash
+swytchcode mcp stop
+```
+
+**What it does:**
+- Reads PID file at `.swytchcode/mcp.pid`
+- Sends SIGTERM signal to stop the server gracefully
+- Removes PID file after stopping
+- Only works for servers started in daemon mode
+
+**Error messages:**
+- `"MCP server is not running: %w"` — No PID file found or server not running
+- `"MCP server is not running (stale PID file removed)"` — PID file existed but process was not running
+- `"stop MCP server: %w"` — Failed to send stop signal
 
 ---
 
