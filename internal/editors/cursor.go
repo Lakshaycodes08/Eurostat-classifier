@@ -1,3 +1,4 @@
+// cursor.go writes Cursor editor rules so the editor delegates execution to swytchcode exec (init-time only).
 package editors
 
 import (

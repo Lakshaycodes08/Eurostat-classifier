@@ -1,64 +1,54 @@
+// list.go implements swytchcode list: lists available integrations from the registry.
 package cli
 
 import (
-	"errors"
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
+	"gitlab.com/swytchcode/shell/internal/registry"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
 
 var (
-	listRaw      bool
-	listVerified bool
+	listJSON bool
 )
 
-// listCmd implements `swytchcode list <library>`.
-//
-// Purpose: Discover available methods without executing anything.
-// Output: JSON to stdout showing verified tools and raw methods.
+// listCmd implements `swytchcode list`.
 var listCmd = &cobra.Command{
-	Use:   "list <library>",
-	Short: "List available verified tools and raw methods for a library",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return errors.New("library name required")
-		}
-		return nil
-	},
+	Use:   "list",
+	Short: "List available integrations",
+	Long:  "Lists all available integrations from the registry.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		library := args[0]
-
-		// TODO:
-		// 1. Load tooling.json to get verified tools for this library
-		// 2. Load Wrekenfile for the library to get all raw methods
-		// 3. Filter based on --raw and --verified flags
-		// 4. Output JSON
-
-		// For now, output stub JSON
-		output := map[string]interface{}{
-			"library":  library,
-			"verified": []string{},
-			"raw":      []string{},
-			"note":     "list command not yet implemented; this is a stub response",
+		projectRoot, err := util.ProjectRoot()
+		if err != nil {
+			return fmt.Errorf("detect project root: %w", err)
 		}
 
-		// Apply filters (when implemented, this will filter the actual lists)
-		if listRaw && !listVerified {
-			output = map[string]interface{}{
-				"raw":  []string{},
-				"note": "list command not yet implemented; this is a stub response",
-			}
-		} else if listVerified && !listRaw {
-			output = map[string]interface{}{
-				"verified": []string{},
-				"note":     "list command not yet implemented; this is a stub response",
-			}
+		regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
+		ctx := context.Background()
+
+		integrationsResp, err := regClient.ListIntegrations(ctx)
+		if err != nil {
+			return fmt.Errorf("fetch integrations: %w", err)
 		}
 
-		if err := util.WriteJSON(os.Stdout, output); err != nil {
-			return fmt.Errorf("write output: %w", err)
+		if listJSON {
+			// Output as JSON array of IDs
+			ids := make([]string, len(integrationsResp.Integrations))
+			for i, integration := range integrationsResp.Integrations {
+				ids[i] = integration.ID
+			}
+			if err := json.NewEncoder(os.Stdout).Encode(ids); err != nil {
+				return fmt.Errorf("encode JSON: %w", err)
+			}
+		} else {
+			// Output one ID per line
+			for _, integration := range integrationsResp.Integrations {
+				fmt.Println(integration.ID)
+			}
 		}
 
 		return nil
@@ -66,6 +56,5 @@ var listCmd = &cobra.Command{
 }
 
 func init() {
-	listCmd.Flags().BoolVar(&listRaw, "raw", false, "show only raw methods")
-	listCmd.Flags().BoolVar(&listVerified, "verified", false, "show only verified tools")
+	listCmd.Flags().BoolVar(&listJSON, "json", false, "output as JSON array")
 }

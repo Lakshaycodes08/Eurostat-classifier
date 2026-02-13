@@ -1,3 +1,4 @@
+// jsonio.go reads and writes JSON for exec stdin/stdout and config files.
 package util
 
 import (

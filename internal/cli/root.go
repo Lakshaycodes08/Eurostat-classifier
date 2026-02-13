@@ -1,3 +1,4 @@
+// root.go defines the root cobra command and wires all subcommands (init, get, exec, etc.).
 package cli
 
 import (
@@ -23,11 +24,10 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(getCmd)
+	rootCmd.AddCommand(addCmd)
 	rootCmd.AddCommand(execCmd)
-	rootCmd.AddCommand(rmCmd)
-	rootCmd.AddCommand(upgradeCmd)
+	rootCmd.AddCommand(bootstrapCmd)
 	rootCmd.AddCommand(listCmd)
-	rootCmd.AddCommand(describeCmd)
-	rootCmd.AddCommand(modeCmd)
+	rootCmd.AddCommand(mcpCmd)
 }
 

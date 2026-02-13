@@ -1,450 +1,392 @@
-## Swytchcode Kernel (Go skeleton)
+# Swytchcode Kernel
 
-Swytchcode is the **execution kernel** for tools. Editors, agents, and languages are **guests** that must call `swytch exec` instead of doing their own SDK logic.
-
-This repo contains a **minimal, opinionated Go skeleton** for that kernel, ready for a Go developer to extend.
-
-Swytchcode is not a library.  
-It is a kernel.  
-All languages, editors, and agents are guests.
+Swytchcode is the **execution kernel** for tools. Editors, agents, and languages call `swytchcode exec` to execute tools deterministically.
 
 **`tooling.json` defines what is trusted.**  
 **Wrekenfiles define what is possible.**
 
+## Commands
+
+### `swytchcode init`
+
+Initialize Swytchcode in this project. Creates `.swytchcode/` directory structure and `tooling.json`.
+
+**Usage:**
+```bash
+# Interactive mode (prompts for editor and mode)
+swytchcode init
+
+# Non-interactive mode (CI)
+swytchcode init --editor=cursor --mode=production --non-interactive
+```
+
+**Flags:**
+- `--editor`: Editor choice (`cursor | vscode | claude | none`)
+- `--mode`: Execution mode (`production | sandbox`)
+- `--non-interactive`: Disable prompts (required for CI)
+
+**What it does:**
+- Creates `.swytchcode/` and `.swytchcode/integrations/` directories
+- Creates `tooling.json` with empty `integrations` and `tools` maps
+- Sets `mode` and `registry_url` in `tooling.json`
+- Writes editor-specific configuration files (if editor ≠ `none`)
+
+**Error messages:**
+- `"init requires --editor when running non-interactively"` — Missing `--editor` flag in non-interactive mode
+- `"init requires --mode when running non-interactively"` — Missing `--mode` flag in non-interactive mode
+- `"invalid mode %q (expected production or sandbox)"` — Invalid mode value
+- `"unknown editor %q (expected cursor|vscode|claude|none)"` — Invalid editor value
+
 ---
 
-### Repository layout
+### `swytchcode get <project_name>`
 
-This project is structured as a single Go module with a `swytchcode` CLI:
+Fetch and install integration bundles (Wrekenfiles, methods, workflows) for a project. Does **not** modify `tooling.json` — use `swytchcode add` to enable tools.
 
-- **`cmd/swytchcode/`**: CLI entrypoint
-- **`internal/cli/`**: Cobra commands (`init`, `get`, `exec`, `rm`, `upgrade`, `list`, `describe`, `mode`)
-- **`internal/kernel/`**: Execution kernel (deterministic, non-interactive)
-- **`internal/wreken/`**: Wrekenfile loading and validation
-- **`internal/tooling/`**: `tooling.json` contract loader
-- **`internal/editors/`**: Init-time only editor configuration writers
-- **`internal/util/`**: Shared helpers (interactive detection, JSON IO, filesystem, env)
+**Usage:**
+```bash
+# Interactive mode (prompts for project if not provided)
+swytchcode get
 
-The `.swytchcode/` directory is created by `swytchcode init`.
-It may be uncommitted in local development, but must exist in CI and production.
+# With project name
+swytchcode get weaviate
+
+# Non-interactive mode
+swytchcode get weaviate --yes --non-interactive
+```
+
+**Flags:**
+- `--yes`: Auto-confirm overwrite in non-interactive mode
+- `--non-interactive`: Disable prompts
+
+**What it does:**
+- Shows spinner animation during fetching operations
+- Fetches all integration bundles for the project from registry
+- Saves to `.swytchcode/integrations/{project}/{library}/{version}/`:
+  - `wrekenfile.yaml` — Wrekenfile spec with METHODS section
+  - `methods.json` — Methods list for this integration version
+  - `workflows.json` — Workflows list for this integration version
+- Updates `.swytchcode/integrations/manifest.json` with `project.library` entries (version, `sandbox_endpoint`, `production_endpoint`, methods count, workflows count)
+- Uses `sandbox_endpoint` and `production_endpoint` directly from bundle response (uses `http://localhost` if empty)
+
+**Error messages:**
+- `"library name required when running non-interactively"` — Missing project name in non-interactive mode
+- `"no integrations available"` — Registry returned no integrations
+- `"no bundles found for project %q"` — No bundles found for the specified project
+- `"Version %q for %s/%s already exists; set yes parameter to true to overwrite"` — Integration version already exists (use `--yes` flag or set `yes` parameter to `true` in MCP)
+- `"fetch available integrations: %w"` — Failed to fetch integrations from registry
+- `"fetch integration bundles: %w"` — Failed to fetch bundles from registry
+- `"Failed to fetch workflows: %v"` — Failed to fetch workflows
+- `"Failed to fetch methods: %v"` — Failed to fetch methods
 
 ---
 
-### `tooling.json` vs Wrekenfiles (important)
+### `swytchcode bootstrap`
 
-Swytchcode intentionally separates **execution contracts** from **execution implementations**.
+Fetch all integrations declared in `tooling.json` that are not already installed. Non-interactive command suitable for CI.
 
-#### `tooling.json` (authoritative contract)
-- Defines **what tools are allowed** in this project.
-- Defines the **canonical input/output schema** for each tool.
-- Stores the **execution mode** (`production` or `sandbox`).
-- Is **committed**, reviewed, and stable.
-- Is the **only agent-facing contract**.
+**Usage:**
+```bash
+swytchcode bootstrap
+```
 
-If it affects *what a tool is allowed to do*, it belongs in `tooling.json`.
+**What it does:**
+- Reads `integrations` section from `tooling.json`
+- Parses `project.library` keys and extracts project names
+- Checks if integration already exists at `.swytchcode/integrations/{project}/{library}/{version}/`
+- Fetches missing integrations using registry API (non-interactive)
+- Shows spinner animation for each integration being fetched
+- Fails fast if any fetch fails
+- Prints summary: fetched, skipped, and failed integrations
 
-Example structure:
+**Error messages:**
+- `"tooling.json not found; run 'swytchcode init' first: %w"` — Project not initialized
+- `"parse tooling.json: %w"` — Invalid tooling.json format
+- `"invalid integrations format in tooling.json"` — Invalid integrations section format
+- `"%s (invalid format)"` — Invalid project.library format
+- `"%s (invalid version format)"` — Invalid version format in integrations
+- `"%s (missing version)"` — Missing version for integration
+- `"%s: %v"` — Failed to fetch integration (shows error details)
+
+---
+
+### `swytchcode list`
+
+List all available integrations from the registry.
+
+**Usage:**
+```bash
+# Plain text output (one ID per line)
+swytchcode list
+
+# JSON output
+swytchcode list --json
+```
+
+**Flags:**
+- `--json`: Output as JSON array instead of one ID per line
+
+**What it does:**
+- Calls `GET /v2/shell/integrations` endpoint
+- Outputs integration IDs (one per line by default, or JSON array with `--json`)
+
+**Error messages:**
+- `"fetch integrations: %w"` — Failed to fetch integrations from registry
+- `"encode JSON: %w"` — Failed to encode JSON output
+
+---
+
+### `swytchcode add [integration_spec] <canonical_id>`
+
+Add a tool (method or workflow) to `tooling.json` by canonical ID. Searches `methods.json` and `workflows.json` files across all fetched integrations.
+
+**Usage:**
+```bash
+# Mode 1: Search all integrations (may prompt if ambiguous)
+swytchcode add api.cluster.create
+
+# Mode 2: Explicit integration spec (CI-safe)
+swytchcode add weaviate@lyrid.v1 api.cluster.create
+
+# Add integration version only (does not fetch)
+swytchcode add integration weaviate@lyrid.v1
+```
+
+**What it does:**
+- Searches `methods.json` and `workflows.json` files in `.swytchcode/integrations/`
+- Determines tool type (method or workflow) based on which file contains the canonical_id
+- Reads wrekenfile to get full tool details
+- Adds tool entry to `tooling.json` with `type`, `integration`, `summary`, `desc`, and `inputs`
+- Automatically adds integration to `integrations` section if not already present
+
+**Error messages:**
+- `"canonical ID %q not found in any fetched integrations.\nRun: swytchcode get <project>"` — Tool not found in any integration
+- `"ambiguous canonical ID. Found in %d integrations:\n  %s\nUse: swytchcode add <integration@version> %s"` — Tool found in multiple integrations (non-interactive mode)
+- `"invalid integration spec format: %q (expected: project@library.version)"` — Invalid integration spec format
+- `"Integration %s not installed. Run: swytchcode get %s"` — Integration not fetched yet
+- `"method %q not found in wrekenfile"` — Method not found in wrekenfile
+- `"workflow %q not found in wrekenfile"` — Workflow not found in wrekenfile
+
+---
+
+### `swytchcode exec [canonical_id]`
+
+Execute a tool via the Swytchcode kernel. The **only** execution path for tools. Pure, deterministic, non-interactive, and offline-capable.
+
+**Usage:**
+```bash
+# CLI args mode
+swytchcode exec api.cluster.create --body cluster.json --input Authorization="Bearer token123"
+
+# With query params
+swytchcode exec api.cluster.get --param id=cluster-123 --input Authorization="Bearer token123"
+
+# JSON stdin mode
+echo '{"tool":"api.cluster.create","args":{"body":{"name":"my-cluster"},"Authorization":"Bearer token123"}}' | swytchcode exec
+
+# Dry-run (show what would be executed)
+swytchcode exec api.cluster.create --body cluster.json --dry-run
+
+# Raw output mode
+swytchcode exec api.cluster.get --param id=123 --raw
+```
+
+**Flags:**
+- `--allow-raw`: Required for executing raw methods (disabled by default)
+- `--dry-run`: Show what would be executed without making HTTP call
+- `--body <file>`: Path to JSON file containing request body
+- `--input <key=value>`: Input key=value pairs (can be specified multiple times)
+- `--param <key=value>`: Query parameter key=value pairs (can be specified multiple times)
+- `--raw`: Output raw HTTP response instead of normalized JSON
+
+**Execution pipeline:**
+1. Parse request (from CLI args or JSON stdin)
+2. Load `tooling.json` and resolve tool entry
+3. Load integration bundle from `.swytchcode/integrations/{project}/{library}/{version}/wrekenfile.yaml`
+4. Resolve method from Wreken `METHODS:` section by `canonical_id`
+5. Get base URL from `manifest.json` based on `mode` (`sandbox_endpoint` if mode is "sandbox", `production_endpoint` otherwise)
+6. Validate input schema against `tooling.json` inputs
+7. Build HTTP request (method from Wreken, URL = baseURL + endpoint, headers, body from args)
+8. Execute HTTP request (or dry-run)
+9. Output JSON response (normalized or raw)
+
+**Output format:**
+- **Default**: Normalized JSON with `request`, `status_code`, and `data` fields
+- **--raw**: Raw HTTP response with `request`, `status_code`, `status`, `headers`, and `body` (string)
+- **--dry-run**: JSON showing `method`, `url`, `headers`, and `body` that would be sent
+
+**Example output:**
 ```json
 {
+  "request": {
+    "method": "POST",
+    "url": "http://localhost/api/serverless/cloud/credential"
+  },
+  "status_code": 200,
+  "data": { ... }
+}
+```
+
+**Exit codes:**
+- `0` — Success
+- `1` — Invalid input
+- `2` — Tool not found
+- `3` — Auth missing/invalid (not currently used)
+- `4` — SDK execution failure
+- `5` — Internal error
+
+**Error messages (JSON on stderr):**
+- `{"error": "invalid json input"}` — Invalid JSON in stdin
+- `{"error": "tool is required"}` — Missing tool in request
+- `{"error": "tooling.json not found; run 'swytchcode init' first"}` — Project not initialized
+- `{"error": "tool %q not found in tooling.json. Run: swytchcode add %s"}` — Tool not in tooling.json
+- `{"error": "integration %s not installed. Run: swytchcode get %s"}` — Integration bundle not installed
+- `{"error": "method %q not found in wrekenfile"}` — Method not found in wrekenfile
+- `{"error": "manifest.json not found. Run: swytchcode get <project>"}` — Manifest not found
+- `{"error": "no %s endpoint found for integration %q in manifest.json"}` — Endpoint missing for mode
+- `{"error": "input validation failed: %s"}` — Input validation failed
+- `{"error": "failed to build request: %s"}` — Failed to build HTTP request
+- `{"error": "execution failed: %s"}` — HTTP execution failed
+- `{"error": "raw method execution requires --allow-raw flag"}` — Raw method requires flag
+
+---
+
+### `swytchcode mcp serve`
+
+Start the Model Context Protocol (MCP) server. Exposes swytchcode commands (`list`, `get`, `add`, `exec`) as MCP tools for agent communication.
+
+**Usage:**
+```bash
+# Interactive mode (stdio transport, shows output)
+swytchcode mcp serve
+
+# Daemon mode (background, no output)
+swytchcode mcp serve --daemon
+
+# Daemon mode with log file
+swytchcode mcp serve --daemon --log-file /path/to/mcp.log
+
+# HTTP transport
+swytchcode mcp serve --transport http --port 3000
+
+# HTTP transport in daemon mode
+swytchcode mcp serve --transport http --port 3000 --daemon
+```
+
+**Flags:**
+- `--daemon` / `-d`: Run in daemon mode (background, no terminal output)
+- `--log-file <path>`: Path to log file (only used in daemon mode; if not provided, logs are suppressed)
+- `--transport <type>`: Transport type (`stdio` or `http`), default: `stdio`
+- `--port <number>`: Port for HTTP transport, default: `3000`
+
+**What it does:**
+- Starts an MCP server exposing four tools:
+  - `swytchcode_list` — List available integrations
+  - `swytchcode_get` — Fetch integration bundles
+  - `swytchcode_add` — Add tools to tooling.json
+  - `swytchcode_exec` — Execute tools
+- All tool output is captured and returned through the MCP protocol (not streamed to terminal)
+- In daemon mode: suppresses logs and returns control immediately (logs to file if `--log-file` provided)
+- Supports stdio transport (default) for direct process communication
+- Supports HTTP transport with bearer token authentication
+
+**MCP Tools:**
+
+**swytchcode_list**
+- Parameters: `json` (boolean, optional) — Output as JSON array
+- Returns: CLI output as-is (one ID per line or JSON array)
+
+**swytchcode_get**
+- Parameters: `project_name` (string, required), `yes` (boolean, optional) — Auto-confirm overwrite
+- Returns: CLI output as-is
+
+**swytchcode_add**
+- Parameters: `canonical_id` (string, required), `integration_spec` (string, optional) — Integration spec (project@library.version)
+- Returns: CLI output as-is
+
+**swytchcode_exec**
+- Parameters:
+  - `tool` (string, required) — Canonical ID of tool to execute
+  - `args` (object, optional) — Tool arguments (body, params, Authorization, etc.)
+  - `dry_run` (boolean, optional) — Show what would be executed
+  - `raw` (boolean, optional) — Output raw HTTP response
+  - `allow_raw` (boolean, optional) — Allow execution of raw methods
+- Returns: CLI output as-is (matches `swytchcode exec` output format)
+
+**Error messages:**
+- `"create MCP server: %w"` — Failed to create server
+- `"open log file: %w"` — Failed to open log file
+- `"register tools: %w"` — Failed to register MCP tools
+- HTTP transport errors: `"missing Authorization header"`, `"invalid authorization token"`, `"method not allowed"`
+
+---
+
+## Project Structure
+
+After `swytchcode init`, the following structure is created:
+
+```
+.swytchcode/
+├── tooling.json              # Project configuration (integrations, tools, mode, registry_url)
+└── integrations/
+    ├── manifest.json         # Registry manifest with project.library entries (version, endpoints)
+    └── {project}/{library}/{version}/
+        ├── wrekenfile.yaml   # Wrekenfile spec with METHODS section
+        ├── methods.json      # Methods list for this integration version
+        └── workflows.json    # Workflows list for this integration version
+```
+
+### `tooling.json` structure
+
+```json
+{
+  "version": "1.0",
   "mode": "production",
+  "registry_url": "https://localhost",
+  "integrations": {
+    "weaviate.lyrid": { "version": "v1" }
+  },
   "tools": {
-    "stripe.createCustomer": {
-      "library": "stripe",
-      "operation": "createCustomer"
+    "api.cluster.create": {
+      "summary": "Create a new cluster instance",
+      "integration": "weaviate.lyrid@v1",
+      "type": "method",
+      "desc": "Create a new cluster instance",
+      "inputs": [
+        {
+          "Authorization": {
+            "LOCATION": "header",
+            "TYPE": "STRING"
+          }
+        }
+      ]
     }
   }
 }
 ```
 
-#### Wrekenfiles (implementation details)
-- Define **how an SDK method is executed**.
-- Encode SDK calls, auth mapping, retries, and metadata.
-- Are **library-specific** and may change independently.
-- Must **conform to** the I/O contract defined in `tooling.json`.
-
-If it affects *how the SDK is called*, it belongs in a Wrekenfile.
-
-The kernel enforces the boundary:
-- Inputs are validated against `tooling.json`.
-- SDK outputs are normalized to the shape declared in `tooling.json`.
-- Extra fields are dropped; missing required fields cause failure.
-
-Wrekenfiles must never define public I/O schemas.
+- **mode**: Execution mode (`production` or `sandbox`) — determines which endpoint from `manifest.json` is used
+- **integrations**: Pinned integration versions (keys are `project.library` format)
+- **tools**: Unified map of all trusted tools, keyed by `canonical_id`
 
 ---
 
-### Verified tools vs Raw methods
+## Base URL Resolution
 
-Swytchcode intentionally exposes two execution surfaces.
+When executing a tool, the base URL is resolved from `manifest.json` based on the `mode` in `tooling.json`:
 
-#### Verified tools (tooling.json)
-Verified tools are explicitly declared in `tooling.json`.
+- If `mode` is `"sandbox"` → use `sandbox_endpoint` from `manifest.json`
+- Otherwise → use `production_endpoint` from `manifest.json`
 
-Properties:
-- Reviewed and intentional
-- Stable input/output contracts
-- Safe for CI, production, and agents
-- Suggested by editors and agents by default
-
-`tooling.json` defines what is **trusted**.
-
-This surface may include:
-- Single SDK methods
-- Curated SDK methods
-- Verified multi-step workflows (explicitly declared)
+The full URL is constructed as: `baseURL + endpoint` (where `endpoint` comes from the Wreken METHOD definition).
 
 ---
 
-#### Raw methods (Wrekenfiles)
-Raw methods are defined in Wrekenfiles but **not promoted** into `tooling.json`.
+## Error Handling
 
-Properties:
-- Fully executable
-- Discoverable
-- Not guaranteed stable
-- Not allowed in CI or agents by default
+All errors are written to stderr as JSON:
+```json
+{"error": "error message here"}
+```
 
-Wrekenfiles define what is **possible**.
-
-Raw methods are intended for:
-- Exploration
-- Advanced users
-- Rapid iteration before promotion
-
-Execution of raw methods is always **explicitly opt-in**.
-
----
-
-### CI and `.swytchcode/` policy
-
-`.swytchcode/` is **execution metadata**, not user state.
-
-#### Local development
-- `.swytchcode/` may be uncommitted.
-- Developers may experiment freely using `init` and `get`.
-
-#### CI / Docker / production
-- `.swytchcode/` **must exist**.
-- If `.swytchcode/` is missing, `swytchcode exec` must fail.
-- CI must never infer or auto-download integrations.
-- Mode must be explicitly set during `init`: `swytchcode init --mode=production --editor=none --non-interactive`.
-
-In CI, Swytchcode never infers integrations.
-
-If `.swytchcode/` is missing, execution fails.  
-If a tool is not declared in `tooling.json`, execution fails.  
-If a raw method is used without explicit opt-in, execution fails.  
-If mode is not set, defaults to `production` (strict policies enforced).
-
-Swytchcode does not guess in CI.
-If execution matters, it must be declared and reviewable.
-
----
-
-### No workflows (by design)
-
-Wrekenfiles describe **individual SDK methods**, not workflows.
-
-Swytchcode intentionally does not own workflows:
-- No hidden sequences
-- No implicit multi-step behavior
-- No business logic encoded in specs
-
-Workflows emerge through **composition**:
-- In application code
-- In agent reasoning
-- In CI scripts
-
-If a multi-step operation must exist, it should be exposed explicitly
-as a single tool in `tooling.json`, implemented transparently by the kernel.
-
-Nothing is hidden inside Wrekenfiles.
-
----
-
-### Promotion model
-
-The expected lifecycle of a method is:
-
-1. Method exists in a Wrekenfile
-2. User discovers it via `swytchcode list`
-3. User experiments locally using raw execution
-4. Team promotes it into `tooling.json`
-5. Method becomes verified, agent-safe, and CI-safe
-
-Swytchcode does not auto-promote anything.
-
----
-
-### Non‑negotiable principles
-
-- **Single execution path**: All execution flows through `swytch exec`.
-- **Deterministic**: Same JSON input → same JSON output, no hidden state.
-- **Exec is never interactive**: No prompts, no TTY detection, no prose.
-- **Setup only is interactive**: `init` and `get` may prompt on a TTY, and must be scriptable via flags.
-- **Editor‑agnostic at runtime**: Editor rules are for authoring only; `exec` ignores them.
-- **Env‑only auth**: Secrets come from environment variables only.
-- **Stable exit codes**: Locked contract for automation (see below).
-
-If an implementation choice violates these, it is wrong.
-
----
-
-### What NOT to add (explicitly forbidden)
-
-The following are non-negotiable:
-
-- ❌ No auto-promotion
-- ❌ No inference from imports
-- ❌ No "helpful" fallback to raw
-- ❌ No workflows hidden in Wrekenfiles
-- ❌ No agent auto-discovery of raw methods
-
----
-
-### Commands and behavior (developer contract)
-
-- **`swytchcode init`**
-  - **Purpose**: One‑time project setup, `.swytchcode/` creation, editor rules, and mode configuration.
-  - **Behavior** (interactive by default):
-    - When running on a TTY without flags, `init` interactively prompts for:
-      - Editor selection (`cursor | vscode | claude | none`)
-      - Mode selection (`production | sandbox`)
-    - Example interactive session:
-      ```
-      $ swytchcode init
-      
-      Which editor do you use?
-        1) cursor
-        2) vscode
-        3) claude
-        4) none
-      Select [1-4]: 1
-      
-      Which execution mode do you want to use?
-        1) production
-        2) sandbox
-      Select [1-2]: 1
-      
-      Swytchcode initialized for project at /path/to/project
-      ```
-    - If `--non-interactive` is set, prompts are disabled and flags are required.
-  - **CI / non‑interactive**:
-    - Use: `swytchcode init --editor=cursor --mode=production --non-interactive`.
-    - If non‑interactive and `--editor` is missing → error (exit code 1).
-    - If non‑interactive and `--mode` is missing → error (exit code 1).
-    - All required parameters must be provided via flags.
-  - **Flags**:
-    - `--editor`: Set editor (`cursor | vscode | claude | none`)
-    - `--mode`: Set execution mode (`production | sandbox`)
-    - `--non-interactive`: Disable prompts (required for CI)
-  - **Responsibilities**:
-    - Detect project root.
-    - Create `.swytchcode/`.
-    - Write `tooling.json` with mode configuration.
-    - Write editor‑specific configs via `internal/editors/*` (Cursor, VS Code, Claude), if editor ≠ `none`.
-
-- **`swytchcode get <library>`**
-  - **Purpose**: Fetch and manage Wrekenfiles (e.g. `stripe`, `openai`).
-  - **Human / TTY**:
-    - With no args, `swytchcode get` may prompt to select a library and confirm overwrites.
-  - **CI / non‑interactive**:
-    - Should be usable as: `swytchcode get stripe --yes --non-interactive`.
-    - If overwrite is needed and `--yes` is missing → fail, do not prompt.
-  - **Responsibilities**:
-    - Resolve library → registry endpoint.
-    - Fetch Wrekenfile JSON/YAML.
-    - Validate schema.
-    - Save to `.swytchcode/wrekenfiles/<library>.json`.
-    - Never execute tools or touch `tooling.json`.
-
-- **`swytchcode rm <library>`**
-  - **Purpose**: Delete a local Wrekenfile spec for a library.
-  - **Human / TTY**:
-    - May prompt to confirm deletion (once implemented).
-    - For now, requires an explicit `--yes` to proceed.
-  - **CI / non‑interactive**:
-    - Use as: `swytchcode rm stripe --yes --non-interactive`.
-    - Must never block or prompt; fails fast without `--yes`.
-  - **Responsibilities**:
-    - Remove `.swytchcode/wrekenfiles/<library>.json` if it exists.
-    - Treat missing specs as a deterministic error (no “best effort”).
-
-- **`swytchcode upgrade <library>`**
-  - **Purpose**: Refresh an existing Wrekenfile spec from the registry.
-  - **Human / TTY**:
-    - May prompt before overwriting the existing spec (once implemented).
-    - For now, requires `--yes` to indicate an intentional upgrade.
-  - **CI / non‑interactive**:
-    - Use as: `swytchcode upgrade stripe --yes --non-interactive`.
-    - Must never prompt and must be safe to run repeatedly.
-  - **Responsibilities**:
-    - Verify an existing spec is present.
-    - Fetch latest Wrekenfile as in `get`.
-    - Validate and overwrite the local spec atomically.
-
-- **`swytchcode list <library>`**
-  - **Purpose**: Discover available methods without executing anything.
-  - **Output**: JSON to stdout:
-    ```json
-    {
-      "verified": [
-        "stripe.createCustomer",
-        "stripe.attachPaymentMethod"
-      ],
-      "raw": [
-        "customers.search",
-        "customers.update",
-        "subscriptions.resume"
-      ]
-    }
-    ```
-  - **Flags**:
-    - `--raw`: Show only raw methods
-    - `--verified`: Show only verified tools
-  - **Behavior**:
-    - Reads `tooling.json` + Wrekenfile
-    - Never executes anything
-    - Safe for CI
-    - Default output is JSON only (no prose)
-
-- **`swytchcode describe <tool>`**
-  - **Purpose**: Inspect a tool or raw method without execution.
-  - **Examples**:
-    - `swytchcode describe stripe.createCustomer` (verified tool)
-    - `swytchcode describe raw.stripe.customers.search` (raw method)
-  - **Behavior**:
-    - Verified tool → show I/O schema from `tooling.json`
-    - Raw method → show metadata from Wrekenfile
-    - No SDK calls
-    - No side effects
-
-- **`swytchcode mode [production|sandbox]`**
-  - **Purpose**: Set or display the execution mode for the project.
-  - **Modes**:
-    - `production`: Use production credentials and enforce strict policies
-    - `sandbox`: Use sandbox/test credentials and allow experimental features
-  - **Usage**:
-    - `swytchcode mode` → Display current mode (defaults to `production`)
-    - `swytchcode mode production` → Set mode to production
-    - `swytchcode mode sandbox` → Set mode to sandbox
-  - **Behavior**:
-    - Mode is stored in `tooling.json` (not a separate config file)
-    - Affects credential selection and policy enforcement
-    - Default mode is `production` if not explicitly set
-    - Can be set during `swytchcode init` or changed later with this command
-  - **CI / non‑interactive**:
-    - Use: `swytchcode mode production` or `swytchcode mode sandbox`
-    - No prompts, deterministic behavior
-
-- **`swytchcode exec`**
-  - **Purpose**: The **only** execution path for tools.
-  - **Input**: JSON on stdin, e.g.
-
-    ```json
-    {
-      "tool": "stripe.createCustomer",
-      "args": {
-        "email": "test@example.com"
-      }
-    }
-    ```
-
-  - **Behavior** (always non‑interactive):
-    - Read and parse stdin JSON.
-    - If tool starts with `raw.`:
-      - Require `--allow-raw` flag
-      - If missing → fail with exit code 1
-      - Resolve directly via Wrekenfile (bypass `tooling.json`)
-    - Else (verified tool):
-      - Load `tooling.json`
-      - Resolve tool → Wrekenfile
-      - Validate input schema
-    - Load env‑based credentials.
-    - Apply policy (retries, idempotency).
-    - Execute SDK call.
-    - Normalize and write JSON output to stdout on success.
-    - Write JSON error to stderr on failure.
-  - **Flags**:
-    - `--allow-raw`: Required for executing raw methods (disabled by default)
-  - **Executing raw methods (explicit opt-in)**:
-    Raw methods may be executed by explicitly opting in.
-
-    Example:
-    ```json
-    {
-      "tool": "raw.stripe.customers.search",
-      "args": { "query": "email:'test@example.com'" }
-    }
-    ```
-
-    This requires:
-    ```bash
-    swytchcode exec --allow-raw
-    ```
-
-    Rules:
-    - Raw execution is disabled by default
-    - CI must never allow raw execution implicitly
-    - Agents must never use raw methods unless explicitly configured
-    - There must be no silent fallback from verified → raw
-  - **Forbidden**:
-    - Prompts, spinners, or human‑oriented prose.
-    - Any branching on editor or language.
-    - Reading editor config files at runtime.
-    - Auto-promotion of raw methods to verified
-    - Silent fallback from verified to raw methods
-
----
-
-### Kernel responsibilities and exit codes
-
-The kernel lives under `internal/kernel/` and must own:
-
-- **Execution orchestration** (no retries in clients).
-- **Idempotency and policy** (e.g. safe retries).
-- **Error mapping** into the following **stable exit codes**:
-
-| Code | Meaning                    |
-| ---- | -------------------------- |
-| 0    | Success                    |
-| 1    | Invalid input              |
-| 2    | Tool not found             |
-| 3    | Auth missing/invalid       |
-| 4    | SDK execution failure      |
-| 5    | Internal error             |
-
-This contract is for CI, Docker images, and agents, and must not change casually.
-
----
-
-### Developer roadmap (what to implement next)
-
-- **CLI wiring**
-  - Complete remaining TODOs in `internal/cli/init.go`:
-    - Interactive prompts for editor and mode are implemented.
-    - Create `.swytchcode/` and `tooling.json` with mode configuration (done).
-    - Delegate editor configuration to `internal/editors/*` (done).
-    - Interactive mode works by default, with `--non-interactive` for CI (done).
-  - Extend `internal/cli/get.go` to:
-    - Support optional interactive prompts on TTY.
-    - Implement non‑interactive `--yes` behavior.
-  - Complete `internal/cli/mode.go`:
-    - Integrate mode into kernel execution logic (credential selection, policy enforcement).
-    - Ensure mode affects SDK calls and environment variable selection.
-
-- **Kernel and contracts**
-  - Flesh out `internal/kernel/*`:
-    - Tool resolution from `tooling.json` + Wrekenfiles.
-    - Schema validation and env‑based auth checks.
-    - SDK invocation layer and error mapping to exit codes.
-  - Implement `internal/wreken/*` and `internal/tooling/*` loaders/validators.
-
-- **Quality gates**
-  - Ensure `echo '{"tool":"x.y","args":{}}' | swytchcode exec` works:
-    - In a Docker container.
-    - In GitHub Actions or GitLab CI.
-    - With no TTY, no `$HOME`, and no editor present.
-
-Once these pieces are in place, your thin clients (Cursor/VS Code/agents) should be <50 LOC and defer all execution to this kernel.
-
+Exit codes are stable and documented above. The kernel never prompts during execution and never calls the registry during `exec`.

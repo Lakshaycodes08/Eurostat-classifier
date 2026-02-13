@@ -1,3 +1,4 @@
+// prompt.go provides interactive selection for setup commands (init, get); not used by exec.
 package util
 
 import (

@@ -1,3 +1,4 @@
+// claude.go writes Claude Code configuration so the agent uses swytchcode exec (init-time only).
 package editors
 
 // WriteClaudeConfig will emit Claude Code configuration (or equivalent)
