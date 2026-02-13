@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
+
+	"gitlab.com/swytchcode/shell/internal/constants"
 )
 
 // Client wraps HTTP client for registry API calls.
@@ -22,15 +23,15 @@ func NewClient(config *Config) *Client {
 	}
 
 	transport := &http.Transport{
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 10,
-		IdleConnTimeout:     90 * time.Second,
+		MaxIdleConns:        constants.HTTPMaxIdleConns,
+		MaxIdleConnsPerHost: constants.HTTPMaxIdleConnsPerHost,
+		IdleConnTimeout:     constants.HTTPIdleConnTimeout,
 	}
 
 	return &Client{
 		httpClient: &http.Client{
 			Transport: transport,
-			Timeout:   30 * time.Second,
+			Timeout:   constants.HTTPClientTimeout,
 		},
 		config: config,
 	}

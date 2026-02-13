@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
+
+	"gitlab.com/swytchcode/shell/internal/constants"
 )
 
 // ExecuteDryRun outputs what would be executed without making the HTTP call.
@@ -40,7 +41,7 @@ func ExecuteDryRun(req *http.Request, stdout io.Writer) int {
 // ExecuteHTTP executes the HTTP request and returns the response.
 func ExecuteHTTP(req *http.Request) (*http.Response, error) {
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: constants.HTTPClientTimeout,
 	}
 
 	resp, err := client.Do(req)

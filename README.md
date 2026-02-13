@@ -73,6 +73,7 @@ swytchcode get weaviate --yes --non-interactive
 - `"library name required when running non-interactively"` — Missing project name in non-interactive mode
 - `"no integrations available"` — Registry returned no integrations
 - `"no bundles found for project %q"` — No bundles found for the specified project
+- `"Version %q for %s/%s already exists; set yes parameter to true to overwrite"` — Integration version already exists (use `--yes` flag or set `yes` parameter to `true` in MCP)
 - `"fetch available integrations: %w"` — Failed to fetch integrations from registry
 - `"fetch integration bundles: %w"` — Failed to fetch bundles from registry
 - `"Failed to fetch workflows: %v"` — Failed to fetch workflows
@@ -247,6 +248,76 @@ swytchcode exec api.cluster.get --param id=123 --raw
 - `{"error": "failed to build request: %s"}` — Failed to build HTTP request
 - `{"error": "execution failed: %s"}` — HTTP execution failed
 - `{"error": "raw method execution requires --allow-raw flag"}` — Raw method requires flag
+
+---
+
+### `swytchcode mcp serve`
+
+Start the Model Context Protocol (MCP) server. Exposes swytchcode commands (`list`, `get`, `add`, `exec`) as MCP tools for agent communication.
+
+**Usage:**
+```bash
+# Interactive mode (stdio transport, shows output)
+swytchcode mcp serve
+
+# Daemon mode (background, no output)
+swytchcode mcp serve --daemon
+
+# Daemon mode with log file
+swytchcode mcp serve --daemon --log-file /path/to/mcp.log
+
+# HTTP transport
+swytchcode mcp serve --transport http --port 3000
+
+# HTTP transport in daemon mode
+swytchcode mcp serve --transport http --port 3000 --daemon
+```
+
+**Flags:**
+- `--daemon` / `-d`: Run in daemon mode (background, no terminal output)
+- `--log-file <path>`: Path to log file (only used in daemon mode; if not provided, logs are suppressed)
+- `--transport <type>`: Transport type (`stdio` or `http`), default: `stdio`
+- `--port <number>`: Port for HTTP transport, default: `3000`
+
+**What it does:**
+- Starts an MCP server exposing four tools:
+  - `swytchcode_list` — List available integrations
+  - `swytchcode_get` — Fetch integration bundles
+  - `swytchcode_add` — Add tools to tooling.json
+  - `swytchcode_exec` — Execute tools
+- All tool output is captured and returned through the MCP protocol (not streamed to terminal)
+- In daemon mode: suppresses logs and returns control immediately (logs to file if `--log-file` provided)
+- Supports stdio transport (default) for direct process communication
+- Supports HTTP transport with bearer token authentication
+
+**MCP Tools:**
+
+**swytchcode_list**
+- Parameters: `json` (boolean, optional) — Output as JSON array
+- Returns: CLI output as-is (one ID per line or JSON array)
+
+**swytchcode_get**
+- Parameters: `project_name` (string, required), `yes` (boolean, optional) — Auto-confirm overwrite
+- Returns: CLI output as-is
+
+**swytchcode_add**
+- Parameters: `canonical_id` (string, required), `integration_spec` (string, optional) — Integration spec (project@library.version)
+- Returns: CLI output as-is
+
+**swytchcode_exec**
+- Parameters:
+  - `tool` (string, required) — Canonical ID of tool to execute
+  - `args` (object, optional) — Tool arguments (body, params, Authorization, etc.)
+  - `dry_run` (boolean, optional) — Show what would be executed
+  - `raw` (boolean, optional) — Output raw HTTP response
+  - `allow_raw` (boolean, optional) — Allow execution of raw methods
+- Returns: CLI output as-is (matches `swytchcode exec` output format)
+
+**Error messages:**
+- `"create MCP server: %w"` — Failed to create server
+- `"open log file: %w"` — Failed to open log file
+- `"register tools: %w"` — Failed to register MCP tools
+- HTTP transport errors: `"missing Authorization header"`, `"invalid authorization token"`, `"method not allowed"`
 
 ---
 

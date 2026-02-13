@@ -236,7 +236,7 @@ var getCmd = &cobra.Command{
 			
 			// TODO: Extract auth info from bundle or API - for now use empty
 			auth := make(map[string]interface{})
-			if err := updateManifestEntry(projectRoot, projectLibrary, bundle.Version, sandboxEndpoint, productionEndpoint, methodsCount, workflowsCount, auth); err != nil {
+			if err := UpdateManifestEntry(projectRoot, projectLibrary, bundle.Version, sandboxEndpoint, productionEndpoint, methodsCount, workflowsCount, auth); err != nil {
 				bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to update manifest: %v", err))
 				return fmt.Errorf("update manifest: %w", err)
 			}

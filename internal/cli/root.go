@@ -28,5 +28,6 @@ func init() {
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(bootstrapCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(mcpCmd)
 }
 

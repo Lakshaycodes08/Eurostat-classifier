@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gitlab.com/swytchcode/shell/internal/manifest"
 	"gitlab.com/swytchcode/shell/internal/registry"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
@@ -240,7 +241,7 @@ func fetchIntegration(ctx context.Context, regClient *registry.Client, projectRo
 	}
 
 	auth := make(map[string]interface{})
-	if err := updateManifestEntry(projectRoot, projectLibrary, version, sandboxEndpoint, productionEndpoint, methodsCount, workflowsCount, auth); err != nil {
+		if err := manifest.UpdateEntry(projectRoot, projectLibrary, version, sandboxEndpoint, productionEndpoint, methodsCount, workflowsCount, auth); err != nil {
 		return fmt.Errorf("update manifest: %w", err)
 	}
 
