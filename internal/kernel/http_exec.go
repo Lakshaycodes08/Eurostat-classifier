@@ -52,11 +52,15 @@ func ExecuteHTTP(req *http.Request) (*http.Response, error) {
 }
 
 // OutputRawResponse outputs the raw HTTP response.
-func OutputRawResponse(resp *http.Response, stdout io.Writer, stderr io.Writer) int {
+func OutputRawResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) int {
 	defer resp.Body.Close()
 
-	// Output status and headers
+	// Output request URL for verification, then status and headers
 	output := map[string]interface{}{
+		"request": map[string]string{
+			"method": req.Method,
+			"url":    req.URL.String(),
+		},
 		"status_code": resp.StatusCode,
 		"status":      resp.Status,
 		"headers":    resp.Header,
@@ -84,7 +88,7 @@ func OutputRawResponse(resp *http.Response, stdout io.Writer, stderr io.Writer) 
 }
 
 // OutputJSONResponse outputs normalized JSON response.
-func OutputJSONResponse(resp *http.Response, stdout io.Writer, stderr io.Writer) int {
+func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) int {
 	defer resp.Body.Close()
 
 	// Read response body
@@ -102,8 +106,12 @@ func OutputJSONResponse(resp *http.Response, stdout io.Writer, stderr io.Writer)
 		return ExitCodeSDKFailure
 	}
 
-	// Output normalized JSON
+	// Output normalized JSON; include request URL so caller can verify base URL was applied
 	output := map[string]interface{}{
+		"request": map[string]string{
+			"method": req.Method,
+			"url":    req.URL.String(),
+		},
 		"status_code": resp.StatusCode,
 		"data":        responseJSON,
 	}

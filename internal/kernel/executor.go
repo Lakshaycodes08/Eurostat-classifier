@@ -117,10 +117,10 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 		return ExitCodeSDKFailure
 	}
 
-	// Step 9: Output response
+	// Step 9: Output response (include request URL so caller can verify base URL)
 	if rawOutput {
-		return OutputRawResponse(resp, stdout, stderr)
+		return OutputRawResponse(resp, httpReq, stdout, stderr)
 	}
 
-	return OutputJSONResponse(resp, stdout, stderr)
+	return OutputJSONResponse(resp, httpReq, stdout, stderr)
 }

@@ -10,18 +10,23 @@ import (
 )
 
 // BuildRequest builds an HTTP request from method definition, base URL, and input args.
+// baseURL is the manifest endpoint (sandbox or production) and is prepended to the method path.
 func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (*http.Request, error) {
-	// Construct full URL: baseURL + endpoint
-	fullURL := baseURL + method.Endpoint
+	// Prepend base URL to method path (normalize slashes)
+	base := strings.TrimSuffix(baseURL, "/")
+	path := method.Endpoint
+	if path != "" && path[0] != '/' {
+		path = "/" + path
+	}
+	fullURL := base + path
 
 	// Replace path parameters in endpoint (e.g., /api/cluster/{id} -> /api/cluster/123)
-	endpoint := method.Endpoint
 	if params, ok := args["params"].(map[string]string); ok {
 		for key, value := range params {
 			placeholder := "{" + key + "}"
-			if strings.Contains(endpoint, placeholder) {
-				endpoint = strings.ReplaceAll(endpoint, placeholder, value)
-				fullURL = baseURL + endpoint
+			if strings.Contains(path, placeholder) {
+				path = strings.ReplaceAll(path, placeholder, value)
+				fullURL = base + path
 			}
 		}
 	}
