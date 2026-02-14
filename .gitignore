@@ -33,7 +33,6 @@ go.work.sum
 
 
 # Custom
-.swytchcode/integrations/
+.swytchcode
 .cursor/
 .DS_Store
-swytchcode
