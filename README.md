@@ -496,3 +496,21 @@ All errors are written to stderr as JSON:
 ```
 
 Exit codes are stable and documented above. The kernel never prompts during execution and never calls the registry during `exec`.
+
+---
+
+## Testing with MCP Inspector
+
+You can run the MCP server and inspect it with [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) (e.g. `npx @modelcontextprotocol/inspector`).
+
+Using the shell
+
+```sh
+npx @modelcontextprotocol/inspector ./swytchcode mcp serve
+```
+
+Using the http
+
+```sh
+npx @modelcontextprotocol/inspector ./swytchcode mcp serve --transport http --port 3000
+```
