@@ -35,7 +35,8 @@ type ExecRequest struct {
 //   10. Return JSON output
 //
 // It returns a process exit code from the fixed set defined in errors.go.
-func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool, dryRun bool, rawOutput bool, projectRoot string) int {
+// Execute runs a single tool invocation. When jsonOutput is true, stdout is guaranteed to be a single JSON object (normalized or raw per rawOutput).
+func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool, dryRun bool, rawOutput bool, jsonOutput bool, projectRoot string) int {
 	var req ExecRequest
 	if err := util.ReadJSON(stdin, &req); err != nil {
 		writeErrorJSON(stderr, "invalid json input")

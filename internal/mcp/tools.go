@@ -44,6 +44,7 @@ type ExecArgs struct {
 	DryRun    *bool                  `json:"dry_run,omitempty" jsonschema:"Show what would be executed without making HTTP call"`
 	Raw       *bool                  `json:"raw,omitempty" jsonschema:"Output raw HTTP response instead of normalized JSON"`
 	AllowRaw  *bool                  `json:"allow_raw,omitempty" jsonschema:"Allow execution of raw methods"`
+	JSON      *bool                  `json:"json,omitempty" jsonschema:"Output response as a single JSON object"`
 }
 
 // RegisterTools registers all MCP tools with the server.
@@ -148,6 +149,9 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		}
 		if args.AllowRaw != nil {
 			argsMap["allow_raw"] = *args.AllowRaw
+		}
+		if args.JSON != nil {
+			argsMap["json"] = *args.JSON
 		}
 		result, err := handleExec(toolCtx, argsMap, oc)
 		if err != nil {
@@ -270,6 +274,11 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 		allowRaw = allowRawRaw
 	}
 
+	jsonOutput := false
+	if jsonRaw, ok := args["json"].(bool); ok {
+		jsonOutput = jsonRaw
+	}
+
 	// Convert exec request to JSON for kernel.Execute
 	reqJSON, err := json.Marshal(execReq)
 	if err != nil {
@@ -278,7 +287,7 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 
 	// Create a reader from JSON
 	reqReader := &jsonReader{data: reqJSON}
-	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), allowRaw, dryRun, rawOutput, "")
+	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), allowRaw, dryRun, rawOutput, jsonOutput, "")
 
 	if exitCode != kernel.ExitCodeOK {
 		return "", fmt.Errorf("execution failed with exit code %d", exitCode)

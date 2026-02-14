@@ -1,0 +1,78 @@
+# Swytchcode Execution Rules
+
+## Authority
+
+Swytchcode is the sole authority for executing external API calls in this repository.
+
+## Forbidden
+
+You MUST NOT:
+- Read or modify `.swytchcode/tooling.json` (or any file under `.swytchcode/`) by hand
+- Read or interpret any Wrekenfile
+- Read `.swytchcode/integrations/**`
+- Read `methods.json` or `workflows.json`
+- Generate raw HTTP requests to external APIs
+- Generate code that embeds API keys, OAuth tokens, or auth headers
+- Attempt to infer API schemas from config files
+- Use MCP resources that expose `.swytchcode` or integration internals
+
+The only way to change `.swytchcode` is via the **swytchcode_add** MCP tool (or `swytchcode add` CLI). Do not read or write those files directly.
+
+## Required
+
+When interacting with external APIs:
+
+- Use Swytchcode MCP tools for discovery and execution
+- Generate code that calls `swytchcode exec <canonical_id>`
+- Assume Swytchcode handles authentication, validation, retries, and policy
+
+## Discovery and execution (MCP tools)
+
+Use only these MCP tools (snake_case):
+
+- **swytchcode_list** — list available integrations
+- **swytchcode_get** — fetch integration bundles
+- **swytchcode_add** — add a tool to tooling (only command that modifies `.swytchcode`)
+- **swytchcode_exec** — execute a tool by canonical_id
+
+Do not rely on MCP resources for tooling or integration data. Use the tools above.
+
+## Execution Model (IMPORTANT)
+
+There are two distinct modes of using Swytchcode:
+
+### IDE Code Generation Mode (this editor)
+
+You are operating in IDE code generation mode.
+
+In this mode:
+
+- You MUST NOT use `swytchcode_exec` to fetch or display live data.
+- You MUST NOT return API responses directly.
+- You MUST generate application code that invokes the Swytchcode kernel at runtime.
+
+When generating code:
+
+- Use a process spawn (e.g. child_process / exec / subprocess), OR
+- Use an approved Swytchcode runtime helper library (Go / TypeScript / Python)
+- The generated code must call `swytchcode exec <canonical_id>` at runtime.
+- The generated code must return executable code, not API results.
+
+### Forbidden in IDE Mode
+
+- Calling `swytchcode_exec` to inspect or preview data
+- Making raw HTTP API calls
+- Embedding authentication or headers
+
+This makes the rule unambiguous: IDE agents generate code, they do not execute for data.
+
+## Execution
+
+Never call external APIs directly. Always delegate execution to Swytchcode (via `swytchcode exec` in generated runtime code).
+
+## Runtime code generation
+
+Generated application code must:
+
+- Call Swytchcode via CLI (`swytchcode exec <canonical_id>`) or an approved runtime helper
+- Treat Swytchcode as a black-box executor
