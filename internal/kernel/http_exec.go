@@ -11,11 +11,19 @@ import (
 )
 
 // ExecuteDryRun outputs what would be executed without making the HTTP call.
+// Output: method, full url (with query string), all headers (Authorization + from args.headers), and body when present.
 func ExecuteDryRun(req *http.Request, stdout io.Writer) int {
+	// Headers as flat map[string]string so JSON is clean (spec: "Authorization": "Bearer token123")
+	headersMap := make(map[string]string)
+	for name, vals := range req.Header {
+		if len(vals) > 0 {
+			headersMap[name] = vals[0]
+		}
+	}
 	dryRunOutput := map[string]interface{}{
 		"method":  req.Method,
-		"url":     req.URL.String(),
-		"headers": req.Header,
+		"url":    req.URL.String(), // full URL with path substituted and query string
+		"headers": headersMap,
 	}
 
 	if req.Body != nil {
@@ -52,8 +60,8 @@ func ExecuteHTTP(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// OutputRawResponse outputs the raw HTTP response.
-func OutputRawResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) int {
+// OutputRawResponse outputs the raw HTTP response. Returns (exitCode, errMsg); errMsg is non-empty only when exitCode != ExitCodeOK.
+func OutputRawResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) (int, string) {
 	defer resp.Body.Close()
 
 	// Output request URL for verification, then status and headers
@@ -64,47 +72,50 @@ func OutputRawResponse(resp *http.Response, req *http.Request, stdout io.Writer,
 		},
 		"status_code": resp.StatusCode,
 		"status":      resp.Status,
-		"headers":    resp.Header,
+		"headers":     resp.Header,
 	}
 
 	// Read body
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		writeErrorJSON(stderr, "failed to read response body: "+err.Error())
-		return ExitCodeSDKFailure
+		msg := "failed to read response body: " + err.Error()
+		writeErrorJSON(stderr, msg)
+		return ExitCodeSDKFailure, msg
 	}
 
 	output["body"] = string(bodyBytes)
 
 	if err := json.NewEncoder(stdout).Encode(output); err != nil {
-		writeErrorJSON(stderr, "failed to encode response")
-		return ExitCodeInternalError
+		msg := "failed to encode response"
+		writeErrorJSON(stderr, msg)
+		return ExitCodeInternalError, msg
 	}
 
 	if resp.StatusCode >= 400 {
-		return ExitCodeSDKFailure
+		return ExitCodeSDKFailure, fmt.Sprintf("HTTP status %d %s", resp.StatusCode, resp.Status)
 	}
 
-	return ExitCodeOK
+	return ExitCodeOK, ""
 }
 
-// OutputJSONResponse outputs normalized JSON response.
-func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) int {
+// OutputJSONResponse outputs normalized JSON response. Returns (exitCode, errMsg); errMsg is non-empty only when exitCode != ExitCodeOK.
+func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) (int, string) {
 	defer resp.Body.Close()
 
 	// Read response body
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		writeErrorJSON(stderr, "failed to read response body: "+err.Error())
-		return ExitCodeSDKFailure
+		msg := "failed to read response body: " + err.Error()
+		writeErrorJSON(stderr, msg)
+		return ExitCodeSDKFailure, msg
 	}
 
 	// Parse JSON response
 	var responseJSON interface{}
 	if err := json.Unmarshal(bodyBytes, &responseJSON); err != nil {
-		// If not JSON, return as-is with error
-		writeErrorJSON(stderr, "response is not valid JSON")
-		return ExitCodeSDKFailure
+		msg := "response is not valid JSON"
+		writeErrorJSON(stderr, msg)
+		return ExitCodeSDKFailure, msg
 	}
 
 	// Output normalized JSON; include request URL so caller can verify base URL was applied
@@ -118,13 +129,14 @@ func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer
 	}
 
 	if err := json.NewEncoder(stdout).Encode(output); err != nil {
-		writeErrorJSON(stderr, "failed to encode response")
-		return ExitCodeInternalError
+		msg := "failed to encode response"
+		writeErrorJSON(stderr, msg)
+		return ExitCodeInternalError, msg
 	}
 
 	if resp.StatusCode >= 400 {
-		return ExitCodeSDKFailure
+		return ExitCodeSDKFailure, fmt.Sprintf("HTTP status %d %s", resp.StatusCode, resp.Status)
 	}
 
-	return ExitCodeOK
+	return ExitCodeOK, ""
 }

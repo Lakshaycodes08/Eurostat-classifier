@@ -36,3 +36,4 @@ go.work.sum
 .swytchcode/
 .cursor/
 .DS_Store
+/swytchcode

@@ -6,11 +6,48 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
+// queryParamReservedKeys are top-level args that must not be sent as URL query parameters.
+var queryParamReservedKeys = map[string]bool{
+	"body": true, "params": true, "Authorization": true, "headers": true,
+}
+
+// paramsFromArgs returns a normalized map[string]string from args["params"].
+// JSON stdin produces map[string]interface{}; CLI may produce map[string]string. Both are supported.
+func paramsFromArgs(args map[string]interface{}) map[string]string {
+	if args == nil {
+		return nil
+	}
+	raw, ok := args["params"]
+	if !ok || raw == nil {
+		return nil
+	}
+	out := make(map[string]string)
+	switch m := raw.(type) {
+	case map[string]string:
+		return m
+	case map[string]interface{}:
+		for k, v := range m {
+			out[k] = argValueToQueryString(v)
+		}
+		return out
+	}
+	return nil
+}
+
 // BuildRequest builds an HTTP request from method definition, base URL, and input args.
 // baseURL is the manifest endpoint (sandbox or production) and is prepended to the method path.
+//
+// GET: path params from args["params"] (e.g. /api/{id}); query from args["params"] + all other top-level args
+// (e.g. project_name, filter). No body.
+//
+// POST/PUT/PATCH: same URL and query as above; body from args["body"] (JSON); Content-Type application/json
+// if body is set and not already set by method headers.
+//
+// Headers: (1) method.Headers from Wreken, (2) args["Authorization"], (3) args["headers"] map (any extra headers).
 func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (*http.Request, error) {
 	// Prepend base URL to method path (normalize slashes)
 	base := strings.TrimSuffix(baseURL, "/")
@@ -19,15 +56,15 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 		path = "/" + path
 	}
 	fullURL := base + path
+	params := paramsFromArgs(args)
 
 	// Replace path parameters in endpoint (e.g., /api/cluster/{id} -> /api/cluster/123)
-	if params, ok := args["params"].(map[string]string); ok {
-		for key, value := range params {
-			placeholder := "{" + key + "}"
-			if strings.Contains(path, placeholder) {
-				path = strings.ReplaceAll(path, placeholder, value)
-				fullURL = base + path
-			}
+	// Keys used in path must not be added to query (path takes precedence).
+	for key, value := range params {
+		placeholder := "{" + key + "}"
+		if strings.Contains(path, placeholder) {
+			path = strings.ReplaceAll(path, placeholder, value)
+			fullURL = base + path
 		}
 	}
 
@@ -37,18 +74,27 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
-	// Add query parameters
-	if params, ok := args["params"].(map[string]string); ok {
-		query := parsedURL.Query()
-		for key, value := range params {
-			// Skip path params that were already replaced
-			placeholder := "{" + key + "}"
-			if !strings.Contains(method.Endpoint, placeholder) {
-				query.Set(key, value)
-			}
+	// Query: merge (a) params (keys not used in path) and (b) other top-level args. Prefer params when both exist.
+	query := parsedURL.Query()
+	for key, value := range params {
+		placeholder := "{" + key + "}"
+		if !strings.Contains(method.Endpoint, placeholder) && value != "" {
+			query.Set(key, value)
 		}
-		parsedURL.RawQuery = query.Encode()
 	}
+	for key, val := range args {
+		if queryParamReservedKeys[key] {
+			continue
+		}
+		if query.Get(key) != "" {
+			continue // params already set this; prefer params
+		}
+		str := argValueToQueryString(val)
+		if str != "" {
+			query.Set(key, str)
+		}
+	}
+	parsedURL.RawQuery = query.Encode()
 
 	// Prepare body
 	var bodyReader *strings.Reader
@@ -72,16 +118,26 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set headers from method definition
+	// Set headers from method definition (Wreken HEADERS)
 	for key, value := range method.Headers {
 		req.Header.Set(key, value)
 	}
 
-	// Inject auth headers from args
-	// Look for Authorization or other auth fields in args
+	// Headers from args: Authorization (single) and optional args["headers"] map
 	if authRaw, ok := args["Authorization"]; ok {
 		if authStr, ok := authRaw.(string); ok {
 			req.Header.Set("Authorization", authStr)
+		}
+	}
+	if headersMap, ok := args["headers"].(map[string]interface{}); ok {
+		for key, val := range headersMap {
+			req.Header.Set(key, argValueToQueryString(val))
+		}
+	}
+	// Also support args["headers"] as map[string]string (e.g. from JSON)
+	if headersMap, ok := args["headers"].(map[string]string); ok {
+		for key, val := range headersMap {
+			req.Header.Set(key, val)
 		}
 	}
 
@@ -93,4 +149,30 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 	}
 
 	return req, nil
+}
+
+// argValueToQueryString converts an arg value to a query string value. Returns empty string to skip.
+func argValueToQueryString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	switch x := v.(type) {
+	case string:
+		return x
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(x)
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case bool:
+		return strconv.FormatBool(x)
+	default:
+		// Slice/map: encode as JSON so ?filter={"a":1} works
+		b, err := json.Marshal(x)
+		if err != nil {
+			return ""
+		}
+		return string(b)
+	}
 }

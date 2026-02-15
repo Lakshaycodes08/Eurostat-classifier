@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gitlab.com/swytchcode/shell/internal/constants"
 	"gitlab.com/swytchcode/shell/internal/kernel"
-	"gitlab.com/swytchcode/shell/internal/mcp/commands"
+	"gitlab.com/swytchcode/shell/internal/commands"
 	"gitlab.com/swytchcode/shell/internal/registry"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
@@ -129,7 +130,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 	// swytchcode_exec
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "swytchcode_exec",
-		Description: "Execute a tool via the Swytchcode kernel",
+		Description: "Execute a tool via the Swytchcode kernel. Use dry_run: true to see the planned request (method, url, headers, body) without making the HTTP call. The tool result content is always the full stdout/stderr output (dry-run payload or execution result).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args ExecArgs) (*mcp.CallToolResult, ToolOutput, error) {
 		toolCtx, cancel := context.WithTimeout(ctx, constants.MCPRequestTimeout)
 		defer cancel()
@@ -154,8 +155,15 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 			argsMap["json"] = *args.JSON
 		}
 		result, err := handleExec(toolCtx, argsMap, oc)
+		output := oc.GetCombinedOutput()
 		if err != nil {
-			return nil, ToolOutput{}, err
+			// Return captured output (stderr with kernel JSON error) so the client can see it; mark as error.
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{Text: output},
+				},
+				IsError: true,
+			}, ToolOutput{Output: output}, nil
 		}
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
@@ -290,6 +298,7 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), allowRaw, dryRun, rawOutput, jsonOutput, "")
 
 	if exitCode != kernel.ExitCodeOK {
+		log.Printf("[swytchcode_exec] failed tool=%s exit_code=%d (stderr captured)", tool, exitCode)
 		return "", fmt.Errorf("execution failed with exit code %d", exitCode)
 	}
 

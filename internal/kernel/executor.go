@@ -39,21 +39,32 @@ type ExecRequest struct {
 func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool, dryRun bool, rawOutput bool, jsonOutput bool, projectRoot string) int {
 	var req ExecRequest
 	if err := util.ReadJSON(stdin, &req); err != nil {
-		writeErrorJSON(stderr, "invalid json input")
+		msg := "invalid json input"
+		writeErrorJSON(stderr, msg)
+		LogExecFailure(ExitCodeInvalidInput, "", msg)
 		return ExitCodeInvalidInput
 	}
 
 	if req.Tool == "" {
-		writeErrorJSON(stderr, "tool is required")
+		msg := "tool is required"
+		writeErrorJSON(stderr, msg)
+		LogExecFailure(ExitCodeInvalidInput, "", msg)
 		return ExitCodeInvalidInput
 	}
+	if req.Args == nil {
+		req.Args = make(map[string]interface{})
+	}
+
+	LogExecRequest(req.Tool, req.Args)
 
 	// Detect project root if not provided
 	if projectRoot == "" {
 		var err error
 		projectRoot, err = util.ProjectRoot()
 		if err != nil {
-			writeErrorJSON(stderr, "failed to detect project root: "+err.Error())
+			msg := "failed to detect project root: " + err.Error()
+			writeErrorJSON(stderr, msg)
+			LogExecFailure(ExitCodeInternalError, req.Tool, msg)
 			return ExitCodeInternalError
 		}
 	}
@@ -61,7 +72,9 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	// Enforce raw method execution policy
 	isRaw := strings.HasPrefix(req.Tool, "raw.")
 	if isRaw && !allowRaw {
-		writeErrorJSON(stderr, "raw method execution requires --allow-raw flag")
+		msg := "raw method execution requires --allow-raw flag"
+		writeErrorJSON(stderr, msg)
+		LogExecFailure(ExitCodeInvalidInput, req.Tool, msg)
 		return ExitCodeInvalidInput
 	}
 
@@ -69,6 +82,7 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	tool, err := ResolveTool(projectRoot, req.Tool, isRaw)
 	if err != nil {
 		writeErrorJSON(stderr, err.Error())
+		LogExecFailure(ExitCodeToolNotFound, req.Tool, err.Error())
 		return ExitCodeToolNotFound
 	}
 
@@ -76,6 +90,7 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	bundle, err := LoadIntegrationBundle(projectRoot, tool.Integration)
 	if err != nil {
 		writeErrorJSON(stderr, err.Error())
+		LogExecFailure(ExitCodeToolNotFound, req.Tool, err.Error())
 		return ExitCodeToolNotFound
 	}
 
@@ -83,6 +98,7 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	method, err := ResolveMethod(bundle, req.Tool)
 	if err != nil {
 		writeErrorJSON(stderr, err.Error())
+		LogExecFailure(ExitCodeToolNotFound, req.Tool, err.Error())
 		return ExitCodeToolNotFound
 	}
 
@@ -90,38 +106,55 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	baseURL, err := GetBaseURL(projectRoot, tool.Integration, tool.Mode)
 	if err != nil {
 		writeErrorJSON(stderr, err.Error())
+		LogExecFailure(ExitCodeInternalError, req.Tool, err.Error())
 		return ExitCodeInternalError
 	}
 
 	// Step 5: Validate input schema
 	if err := ValidateInput(tool, req.Args); err != nil {
-		writeErrorJSON(stderr, "input validation failed: "+err.Error())
+		msg := "input validation failed: " + err.Error()
+		writeErrorJSON(stderr, msg)
+		LogExecFailure(ExitCodeInvalidInput, req.Tool, msg)
 		return ExitCodeInvalidInput
 	}
 
 	// Step 6: Build HTTP request
 	httpReq, err := BuildRequest(method, baseURL, req.Args)
 	if err != nil {
-		writeErrorJSON(stderr, "failed to build request: "+err.Error())
+		msg := "failed to build request: " + err.Error()
+		writeErrorJSON(stderr, msg)
+		LogExecFailure(ExitCodeInvalidInput, req.Tool, msg)
 		return ExitCodeInvalidInput
 	}
 
 	// Step 7: Execute or dry-run
 	if dryRun {
-		return ExecuteDryRun(httpReq, stdout)
+		code := ExecuteDryRun(httpReq, stdout)
+		if code != ExitCodeOK {
+			LogExecFailure(code, req.Tool, "dry-run output failed")
+		}
+		return code
 	}
 
 	// Step 8: Execute HTTP request
 	resp, err := ExecuteHTTP(httpReq)
 	if err != nil {
-		writeErrorJSON(stderr, "execution failed: "+err.Error())
+		msg := "execution failed: " + err.Error()
+		writeErrorJSON(stderr, msg)
+		LogExecFailure(ExitCodeSDKFailure, req.Tool, msg)
 		return ExitCodeSDKFailure
 	}
 
 	// Step 9: Output response (include request URL so caller can verify base URL)
+	var code int
+	var errMsg string
 	if rawOutput {
-		return OutputRawResponse(resp, httpReq, stdout, stderr)
+		code, errMsg = OutputRawResponse(resp, httpReq, stdout, stderr)
+	} else {
+		code, errMsg = OutputJSONResponse(resp, httpReq, stdout, stderr)
 	}
-
-	return OutputJSONResponse(resp, httpReq, stdout, stderr)
+	if code != ExitCodeOK {
+		LogExecFailure(code, req.Tool, errMsg)
+	}
+	return code
 }

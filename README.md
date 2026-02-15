@@ -92,7 +92,7 @@ swytchcode get weaviate --yes --non-interactive
 - `"library name required when running non-interactively"` — Missing project name in non-interactive mode
 - `"no integrations available"` — Registry returned no integrations
 - `"no bundles found for project %q"` — No bundles found for the specified project
-- `"Version %q for %s/%s already exists; set yes parameter to true to overwrite"` — Integration version already exists (use `--yes` flag or set `yes` parameter to `true` in MCP)
+- `"Version %q for %s/%s already exists; use --yes to overwrite"` — Integration version already exists (CLI: use `--yes`; MCP: set `yes` parameter to `true`)
 - `"fetch available integrations: %w"` — Failed to fetch integrations from registry
 - `"fetch integration bundles: %w"` — Failed to fetch bundles from registry
 - `"Failed to fetch workflows: %v"` — Failed to fetch workflows
@@ -200,6 +200,9 @@ swytchcode exec api.cluster.create --body cluster.json --input Authorization="Be
 # With query params
 swytchcode exec api.cluster.get --param id=cluster-123 --input Authorization="Bearer token123"
 
+# With custom headers
+swytchcode exec api.cluster.get --header X-Request-Id=abc-123 --param id=cluster-123
+
 # JSON stdin mode
 echo '{"tool":"api.cluster.create","args":{"body":{"name":"my-cluster"},"Authorization":"Bearer token123"}}' | swytchcode exec
 
@@ -219,6 +222,7 @@ swytchcode exec api.cluster.get --param id=123 --json
 - `--body <file>`: Path to JSON file containing request body
 - `--input <key=value>`: Input key=value pairs (can be specified multiple times)
 - `--param <key=value>`: Query parameter key=value pairs (can be specified multiple times)
+- `--header <key=value>`: Request header key=value pairs (can be specified multiple times)
 - `--raw`: Output raw HTTP response instead of normalized JSON
 - `--json`: Output response as a single JSON object to stdout (for piping and scripting)
 
@@ -378,12 +382,12 @@ swytchcode mcp stop
 **swytchcode_exec**
 - Parameters:
   - `tool` (string, required) — Canonical ID of tool to execute
-  - `args` (object, optional) — Tool arguments (body, params, Authorization, etc.)
-  - `dry_run` (boolean, optional) — Show what would be executed
+  - `args` (object, optional) — Tool arguments: `body`, `params` (query/path), `Authorization`, `headers` (map of header name to value), and any other top-level keys as query params
+  - `dry_run` (boolean, optional) — If true, show the planned request (method, url, headers, body) without making the HTTP call; use this to inspect the input that would be sent
   - `raw` (boolean, optional) — Output raw HTTP response
   - `allow_raw` (boolean, optional) — Allow execution of raw methods
   - `json` (boolean, optional) — Output response as a single JSON object
-- Returns: CLI output as-is (matches `swytchcode exec` output format)
+- Returns: The full stdout/stderr output in the tool result content (dry-run payload, execution result, or kernel JSON error on failure). On failure the result is still returned with `isError: true` so the client can see the error output.
 
 **Error messages:**
 - `"create MCP server: %w"` — Failed to create server
