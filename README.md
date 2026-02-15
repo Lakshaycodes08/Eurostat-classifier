@@ -5,7 +5,23 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 **`tooling.json` defines what is trusted.**  
 **Wrekenfiles define what is possible.**
 
-## Commands
+## Commands at a glance
+
+| Command | Purpose |
+|--------|---------|
+| `swytchcode init` | Create `.swytchcode/`, `tooling.json`, and editor rule files (Cursor / Claude / VS Code) |
+| `swytchcode get <project>` | Fetch integration bundles (Wrekenfiles, methods, workflows) |
+| `swytchcode bootstrap` | Fetch all integrations declared in `tooling.json` |
+| `swytchcode list` | List available integrations from the registry |
+| `swytchcode add [spec] <canonical_id>` | Add a tool to `tooling.json` |
+| `swytchcode exec [canonical_id]` | Execute a tool (CLI or JSON stdin); supports `--json`, `--raw`, `--dry-run` |
+| `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_list`, `swytchcode_get`, `swytchcode_add`, `swytchcode_exec` |
+| `swytchcode mcp status` | Check if MCP server is running (daemon mode) |
+| `swytchcode mcp stop` | Stop MCP server (daemon mode) |
+
+---
+
+## Commands (detail)
 
 ### `swytchcode init`
 
@@ -29,7 +45,10 @@ swytchcode init --editor=cursor --mode=production --non-interactive
 - Creates `.swytchcode/` and `.swytchcode/integrations/` directories
 - Creates `tooling.json` with empty `integrations` and `tools` maps
 - Sets `mode` and `registry_url` in `tooling.json`
-- Writes editor-specific configuration files (if editor ≠ `none`)
+- Installs editor rule templates in the repo (if editor ≠ `none`):
+  - **cursor** → `.cursor/rules/swytchcode.mdc`
+  - **claude** → `CLAUDE.md` (repo root)
+  - **vscode** → `.github/instructions/swytchcode.md` (Copilot) and `CLAUDE.md` (repo root)
 
 **Error messages:**
 - `"init requires --editor when running non-interactively"` — Missing `--editor` flag in non-interactive mode
@@ -73,7 +92,7 @@ swytchcode get weaviate --yes --non-interactive
 - `"library name required when running non-interactively"` — Missing project name in non-interactive mode
 - `"no integrations available"` — Registry returned no integrations
 - `"no bundles found for project %q"` — No bundles found for the specified project
-- `"Version %q for %s/%s already exists; set yes parameter to true to overwrite"` — Integration version already exists (use `--yes` flag or set `yes` parameter to `true` in MCP)
+- `"Version %q for %s/%s already exists; use --yes to overwrite"` — Integration version already exists (CLI: use `--yes`; MCP: set `yes` parameter to `true`)
 - `"fetch available integrations: %w"` — Failed to fetch integrations from registry
 - `"fetch integration bundles: %w"` — Failed to fetch bundles from registry
 - `"Failed to fetch workflows: %v"` — Failed to fetch workflows
@@ -181,6 +200,9 @@ swytchcode exec api.cluster.create --body cluster.json --input Authorization="Be
 # With query params
 swytchcode exec api.cluster.get --param id=cluster-123 --input Authorization="Bearer token123"
 
+# With custom headers
+swytchcode exec api.cluster.get --header X-Request-Id=abc-123 --param id=cluster-123
+
 # JSON stdin mode
 echo '{"tool":"api.cluster.create","args":{"body":{"name":"my-cluster"},"Authorization":"Bearer token123"}}' | swytchcode exec
 
@@ -189,6 +211,9 @@ swytchcode exec api.cluster.create --body cluster.json --dry-run
 
 # Raw output mode
 swytchcode exec api.cluster.get --param id=123 --raw
+
+# JSON output (single JSON object to stdout, for scripting)
+swytchcode exec api.cluster.get --param id=123 --json
 ```
 
 **Flags:**
@@ -197,7 +222,9 @@ swytchcode exec api.cluster.get --param id=123 --raw
 - `--body <file>`: Path to JSON file containing request body
 - `--input <key=value>`: Input key=value pairs (can be specified multiple times)
 - `--param <key=value>`: Query parameter key=value pairs (can be specified multiple times)
+- `--header <key=value>`: Request header key=value pairs (can be specified multiple times)
 - `--raw`: Output raw HTTP response instead of normalized JSON
+- `--json`: Output response as a single JSON object to stdout (for piping and scripting)
 
 **Execution pipeline:**
 1. Parse request (from CLI args or JSON stdin)
@@ -211,8 +238,8 @@ swytchcode exec api.cluster.get --param id=123 --raw
 9. Output JSON response (normalized or raw)
 
 **Output format:**
-- **Default**: Normalized JSON with `request`, `status_code`, and `data` fields
-- **--raw**: Raw HTTP response with `request`, `status_code`, `status`, `headers`, and `body` (string)
+- **Default** / **--json**: Single JSON object to stdout — normalized shape with `request`, `status_code`, and `data` (or raw shape with `--raw`). Use `--json` explicitly when piping.
+- **--raw**: Raw HTTP response JSON: `request`, `status_code`, `status`, `headers`, `body` (string)
 - **--dry-run**: JSON showing `method`, `url`, `headers`, and `body` that would be sent
 
 **Example output:**
@@ -355,11 +382,12 @@ swytchcode mcp stop
 **swytchcode_exec**
 - Parameters:
   - `tool` (string, required) — Canonical ID of tool to execute
-  - `args` (object, optional) — Tool arguments (body, params, Authorization, etc.)
-  - `dry_run` (boolean, optional) — Show what would be executed
+  - `args` (object, optional) — Tool arguments: `body`, `params` (query/path), `Authorization`, `headers` (map of header name to value), and any other top-level keys as query params
+  - `dry_run` (boolean, optional) — If true, show the planned request (method, url, headers, body) without making the HTTP call; use this to inspect the input that would be sent
   - `raw` (boolean, optional) — Output raw HTTP response
   - `allow_raw` (boolean, optional) — Allow execution of raw methods
-- Returns: CLI output as-is (matches `swytchcode exec` output format)
+  - `json` (boolean, optional) — Output response as a single JSON object
+- Returns: The full stdout/stderr output in the tool result content (dry-run payload, execution result, or kernel JSON error on failure). On failure the result is still returned with `isError: true` so the client can see the error output.
 
 **Error messages:**
 - `"create MCP server: %w"` — Failed to create server
@@ -380,50 +408,6 @@ swytchcode mcp stop
 - Use `swytchcode mcp status` to check if the server is running
 - Use `swytchcode mcp stop` to gracefully stop the server (SIGTERM on Unix, process termination on Windows)
 - The server can only be stopped via `swytchcode mcp stop` or by killing the process directly
-
----
-
-### `swytchcode mcp status`
-
-Check if the MCP server is running (daemon mode only).
-
-**Usage:**
-```bash
-swytchcode mcp status
-```
-
-**What it does:**
-- Checks for PID file at `.swytchcode/mcp.pid`
-- Verifies if the process is still running
-- Removes stale PID files if process is not running
-- Prints server status (running with PID, or not running)
-
-**Output:**
-- `"MCP server is running (PID: <pid>)"` — Server is running
-- `"MCP server is not running"` — No PID file found
-- `"MCP server is not running (stale PID file removed)"` — PID file existed but process was not running
-
----
-
-### `swytchcode mcp stop`
-
-Stop the running MCP server (daemon mode only).
-
-**Usage:**
-```bash
-swytchcode mcp stop
-```
-
-**What it does:**
-- Reads PID file at `.swytchcode/mcp.pid`
-- Sends SIGTERM signal to stop the server gracefully
-- Removes PID file after stopping
-- Only works for servers started in daemon mode
-
-**Error messages:**
-- `"MCP server is not running: %w"` — No PID file found or server not running
-- `"MCP server is not running (stale PID file removed)"` — PID file existed but process was not running
-- `"stop MCP server: %w"` — Failed to send stop signal
 
 ---
 
@@ -474,6 +458,20 @@ After `swytchcode init`, the following structure is created:
 - **mode**: Execution mode (`production` or `sandbox`) — determines which endpoint from `manifest.json` is used
 - **integrations**: Pinned integration versions (keys are `project.library` format)
 - **tools**: Unified map of all trusted tools, keyed by `canonical_id`
+
+---
+
+## Editor rules (init)
+
+When you run `swytchcode init --editor=<cursor|claude|vscode>`, the CLI installs rule templates so the editor uses Swytchcode for API execution and does not read `.swytchcode/` or Wrekenfiles directly.
+
+| Editor | Files installed |
+|--------|------------------|
+| **cursor** | `.cursor/rules/swytchcode.mdc` |
+| **claude** | `CLAUDE.md` (repo root) |
+| **vscode** | `.github/instructions/swytchcode.md` (Copilot), `CLAUDE.md` (repo root) |
+
+Templates are embedded in the binary; source lives in `editors/` (see `editors/README.md`). Rules require using MCP tools `swytchcode_list`, `swytchcode_get`, `swytchcode_add`, `swytchcode_exec` and generating runtime code that calls `swytchcode exec <canonical_id>`.
 
 ---
 

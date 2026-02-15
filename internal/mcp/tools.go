@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gitlab.com/swytchcode/shell/internal/constants"
 	"gitlab.com/swytchcode/shell/internal/kernel"
-	"gitlab.com/swytchcode/shell/internal/mcp/commands"
+	"gitlab.com/swytchcode/shell/internal/commands"
 	"gitlab.com/swytchcode/shell/internal/registry"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
@@ -44,6 +45,7 @@ type ExecArgs struct {
 	DryRun    *bool                  `json:"dry_run,omitempty" jsonschema:"Show what would be executed without making HTTP call"`
 	Raw       *bool                  `json:"raw,omitempty" jsonschema:"Output raw HTTP response instead of normalized JSON"`
 	AllowRaw  *bool                  `json:"allow_raw,omitempty" jsonschema:"Allow execution of raw methods"`
+	JSON      *bool                  `json:"json,omitempty" jsonschema:"Output response as a single JSON object"`
 }
 
 // RegisterTools registers all MCP tools with the server.
@@ -128,7 +130,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 	// swytchcode_exec
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "swytchcode_exec",
-		Description: "Execute a tool via the Swytchcode kernel",
+		Description: "Execute a tool via the Swytchcode kernel. Use dry_run: true to see the planned request (method, url, headers, body) without making the HTTP call. The tool result content is always the full stdout/stderr output (dry-run payload or execution result).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args ExecArgs) (*mcp.CallToolResult, ToolOutput, error) {
 		toolCtx, cancel := context.WithTimeout(ctx, constants.MCPRequestTimeout)
 		defer cancel()
@@ -149,9 +151,19 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		if args.AllowRaw != nil {
 			argsMap["allow_raw"] = *args.AllowRaw
 		}
+		if args.JSON != nil {
+			argsMap["json"] = *args.JSON
+		}
 		result, err := handleExec(toolCtx, argsMap, oc)
+		output := oc.GetCombinedOutput()
 		if err != nil {
-			return nil, ToolOutput{}, err
+			// Return captured output (stderr with kernel JSON error) so the client can see it; mark as error.
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{Text: output},
+				},
+				IsError: true,
+			}, ToolOutput{Output: output}, nil
 		}
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
@@ -270,6 +282,11 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 		allowRaw = allowRawRaw
 	}
 
+	jsonOutput := false
+	if jsonRaw, ok := args["json"].(bool); ok {
+		jsonOutput = jsonRaw
+	}
+
 	// Convert exec request to JSON for kernel.Execute
 	reqJSON, err := json.Marshal(execReq)
 	if err != nil {
@@ -278,9 +295,10 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 
 	// Create a reader from JSON
 	reqReader := &jsonReader{data: reqJSON}
-	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), allowRaw, dryRun, rawOutput, "")
+	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), allowRaw, dryRun, rawOutput, jsonOutput, "")
 
 	if exitCode != kernel.ExitCodeOK {
+		log.Printf("[swytchcode_exec] failed tool=%s exit_code=%d (stderr captured)", tool, exitCode)
 		return "", fmt.Errorf("execution failed with exit code %d", exitCode)
 	}
 

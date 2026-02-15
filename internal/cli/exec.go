@@ -13,13 +13,24 @@ import (
 	"gitlab.com/swytchcode/shell/internal/util"
 )
 
+// readStdinIfAvailable reads all of stdin. Caller can use the result to merge args when in CLI-args mode.
+func readStdinIfAvailable() []byte {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil || len(data) == 0 {
+		return nil
+	}
+	return data
+}
+
 var (
 	execAllowRaw bool
 	execDryRun   bool
 	execBodyFile string
 	execInput    []string // key=value pairs
 	execParam    []string // query params key=value
+	execHeader   []string // header key=value pairs
 	execRaw      bool     // output raw HTTP response
+	execJSON     bool     // output JSON (default: true for exec; flag for explicit scripting)
 )
 
 // execCmd implements `swytchcode exec`.
@@ -57,7 +68,7 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 
 		if len(args) == 0 {
 			// JSON stdin mode
-			exitCode = kernel.Execute(os.Stdin, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, "")
+			exitCode = kernel.Execute(os.Stdin, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "")
 		} else {
 			// CLI args mode: canonical_id provided as argument
 			canonicalID := args[0]
@@ -106,6 +117,34 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 				argsMap["params"] = params
 			}
 
+			// Parse --header key=value pairs (request headers)
+			headers := make(map[string]string)
+			for _, h := range execHeader {
+				parts := splitKeyValue(h)
+				if len(parts) == 2 {
+					headers[parts[0]] = parts[1]
+				}
+			}
+			if len(headers) > 0 {
+				argsMap["headers"] = headers
+			}
+
+			// Merge stdin into args when runtime sends JSON (e.g. {"project_name":"swytchcode"} or {"tool":"...","args":{...}}).
+			if stdinBytes := readStdinIfAvailable(); len(stdinBytes) > 0 {
+				var stdinObj map[string]interface{}
+				if json.Unmarshal(stdinBytes, &stdinObj) == nil {
+					if nested, ok := stdinObj["args"].(map[string]interface{}); ok && stdinObj["tool"] != nil {
+						for k, v := range nested {
+							argsMap[k] = v
+						}
+					} else {
+						for k, v := range stdinObj {
+							argsMap[k] = v
+						}
+					}
+				}
+			}
+
 			// Create exec request
 			req := kernel.ExecRequest{
 				Tool: canonicalID,
@@ -121,7 +160,7 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 
 			// Create a reader from the JSON bytes
 			reqReader := &jsonReader{data: reqJSON}
-			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, "")
+			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "")
 		}
 
 		os.Exit(exitCode)
@@ -162,5 +201,7 @@ func init() {
 	execCmd.Flags().StringVar(&execBodyFile, "body", "", "path to JSON file containing request body")
 	execCmd.Flags().StringArrayVar(&execInput, "input", []string{}, "input key=value pairs (can be specified multiple times)")
 	execCmd.Flags().StringArrayVar(&execParam, "param", []string{}, "query parameter key=value pairs (can be specified multiple times)")
+	execCmd.Flags().StringArrayVar(&execHeader, "header", []string{}, "request header key=value pairs (can be specified multiple times)")
 	execCmd.Flags().BoolVar(&execRaw, "raw", false, "output raw HTTP response instead of normalized JSON")
+	execCmd.Flags().BoolVar(&execJSON, "json", false, "output response as JSON (single JSON object to stdout)")
 }

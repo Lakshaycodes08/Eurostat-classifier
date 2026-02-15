@@ -1,15 +1,20 @@
-// claude.go writes Claude Code configuration so the agent uses swytchcode exec (init-time only).
+// claude.go writes CLAUDE.md at repo root so Claude uses swytchcode exec (init-time only).
 package editors
 
-// WriteClaudeConfig will emit Claude Code configuration (or equivalent)
-// that ensures the agent uses `swytchcode exec` as the single execution
-// path for tools.
-//
-// Like the other editor writers, this is invoked only during `swytchcode init`
-// and must never be consulted at runtime by the kernel.
+import (
+	"os"
+	"path/filepath"
+)
+
+const claudeTemplatePath = "templates/claude/CLAUDE.md"
+
+// WriteClaudeConfig writes root/CLAUDE.md from the embedded template.
 func WriteClaudeConfig(projectRoot string) error {
-	// TODO: Implement Claude editor config emission.
-	_ = projectRoot
-	return nil
+	content, err := templates.ReadFile(claudeTemplatePath)
+	if err != nil {
+		return err
+	}
+	dest := filepath.Join(projectRoot, "CLAUDE.md")
+	return os.WriteFile(dest, content, 0o644)
 }
 
