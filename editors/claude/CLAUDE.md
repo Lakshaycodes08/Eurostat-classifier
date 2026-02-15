@@ -1,8 +1,23 @@
 # Swytchcode Execution Rules
 
-Swytchcode is the sole authority for executing external API calls in this repository.
+Swytchcode is the sole authority for executing external API calls.
 
 You are operating in **IDE code generation mode**.
+
+---
+
+## Default workflow (follow this unless instructed otherwise)
+
+When asked to integrate or use an external API:
+
+1. Use Swytchcode discovery tools to find available integrations and tools.
+2. Discover canonical IDs and required parameters via discovery—do not guess by trial and error.
+3. If a required tool is missing from tooling.json, ask the user before adding it.
+4. Add tools only after explicit user approval.
+5. Generate runtime application code that delegates execution to Swytchcode at runtime.
+6. Do NOT fetch or return live API data unless explicitly requested.
+
+If a tool requires parameters, discover required inputs via Swytchcode discovery rather than inferring them from failed executions.
 
 ---
 
@@ -10,50 +25,42 @@ You are operating in **IDE code generation mode**.
 
 You MUST NOT:
 
-- Read, inspect, or modify any files under `.swytchcode/`
-- Read or interpret Wrekenfiles, `methods.json`, or `workflows.json`
+- Read or inspect `.swytchcode/` files directly (including Wrekenfiles, `methods.json`, `workflows.json`)
 - Generate raw HTTP requests to external APIs
-- Embed authentication tokens, headers, or credentials in code
-- Use MCP to fetch or display live API data
-- Call `swytchcode exec` (or `swytchcode_exec`) to obtain results directly
+- Embed credentials or auth logic in code
+- Execute tools to fetch live data in IDE mode
+- Guess canonical IDs by trial and error
+- Add tools to tooling.json without explicit user approval
+- Generate code that shells out to the `swytchcode exec` command (e.g. in a terminal or subprocess string). Use a runtime library or the programmatic CLI contract instead (see below).
 
 ---
 
 ## Required behavior
 
-When an external API interaction is needed, you MUST:
-
-- Use Swytchcode MCP tools **only for discovery**
-- Generate **runtime application code** that delegates execution to Swytchcode
-- Treat Swytchcode as a black-box execution kernel
-
 Generated code MUST:
 
-- Invoke the Swytchcode kernel at runtime by:
-  - spawning the `swytchcode` CLI, OR
-  - using an approved Swytchcode runtime helper (TypeScript / Go / Python)
-- Execute `swytchcode exec <canonical_id>` when the application runs
-- Return executable code, not API responses
+- Call Swytchcode at runtime (via a runtime library or the programmatic CLI contract).
+- Return executable code, not execution results.
+
+Invoke the kernel in one of these ways only:
+
+- **Preferred:** Use an official Swytchcode runtime library for the target language (Node/TS, Go, Python) when available.
+- **If no runtime exists:** Invoke the CLI programmatically: spawn the process, send a single JSON object to stdin (kernel args: `body`, `params`, `Authorization`, `headers`, etc.), read stdout and stderr, parse JSON. Do not construct or run the `swytchcode exec ...` command as a shell string.
+
+See the project’s **runtime-libraries README** (Other languages / CLI contract) for the exact stdin/stdout/stderr and exit-code contract.
 
 ---
 
 ## MCP usage
 
-Allowed MCP usage in IDE mode:
-
-- Discovery only (e.g. listing available tools, describing schemas)
-
-Forbidden MCP usage in IDE mode:
-
-- Direct execution to fetch, preview, or display live data
-- Any MCP action that mutates `.swytchcode` unless explicitly requested by the user
+- **Allowed:** Discovery only (list integrations, list tools, describe schemas).
+- **Forbidden:** Direct execution to fetch or display live data; any mutation of `.swytchcode` without explicit user approval.
 
 ---
 
-## Execution modes (important)
+## Execution modes
 
 - **IDE agents** generate code only. They never return live API data.
-- **Non-IDE agents** (analysis, inspection, automation) may call `swytchcode_exec` directly and return results.
+- **Non-IDE agents** may execute tools and return results.
 
-External APIs must never be called directly.  
 All execution authority belongs to Swytchcode.
