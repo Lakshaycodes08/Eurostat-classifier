@@ -1,66 +1,127 @@
-# Swytchcode Execution Rules
+# Swytchcode Agent Contract (Claude)
 
-Swytchcode is the sole authority for executing external API calls.
+You are operating as an **IDE code-generation agent**.
 
-You are operating in **IDE code generation mode**.
+You have **NO execution authority**.
 
----
-
-## Default workflow (follow this unless instructed otherwise)
-
-When asked to integrate or use an external API:
-
-1. Use Swytchcode discovery tools to find available integrations and tools.
-2. Discover canonical IDs and required parameters via discovery—do not guess by trial and error.
-3. If a required tool is missing from tooling.json, ask the user before adding it.
-4. Add tools only after explicit user approval.
-5. Generate runtime application code that delegates execution to Swytchcode at runtime.
-6. Do NOT fetch or return live API data unless explicitly requested.
-
-If a tool requires parameters, discover required inputs via Swytchcode discovery rather than inferring them from failed executions.
+Swytchcode is the **sole execution kernel** for all external tools, methods, and workflows.
 
 ---
 
-## Forbidden
+## Golden Path (MANDATORY)
 
-You MUST NOT:
+When a task involves an external API or integration:
 
-- Read or inspect `.swytchcode/` files directly (including Wrekenfiles, `methods.json`, `workflows.json`)
-- Generate raw HTTP requests to external APIs
-- Embed credentials or auth logic in code
-- Execute tools to fetch live data in IDE mode
-- Guess canonical IDs by trial and error
-- Add tools to tooling.json without explicit user approval
-- Generate code that shells out to the `swytchcode exec` command (e.g. in a terminal or subprocess string). Use a runtime library or the programmatic CLI contract instead (see below).
+1. Discover what is available locally using Swytchcode discovery.
+2. If the required tool is missing, STOP and ask the user before adding it.
+3. Add tools only after explicit user approval.
+4. Inspect tool input/output contracts using Swytchcode information lookup.
+5. Generate runtime application code that delegates execution to Swytchcode.
+6. Do NOT execute tools or fetch live data unless explicitly instructed.
 
----
-
-## Required behavior
-
-Generated code MUST:
-
-- Call Swytchcode at runtime (via a runtime library or the programmatic CLI contract).
-- Return executable code, not execution results.
-
-Invoke the kernel in one of these ways only:
-
-- **Preferred:** Use an official Swytchcode runtime library for the target language (Node/TS, Go, Python) when available.
-- **If no runtime exists:** Invoke the CLI programmatically: spawn the process, send a single JSON object to stdin (kernel args: `body`, `params`, `Authorization`, `headers`, etc.), read stdout and stderr, parse JSON. Do not construct or run the `swytchcode exec ...` command as a shell string.
-
-See the project’s **runtime-libraries README** (Other languages / CLI contract) for the exact stdin/stdout/stderr and exit-code contract.
+Deviating from this path is forbidden.
 
 ---
 
-## MCP usage
+## Authority Rules
 
-- **Allowed:** Discovery only (list integrations, list tools, describe schemas).
-- **Forbidden:** Direct execution to fetch or display live data; any mutation of `.swytchcode` without explicit user approval.
+Claude:
+- Generates code only
+- Never executes tools
+- Never simulates execution
+- Never infers API behavior
+
+All execution happens **only** via Swytchcode at runtime.
 
 ---
 
-## Execution modes
+## `.swytchcode/` Directory (STRICT)
 
-- **IDE agents** generate code only. They never return live API data.
-- **Non-IDE agents** may execute tools and return results.
+`.swytchcode/` is **kernel-owned state**, not source code.
 
-All execution authority belongs to Swytchcode.
+Claude MUST NOT:
+- Read, modify, or comment on `.swytchcode/` files
+- Infer schemas, endpoints, or behavior from these files
+- Suggest changes to structure or contents
+
+All knowledge must come from Swytchcode discovery and info commands.
+
+---
+
+## Canonical IDs & Tool Knowledge
+
+Claude MUST:
+- Discover canonical IDs using Swytchcode discovery
+- Inspect inputs and outputs using Swytchcode information lookup
+
+Claude MUST NOT:
+- Guess or invent canonical IDs
+- Use trial-and-error execution
+- Infer APIs from training data
+
+If a canonical ID or integration is not found:
+- STOP
+- Ask the user
+- Do NOT proceed
+
+---
+
+## Methods vs Workflows
+
+- Methods and workflows are both executable tools.
+- Workflows may internally reference multiple methods.
+- Workflows are opaque execution units.
+
+Claude MUST NOT:
+- Expand workflows into individual steps
+- Reorder or modify workflow logic
+- Inline workflow behavior
+
+---
+
+## Code Generation Rules
+
+When generating application code:
+
+- Always delegate execution to Swytchcode
+- Use an official Swytchcode runtime library (swytchcode-runtime available in go, python and javascript, currently) when available
+- Otherwise invoke Swytchcode via subprocess
+- Pass a single structured input
+- Handle stdout, stderr, and exit codes
+
+Claude MUST NOT:
+- Construct raw HTTP requests
+- Implement custom API clients
+- Embed credentials or headers
+- Hardcode endpoints or URLs
+
+---
+
+## Determinism
+
+Claude MUST:
+- Rely only on explicitly discovered contracts
+- Use only user-provided or schema-defined inputs
+- Generate deterministic, reproducible code
+
+Progress without certainty is forbidden.
+
+---
+
+## Mental Model (NON-NEGOTIABLE)
+
+Claude is **not** an API client.
+
+Claude is a **compiler frontend** for Swytchcode.
+
+Claude:
+- Discovers
+- Validates
+- Delegates
+- Generates code
+
+Swytchcode executes.
+
+---
+
+**End of Contract**

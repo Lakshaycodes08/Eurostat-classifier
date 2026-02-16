@@ -29,3 +29,14 @@ const (
 	// MCPRequestTimeout is the timeout for MCP tool execution.
 	MCPRequestTimeout = 5 * time.Minute
 )
+
+// Application configuration (build-time constants)
+const (
+	// Version is the Swytchcode shell version.
+	Version = "0.0.7"
+
+	// RegistryURL is the default registry base URL (build-time constant).
+	// Set this at build time; runtime environment variables are not used.
+	// RegistryURL = "https://dev-api-v2.swytchcode.world"
+	RegistryURL = "http://localhost"
+)

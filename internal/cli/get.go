@@ -55,12 +55,12 @@ var getCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("fetch available integrations: %w", err)
 			}
-			if len(listResp.Integrations) == 0 {
+			if len(listResp.Projects) == 0 {
 				return errors.New("no integrations available")
 			}
-			options := make([]string, len(listResp.Integrations))
-			for i, integration := range listResp.Integrations {
-				options[i] = integration.ID
+			options := make([]string, len(listResp.Projects))
+			for i, project := range listResp.Projects {
+				options[i] = project.ProjectName
 			}
 			fmt.Println()
 			_, library = util.SelectWithRetry("Which library do you want to add?", options)

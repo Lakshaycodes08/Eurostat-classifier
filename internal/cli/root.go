@@ -5,12 +5,14 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"gitlab.com/swytchcode/shell/internal/constants"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "swytchcode",
 	Short: "Swytchcode execution kernel",
 	Long:  "Swytchcode is the single execution authority for tools. Editors, agents, and languages are guests.",
+	Version: constants.Version,
 }
 
 // Execute is the main entrypoint invoked by cmd/swytchcode/main.go.
@@ -28,6 +30,8 @@ func init() {
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(bootstrapCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(searchCmd)
+	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(mcpCmd)
 }
 

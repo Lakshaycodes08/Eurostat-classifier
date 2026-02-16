@@ -9,19 +9,45 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 
 | Command | Purpose |
 |--------|---------|
+| `swytchcode -v` or `swytchcode --version` | Show Swytchcode version |
 | `swytchcode init` | Create `.swytchcode/`, `tooling.json`, and editor rule files (Cursor / Claude / VS Code) |
 | `swytchcode get <project>` | Fetch integration bundles (Wrekenfiles, methods, workflows) |
 | `swytchcode bootstrap` | Fetch all integrations declared in `tooling.json` |
-| `swytchcode list` | List available integrations from the registry |
+| `swytchcode list` | List locally available tools and integrations (from tooling.json and fetched integrations) |
+| `swytchcode list methods [prefix]` | List locally available methods (optionally filtered by project prefix) |
+| `swytchcode list workflows [prefix]` | List locally available workflows (optionally filtered by project prefix) |
+| `swytchcode list integrations` | List locally fetched integrations |
+| `swytchcode search [integrations] [keyword]` | Search remote registry for available integrations |
 | `swytchcode add [spec] <canonical_id>` | Add a tool to `tooling.json` |
+| `swytchcode info <canonical_id>` | Show information about a tool by canonical ID |
 | `swytchcode exec [canonical_id]` | Execute a tool (CLI or JSON stdin); supports `--json`, `--raw`, `--dry-run` |
-| `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_list`, `swytchcode_get`, `swytchcode_add`, `swytchcode_exec` |
+| `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec` |
 | `swytchcode mcp status` | Check if MCP server is running (daemon mode) |
 | `swytchcode mcp stop` | Stop MCP server (daemon mode) |
 
 ---
 
 ## Commands (detail)
+
+### `swytchcode -v` or `swytchcode --version`
+
+Display the Swytchcode version.
+
+**Usage:**
+```bash
+swytchcode -v
+# or
+swytchcode --version
+```
+
+**Output:**
+```
+swytchcode version 0.0.1
+```
+
+The version is a build-time constant defined in `internal/constants/constants.go`. To change the version, update `constants.Version` and rebuild.
+
+---
 
 ### `swytchcode init`
 
@@ -37,24 +63,24 @@ swytchcode init --editor=cursor --mode=production --non-interactive
 ```
 
 **Flags:**
-- `--editor`: Editor choice (`cursor | vscode | claude | none`)
+- `--editor`: Editor choice (`cursor | copilot | claude | none`)
 - `--mode`: Execution mode (`production | sandbox`)
 - `--non-interactive`: Disable prompts (required for CI)
 
 **What it does:**
 - Creates `.swytchcode/` and `.swytchcode/integrations/` directories
 - Creates `tooling.json` with empty `integrations` and `tools` maps
-- Sets `mode` and `registry_url` in `tooling.json`
+- Sets `mode` and `version` in `tooling.json`
 - Installs editor rule templates in the repo (if editor ≠ `none`):
   - **cursor** → `.cursor/rules/swytchcode.mdc`
+  - **copilot** → `.github/instructions/swytchcode.md`
   - **claude** → `CLAUDE.md` (repo root)
-  - **vscode** → `.github/instructions/swytchcode.md` (Copilot) and `CLAUDE.md` (repo root)
 
 **Error messages:**
 - `"init requires --editor when running non-interactively"` — Missing `--editor` flag in non-interactive mode
 - `"init requires --mode when running non-interactively"` — Missing `--mode` flag in non-interactive mode
 - `"invalid mode %q (expected production or sandbox)"` — Invalid mode value
-- `"unknown editor %q (expected cursor|vscode|claude|none)"` — Invalid editor value
+- `"unknown editor %q (expected cursor|copilot|claude|none)"` — Invalid editor value
 
 ---
 
@@ -131,26 +157,106 @@ swytchcode bootstrap
 
 ### `swytchcode list`
 
-List all available integrations from the registry.
+List locally available tools and integrations. **No registry calls** — reads from `tooling.json` and `.swytchcode/integrations/` directory.
 
 **Usage:**
 ```bash
-# Plain text output (one ID per line)
+# List everything (methods, workflows, integrations)
 swytchcode list
+
+# List only methods
+swytchcode list methods
+
+# List only workflows
+swytchcode list workflows
+
+# List only integrations
+swytchcode list integrations
+
+# Filter methods by project prefix
+swytchcode list methods stripe
+
+# Filter workflows by project prefix
+swytchcode list workflows stripe
 
 # JSON output
 swytchcode list --json
+swytchcode list methods --json
 ```
 
 **Flags:**
-- `--json`: Output as JSON array instead of one ID per line
+- `--json`: Output as JSON object with `methods`, `workflows`, and `integrations` arrays
+
+**What it does:**
+- Reads `tooling.json` to list methods and workflows that are executable locally
+- Scans `.swytchcode/integrations/` directory to list fetched integrations
+- Supports filtering by type (methods/workflows/integrations)
+- Supports prefix filtering to show tools from a specific project (e.g., `list methods stripe`)
+
+**Output format:**
+
+Default (human-readable):
+```
+Methods:
+  stripe.customer.create
+  stripe.customer.update
+
+Workflows:
+  stripe.checkout.session.create
+
+Integrations:
+  stripe.stripe@v1
+  weaviate.lyrid@v1
+```
+
+JSON (`--json`):
+```json
+{
+  "methods": ["stripe.customer.create", "stripe.customer.update"],
+  "workflows": ["stripe.checkout.session.create"],
+  "integrations": ["stripe.stripe@v1", "weaviate.lyrid@v1"]
+}
+```
+
+**Error messages:**
+- `"detect project root: %w"` — Failed to detect project root
+- `"tooling.json not found; run 'swytchcode init' first"` — Project not initialized
+
+---
+
+### `swytchcode search`
+
+Search remote registry for available integrations. **Read-only** — never mutates local state.
+
+**Usage:**
+```bash
+# Search all available integrations
+swytchcode search
+swytchcode search integrations
+
+# Search by keyword
+swytchcode search stripe
+swytchcode search integrations stripe
+
+# JSON output
+swytchcode search --json
+```
+
+**Flags:**
+- `--json`: Output as JSON array instead of one project name per line
 
 **What it does:**
 - Calls `GET /v2/shell/integrations` endpoint
-- Outputs integration IDs (one per line by default, or JSON array with `--json`)
+- Returns project names available in the registry
+- Supports keyword filtering (case-insensitive substring match)
+- Read-only operation — does not download or modify local state
+
+**Output format:**
+- Default: One project name per line
+- JSON: Array of project name strings
 
 **Error messages:**
-- `"fetch integrations: %w"` — Failed to fetch integrations from registry
+- `"search integrations: %w"` — Failed to search registry
 - `"encode JSON: %w"` — Failed to encode JSON output
 
 ---
@@ -172,10 +278,22 @@ swytchcode add integration weaviate@lyrid.v1
 ```
 
 **What it does:**
-- Searches `methods.json` and `workflows.json` files in `.swytchcode/integrations/`
-- Determines tool type (method or workflow) based on which file contains the canonical_id
-- Reads wrekenfile to get full tool details
-- Adds tool entry to `tooling.json` with `type`, `integration`, `summary`, `desc`, and `inputs`
+
+For **methods**:
+- Searches `methods.json` files in `.swytchcode/integrations/`
+- Reads wrekenfile to get full method details
+- Adds method entry to `tooling.json` with `type: "method"`, `integration`, `summary`, `desc`, and `inputs`
+- Automatically adds integration to `integrations` section if not already present
+
+For **workflows**:
+- Searches `workflows.json` files in `.swytchcode/integrations/`
+- Reads workflow definition (with `name`, `canonical_id`, and `steps` array)
+- For each step in the workflow:
+  - Looks up the method's canonical_id in the wrekenfile `METHODS` section
+  - Adds the method to `tooling.json` with full details (`summary`, `desc`, `inputs`, etc.)
+  - Adds an `index` field to preserve the order of methods in the workflow
+  - Skips methods that already exist in `tooling.json` (duplicates)
+- Adds workflow entry to `tooling.json` with `type: "workflow"`, `name`, `integration`, and `steps` array (array of method canonical_ids in order)
 - Automatically adds integration to `integrations` section if not already present
 
 **Error messages:**
@@ -184,7 +302,38 @@ swytchcode add integration weaviate@lyrid.v1
 - `"invalid integration spec format: %q (expected: project@library.version)"` — Invalid integration spec format
 - `"Integration %s not installed. Run: swytchcode get %s"` — Integration not fetched yet
 - `"method %q not found in wrekenfile"` — Method not found in wrekenfile
-- `"workflow %q not found in wrekenfile"` — Workflow not found in wrekenfile
+- `"workflow %q not found in workflows.json"` — Workflow not found in workflows.json
+- `"Warning: method %q from workflow step not found in wrekenfile: %v"` — Method referenced in workflow steps not found in wrekenfile
+
+---
+
+### `swytchcode info <canonical_id>`
+
+Show information about a tool (method or workflow) by canonical ID. Recursively searches all fetched integrations and displays tool details from wrekenfiles.
+
+**Usage:**
+```bash
+# Human-readable output
+swytchcode info api.cluster.create
+
+# JSON output
+swytchcode info api.cluster.create --json
+```
+
+**What it does:**
+- Recursively searches `.swytchcode/integrations/{project}/{library}/{version}/` directories
+- Checks `methods.json` and `workflows.json` files for the canonical_id
+- Reads the corresponding `wrekenfile.yaml` to extract tool details
+- Returns all matches if the canonical_id appears in multiple integrations
+- Displays: canonical_id, type, integration, summary, description, inputs, and full wrekenfile entry
+
+**Output format:**
+- Default: Human-readable format with tool details
+- `--json`: JSON array of tool information objects
+
+**Error messages:**
+- `"canonical ID %q not found in any fetched integrations"` — Tool not found in any integration
+- `"Warning: failed to read wrekenfile for %s.%s@%s: %v"` — Failed to read wrekenfile for a specific integration
 
 ---
 
@@ -280,7 +429,7 @@ swytchcode exec api.cluster.get --param id=123 --json
 
 ### `swytchcode mcp serve`
 
-Start the Model Context Protocol (MCP) server. Exposes swytchcode commands (`list`, `get`, `add`, `exec`) as MCP tools for agent communication.
+Start the Model Context Protocol (MCP) server. Exposes swytchcode commands (`list`, `get`, `add`, `info`, `exec`) as MCP tools for agent communication.
 
 **Usage:**
 ```bash
@@ -347,10 +496,15 @@ swytchcode mcp stop
 - `--port <number>`: Port for HTTP transport, default: `3000`
 
 **What it does:**
-- Starts an MCP server exposing four tools:
-  - `swytchcode_list` — List available integrations
+- Starts an MCP server exposing nine tools:
+  - `swytchcode_init` — Initialize Swytchcode in the project
+  - `swytchcode_bootstrap` — Fetch all integrations declared in tooling.json
+  - `swytchcode_version` — Get Swytchcode version
+  - `swytchcode_list` — List locally available tools and integrations (no registry calls)
+  - `swytchcode_search` — Search remote registry for available integrations
   - `swytchcode_get` — Fetch integration bundles
   - `swytchcode_add` — Add tools to tooling.json
+  - `swytchcode_info` — Get information about a tool by canonical ID
   - `swytchcode_exec` — Execute tools
 - All tool output is captured and returned through the MCP protocol (not streamed to terminal)
 - In daemon mode (`-d`):
@@ -367,9 +521,25 @@ swytchcode mcp stop
 
 **MCP Tools:**
 
+**swytchcode_init**
+- Parameters: `editor` (string, required) — Editor choice: `"cursor"`, `"copilot"`, `"claude"`, or `"none"`; `mode` (string, required) — Execution mode: `"production"` or `"sandbox"`
+- Returns: CLI output as-is. Initializes Swytchcode in the project (creates `.swytchcode/`, `tooling.json`, and editor-specific config).
+
+**swytchcode_bootstrap**
+- Parameters: None
+- Returns: CLI output as-is. Fetches all integrations declared in `tooling.json` that are not already installed.
+
+**swytchcode_version**
+- Parameters: None
+- Returns: Version string (e.g., `"swytchcode version 0.0.1\n"`).
+
 **swytchcode_list**
-- Parameters: `json` (boolean, optional) — Output as JSON array
-- Returns: CLI output as-is (one ID per line or JSON array)
+- Parameters: `filter` (string, optional) — Filter type: `"methods"`, `"workflows"`, `"integrations"`, or empty for all; `prefix` (string, optional) — Project prefix filter (e.g., `"stripe"`); `json` (boolean, optional) — Output as JSON object
+- Returns: Locally available tools and integrations (from tooling.json and fetched integrations). JSON format: `{"methods": [...], "workflows": [...], "integrations": [...]}`
+
+**swytchcode_search**
+- Parameters: `filter` (string, optional) — Filter type: `"integrations"` or `"methods"`; `keyword` (string, optional) — Search keyword; `json` (boolean, optional) — Output as JSON array
+- Returns: Remote registry search results (project names). Read-only, never mutates local state.
 
 **swytchcode_get**
 - Parameters: `project_name` (string, required), `yes` (boolean, optional) — Auto-confirm overwrite
@@ -378,6 +548,10 @@ swytchcode mcp stop
 **swytchcode_add**
 - Parameters: `canonical_id` (string, required), `integration_spec` (string, optional) — Integration spec (project@library.version)
 - Returns: CLI output as-is
+
+**swytchcode_info**
+- Parameters: `canonical_id` (string, required), `json` (boolean, optional) — Output as JSON array
+- Returns: Tool information (human-readable or JSON array)
 
 **swytchcode_exec**
 - Parameters:
@@ -417,13 +591,13 @@ After `swytchcode init`, the following structure is created:
 
 ```
 .swytchcode/
-├── tooling.json              # Project configuration (integrations, tools, mode, registry_url)
+├── tooling.json              # Project configuration (integrations, tools, mode, version)
 └── integrations/
     ├── manifest.json         # Registry manifest with project.library entries (version, endpoints)
     └── {project}/{library}/{version}/
         ├── wrekenfile.yaml   # Wrekenfile spec with METHODS section
         ├── methods.json      # Methods list for this integration version
-        └── workflows.json    # Workflows list for this integration version
+        └── workflows.json    # Workflows list (name, canonical_id, steps array with name and canonical_id)
 ```
 
 ### `tooling.json` structure
@@ -432,7 +606,6 @@ After `swytchcode init`, the following structure is created:
 {
   "version": "1.0",
   "mode": "production",
-  "registry_url": "https://localhost",
   "integrations": {
     "weaviate.lyrid": { "version": "v1" }
   },
@@ -450,6 +623,20 @@ After `swytchcode init`, the following structure is created:
           }
         }
       ]
+    },
+    "workflow.example": {
+      "name": "Example Workflow",
+      "integration": "weaviate.lyrid@v1",
+      "type": "workflow",
+      "steps": ["api.cluster.create", "api.cluster.update"]
+    },
+    "api.cluster.update": {
+      "summary": "Update a cluster instance",
+      "integration": "weaviate.lyrid@v1",
+      "type": "method",
+      "desc": "Update a cluster instance",
+      "inputs": [...],
+      "index": 1
     }
   }
 }
@@ -458,20 +645,22 @@ After `swytchcode init`, the following structure is created:
 - **mode**: Execution mode (`production` or `sandbox`) — determines which endpoint from `manifest.json` is used
 - **integrations**: Pinned integration versions (keys are `project.library` format)
 - **tools**: Unified map of all trusted tools, keyed by `canonical_id`
+  - **Methods**: `type: "method"` with `summary`, `desc`, `inputs`, `integration`. Methods added from workflows include an `index` field to preserve execution order.
+  - **Workflows**: `type: "workflow"` with `name`, `integration`, and `steps` array (ordered list of method canonical_ids). When a workflow is added, all its step methods are automatically added to `tools` with full details.
 
 ---
 
 ## Editor rules (init)
 
-When you run `swytchcode init --editor=<cursor|claude|vscode>`, the CLI installs rule templates so the editor uses Swytchcode for API execution and does not read `.swytchcode/` or Wrekenfiles directly.
+When you run `swytchcode init --editor=<cursor|copilot|claude>`, the CLI installs rule templates so the editor uses Swytchcode for API execution and does not read `.swytchcode/` or Wrekenfiles directly.
 
 | Editor | Files installed |
 |--------|------------------|
 | **cursor** | `.cursor/rules/swytchcode.mdc` |
+| **copilot** | `.github/instructions/swytchcode.md` |
 | **claude** | `CLAUDE.md` (repo root) |
-| **vscode** | `.github/instructions/swytchcode.md` (Copilot), `CLAUDE.md` (repo root) |
 
-Templates are embedded in the binary; source lives in `editors/` (see `editors/README.md`). Rules require using MCP tools `swytchcode_list`, `swytchcode_get`, `swytchcode_add`, `swytchcode_exec` and generating runtime code that calls `swytchcode exec <canonical_id>`.
+Templates are embedded in the binary; source lives in `editors/` (see `editors/README.md`). Rules require using MCP tools `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec` and generating runtime code that calls `swytchcode exec <canonical_id>`.
 
 ---
 

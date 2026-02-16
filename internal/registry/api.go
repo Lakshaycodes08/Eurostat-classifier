@@ -9,18 +9,21 @@ import (
 	"net/url"
 )
 
-// Integration represents a single integration from the list.
-type Integration struct {
-	ID               string `json:"id"`
-	LatestVersion    string `json:"latest_version"`
-	ProjectUUID      string `json:"project_uuid"`
-	SandboxEndpoint  string `json:"sandbox_endpoint"`
-	ProductionEndpoint string `json:"production_endpoint"`
+// Library represents a library within a project.
+type Library struct {
+	LibraryID      string `json:"library_id"`
+	LibraryVersion string `json:"library_version"`
+}
+
+// Project represents a project with its libraries.
+type Project struct {
+	ProjectName string    `json:"project_name"`
+	Libraries   []Library `json:"libraries"`
 }
 
 // ListIntegrationsResponse is the response from GET /integrations.
 type ListIntegrationsResponse struct {
-	Integrations []Integration `json:"integrations"`
+	Projects []Project `json:"projects"`
 }
 
 // IntegrationBundle represents a single bundle in the bundles array.
@@ -47,11 +50,17 @@ type IntegrationBundlesResponse struct {
 	Bundles     []IntegrationBundle `json:"bundles"`
 }
 
+// WorkflowStep represents a step in a workflow.
+type WorkflowStep struct {
+	Name        string `json:"name"`
+	CanonicalID string `json:"canonical_id"`
+}
+
 // Workflow represents a workflow from the list.
 type Workflow struct {
-	WorkflowUUID string `json:"workflow_uuid"`
-	Title        string `json:"title"`
-	CanonicalID  string `json:"canonical_id"`
+	Name        string        `json:"name"`
+	CanonicalID string        `json:"canonical_id"`
+	Steps       []WorkflowStep `json:"steps"`
 }
 
 // ListWorkflowsResponse is the response from GET /workflows?project_name=...

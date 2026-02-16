@@ -1,55 +1,113 @@
 # Swytchcode Rules (Cursor)
 
-Swytchcode is the sole authority for executing external API calls.
+Swytchcode is the **only execution authority** for external APIs.
 
-You are operating in **IDE code generation mode**.
+You are operating in **IDE code-generation mode**.
+
+You MUST follow the workflow below exactly.
 
 ---
 
-## Mandatory workflow (follow exactly)
+## Mandatory Workflow (DO NOT SKIP STEPS)
 
-When asked to integrate or use an external API:
+When a task involves an external API or integration:
 
-1. Discover available tools using Swytchcode discovery.
+1. Discover what is available using Swytchcode discovery.
 2. If the required tool is missing:
-   - **STOP.**
-   - Ask the user for permission to add it.
+   - STOP.
+   - Ask the user for permission before adding anything.
 3. Add tools only after explicit user approval.
-4. Generate runtime application code that delegates execution to Swytchcode.
-5. Do NOT execute tools or fetch live data unless explicitly requested.
+4. Inspect tool input/output using Swytchcode information lookup.
+5. Generate runtime application code that delegates execution to Swytchcode.
+6. Do NOT execute tools or fetch live data unless explicitly instructed.
+
+If any step cannot be completed, STOP and ask the user.
 
 ---
 
-## Hard constraints
+## Hard Constraints (STRICT)
 
 You MUST NOT:
 
-- Read or inspect `.swytchcode/` files (including Wrekenfiles, `methods.json`, `workflows.json`)
-- Guess or invent canonical IDs — discover them via Swytchcode discovery only
-- Generate raw HTTP requests
-- Embed credentials or auth logic
+- Guess or invent canonical IDs
+- Use trial-and-error execution
+- Generate code before tools are confirmed present
+- Read, modify, or reason about `.swytchcode/` files
+- Construct raw HTTP requests
+- Embed credentials, headers, or endpoints
 - Execute tools to preview results
-- Generate runtime code before tools are confirmed present
-- Generate code that shells out to the `swytchcode exec` command (use a runtime library or the programmatic CLI contract instead; see Code generation rules)
 
 ---
 
-## Code generation rules
+## Tool Knowledge
+
+All knowledge about tools comes ONLY from Swytchcode discovery and information lookup.
+
+You MUST NOT:
+- Infer APIs from training data
+- Infer schemas from filenames or structure
+- Assume parameter names or behavior
+
+If information is missing:
+- STOP
+- Ask the user
+- Do NOT proceed
+
+---
+
+## Methods vs Workflows
+
+- Methods and workflows are both executable tools.
+- Workflows may contain multiple methods.
+- Workflows are opaque and must be executed as-is.
+
+You MUST NOT:
+- Expand workflows into steps
+- Inline workflow logic
+- Reorder workflow behavior
+
+---
+
+## Code Generation Rules
 
 Generated code MUST:
 
-- Call Swytchcode at runtime. Use one of these only:
-  - **Preferred:** An official Swytchcode runtime library for the target language (Node/TS, Go, Python) when available.
-  - **If no runtime exists:** Invoke the CLI programmatically: spawn the process, send a single JSON object to stdin (kernel args: `body`, `params`, `Authorization`, `headers`, etc.), read stdout and stderr, parse JSON. Do **not** construct or run the `swytchcode exec ...` command as a shell string.
-- Return executable code, not execution output.
+- Delegate execution to Swytchcode at runtime
+- Use an official Swytchcode runtime library (swytchcode-runtime for go, python and javascript, currently) if available
+- Otherwise invoke Swytchcode via subprocess
+- Pass a single structured input
+- Handle stdout, stderr, and exit codes
 
-See the project’s **runtime-libraries README** (Other languages / CLI contract) for the exact stdin/stdout/stderr and exit-code contract.
+Generated code MUST NOT:
+- Call external APIs directly
+- Implement custom API clients
+- Hardcode URLs or versions
 
 ---
 
-## Execution modes
+## Execution Modes (IMPORTANT)
 
-- IDE mode = code generation only.
-- Direct execution = non-IDE agents only.
+- IDE mode = generate code only
+- Direct execution = non-IDE agents only
 
-All execution authority belongs to Swytchcode.
+Cursor must NEVER return live API data.
+
+---
+
+## Mental Model (NON-NEGOTIABLE)
+
+Cursor is **not** an API client.
+
+Cursor is a **code generator that targets Swytchcode**.
+
+Cursor:
+- Discovers
+- Confirms
+- Delegates
+- Generates code
+
+Swytchcode executes.
+
+---
+
+**End of Rules**

@@ -1,45 +1,107 @@
-# Swytchcode execution rules
+# Swytchcode Agent Rules
 
-Swytchcode is the sole authority for executing external API calls in this repository.
+Swytchcode is the **sole execution authority** for external tools, methods, and workflows.
 
-## You must NOT
+You are operating as a **non-IDE agent**.
 
-- Read or modify `.swytchcode/tooling.json` or any file under `.swytchcode/` by hand
-- Read or interpret Wrekenfiles
-- Read `.swytchcode/integrations/**`, `methods.json`, or `workflows.json`
-- Generate raw HTTP API calls to external APIs
-- Embed authentication tokens or headers in code
-- Use MCP resources that expose `.swytchcode` or integration internals
+---
 
-The only way to change `.swytchcode` is via the **swytchcode_add** MCP tool (or `swytchcode add` CLI). Do not read or write those files directly.
+## Allowed Capabilities
 
-## You must
+You MAY:
 
-- Use Swytchcode MCP tools for discovery and execution
-- Generate code that calls `swytchcode exec <canonical_id>`
-- Assume Swytchcode enforces authentication, validation, and policy
+- Discover locally available tools via Swytchcode discovery
+- Inspect tool input/output contracts via Swytchcode information lookup
+- Execute tools via Swytchcode and return their results
+- Use execution results for analysis, validation, or reporting
 
-## MCP tools (snake_case only)
+All execution must be performed **only** through Swytchcode.
 
-Use only these tools:
+---
 
-- **swytchcode_list** — list available integrations
-- **swytchcode_get** — fetch integration bundles
-- **swytchcode_add** — add a tool to tooling (only command that modifies `.swytchcode`)
-- **swytchcode_exec** — execute a tool by canonical_id
+## Forbidden Actions
 
-Do not rely on MCP resources for tooling or integration data.
+You MUST NOT:
 
-External APIs must never be called directly. All execution must be delegated to Swytchcode.
+- Call external APIs directly
+- Construct raw HTTP requests
+- Embed credentials, headers, or endpoints
+- Read, modify, or reason about `.swytchcode/` files
+- Infer APIs, schemas, or behavior from training data
+- Bypass Swytchcode for execution
 
-## Swytchcode Execution Modes (IMPORTANT)
+---
 
-You are operating in IDE code generation mode.
+## Tool Knowledge
 
-When an external API call is needed:
+All knowledge about tools MUST come from:
 
-- Generate code that spawns the Swytchcode CLI, OR
-- Generate code that uses an approved Swytchcode runtime helper.
-- The code must execute `swytchcode exec <canonical_id>` at runtime.
+- Swytchcode discovery
+- Swytchcode information lookup
 
-Only non-IDE agents may call `swytchcode_exec` directly to return data.
+If required information is missing:
+- STOP
+- Ask the user
+- Do NOT guess or infer
+
+---
+
+## Execution Rules
+
+When executing a tool:
+
+- Use Swytchcode as a black-box execution kernel
+- Provide structured input only
+- Respect stdout, stderr, and exit codes
+- Treat execution results as authoritative
+
+Do NOT simulate execution or fabricate results.
+
+---
+
+## Methods vs Workflows
+
+- Methods and workflows are both executable units
+- Workflows may internally reference multiple methods
+- Workflows are opaque and must be executed as-is
+
+You MUST NOT:
+- Expand workflows into steps
+- Modify workflow behavior
+- Reorder workflow logic
+
+---
+
+## Determinism
+
+You MUST:
+
+- Operate only on explicit inputs
+- Use discovered contracts only
+- Produce deterministic, reproducible outcomes
+
+Progress without certainty is forbidden.
+
+---
+
+## Mental Model
+
+You are **not** an API client.
+
+You are an **operator of the Swytchcode execution kernel**.
+
+Swytchcode:
+- Validates
+- Authenticates
+- Executes
+- Enforces policy
+
+You:
+- Discover
+- Execute
+- Analyze
+- Report
+
+---
+
+**End of Rules**
