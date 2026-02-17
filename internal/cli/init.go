@@ -2,25 +2,15 @@
 package cli
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/shell/internal/editors"
+	"gitlab.com/swytchcode/shell/internal/commands"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
-
-// defaultRegistryURL returns the registry base URL from env or default (used when writing tooling.json).
-func defaultRegistryURL() string {
-	if u := os.Getenv("SWYTCHCODE_REGISTRY_URL"); u != "" {
-		return u
-	}
-	return "https://localhost"
-}
 
 var (
 	initEditor         string
@@ -55,7 +45,7 @@ var initCmd = &cobra.Command{
 		if interactive && editorChoice == "" {
 			// Interactive mode: prompt for editor selection
 			fmt.Println()
-			_, editorChoice = util.SelectWithRetry("Which editor do you use?", []string{"cursor", "vscode", "claude", "none"})
+			_, editorChoice = util.SelectWithRetry("Which editor do you use?", []string{"cursor", "claude", "none"})
 		}
 
 		modeChoice := strings.ToLower(initMode)
@@ -64,97 +54,19 @@ var initCmd = &cobra.Command{
 			fmt.Println()
 			_, modeChoice = util.SelectWithRetry("Which execution mode do you want to use?", []string{"production", "sandbox"})
 		}
-		if modeChoice != "production" && modeChoice != "sandbox" {
-			return fmt.Errorf("invalid mode %q (expected production or sandbox)", initMode)
-		}
 
 		projectRoot, err := util.ProjectRoot()
 		if err != nil {
 			return fmt.Errorf("detect project root: %w", err)
 		}
 
-		swytchDir := filepath.Join(projectRoot, ".swytchcode")
-		if err := util.EnsureDir(swytchDir, 0o755); err != nil {
-			return fmt.Errorf("create .swytchcode directory: %w", err)
-		}
-		// Create integrations directory where all integration data (wrekenfile, methods, workflows)
-		// will be stored by swytchcode get.
-		if err := util.EnsureDir(filepath.Join(swytchDir, "integrations"), 0o755); err != nil {
-			return fmt.Errorf("create integrations directory: %w", err)
-		}
-
-		// Create or update tooling.json with mode
-		toolingPath := filepath.Join(swytchDir, "tooling.json")
-		var tooling map[string]interface{}
-		
-		if data, err := os.ReadFile(toolingPath); err == nil {
-			// Load existing tooling.json
-			if err := json.Unmarshal(data, &tooling); err != nil {
-				// If invalid, start fresh
-				tooling = make(map[string]interface{})
-			}
-		} else {
-			// Create new tooling.json
-			tooling = make(map[string]interface{})
-		}
-
-		// Ensure tools and integrations maps exist (integrations = pinned versions for determinism)
-		if _, ok := tooling["tools"]; !ok {
-			tooling["tools"] = make(map[string]interface{})
-		}
-		if _, ok := tooling["integrations"]; !ok {
-			tooling["integrations"] = make(map[string]interface{})
-		}
-
-		// Set mode, version, and registry URL so they are visible and project-specific.
-		// version and registry_url are owned by the kernel: only set when absent (never overwrite on re-init).
-		tooling["mode"] = modeChoice
-		if _, hasVersion := tooling["version"]; !hasVersion {
-			tooling["version"] = "1.0"
-		}
-		if _, hasRegistryURL := tooling["registry_url"]; !hasRegistryURL {
-			tooling["registry_url"] = defaultRegistryURL()
-		}
-
-		// Write tooling.json
-		data, err := json.MarshalIndent(tooling, "", "  ")
-		if err != nil {
-			return fmt.Errorf("marshal tooling.json: %w", err)
-		}
-		if err := os.WriteFile(toolingPath, data, 0o644); err != nil {
-			return fmt.Errorf("write tooling.json: %w", err)
-		}
-
-		switch editorChoice {
-		case "cursor":
-			if err := editors.WriteCursorRules(projectRoot); err != nil {
-				return fmt.Errorf("write Cursor rules: %w", err)
-			}
-		case "vscode":
-			if err := editors.WriteVSCodeConfig(projectRoot); err != nil {
-				return fmt.Errorf("write VS Code config: %w", err)
-			}
-		case "claude":
-			if err := editors.WriteClaudeConfig(projectRoot); err != nil {
-				return fmt.Errorf("write Claude config: %w", err)
-			}
-		case "none", "":
-			// No editor configuration.
-		default:
-			return fmt.Errorf("unknown editor %q (expected cursor|vscode|claude|none)", editorChoice)
-		}
-
-		// For humans on a TTY, a short confirmation is acceptable here.
-		if isTTY {
-			fmt.Println("Swytchcode initialized for project at", projectRoot)
-		}
-
-		return nil
+		// Use shared RunInit function (non-interactive mode)
+		return commands.RunInit(projectRoot, editorChoice, modeChoice, os.Stdout)
 	},
 }
 
 func init() {
-	initCmd.Flags().StringVar(&initEditor, "editor", "", "cursor | vscode | claude | none")
+	initCmd.Flags().StringVar(&initEditor, "editor", "", "cursor | claude | none")
 	initCmd.Flags().StringVar(&initMode, "mode", "", "production | sandbox")
 	initCmd.Flags().BoolVar(&initNonInteractive, "non-interactive", false, "disable prompts; suitable for CI")
 }

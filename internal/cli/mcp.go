@@ -36,7 +36,11 @@ var mcpServeCmd = &cobra.Command{
 	Short: "Start the MCP server",
 	Long: `Start the Model Context Protocol server.
 
-The server exposes swytchcode commands (list, get, add, exec) as MCP tools.
+The server exposes all swytchcode commands as MCP tools:
+- swytchcode_init, swytchcode_bootstrap, swytchcode_version
+- swytchcode_list, swytchcode_search, swytchcode_get, swytchcode_add
+- swytchcode_info, swytchcode_exec
+
 Supports both stdio and HTTP transports.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Read daemon flag value

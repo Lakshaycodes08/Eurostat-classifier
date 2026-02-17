@@ -1,0 +1,4680 @@
+VERSION: 2.0.2
+DEFAULTS:
+  w_base_url: http://localhost:80
+METHODS:
+  app.authenticate.create:
+    SUMMARY: App email authentication
+    DESC: App email authentication
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/authenticate
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.authenticate.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.authenticate.createResponse200)
+    INPUTS:
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.authenticate.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.authenticate.createResponse200)
+        RETURNVAR: app_authenticate_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.authenticate.create
+  app.register.create:
+    SUMMARY: App registration
+    DESC: App registration
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/register
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.register.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.register.createResponse200)
+    INPUTS:
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.register.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.register.createResponse200)
+        RETURNVAR: app_register_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.register.create
+  app.logout.create:
+    SUMMARY: App logout
+    DESC: App logout
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/logout
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.logout.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.logout.createResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.logout.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.logout.createResponse200)
+        RETURNVAR: app_logout_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.logout.create
+  app.profile.completeProfile.update:
+    SUMMARY: App profile completion
+    DESC: App profile completion
+    HTTP:
+      METHOD: PATCH
+      ENDPOINT: /v2/app/profiles/complete-profile
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.profile.completeProfile.updateRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.profile.completeProfile.updateResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.profile.completeProfile.updateRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.profile.completeProfile.updateResponse200)
+        RETURNVAR: app_profile_completeProfile_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.profile.completeProfile.update
+  app.project.create:
+    SUMMARY: Create a new project
+    DESC: Create a new project
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/projects
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.project.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.project.createResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.project.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.project.createResponse200)
+        RETURNVAR: app_project_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.project.create
+  app.project.list:
+    SUMMARY: Get projects list
+    DESC: Get projects list
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/projects
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_project_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.project.list
+  app.project.get:
+    SUMMARY: Get a project by UUID
+    DESC: Get a project by UUID
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/projects/{project_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.project.getResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.project.getResponse200)
+        RETURNVAR: app_project_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.project.get
+  app.project.delete:
+    SUMMARY: Delete a project
+    DESC: Delete a project
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/app/projects/{project_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.project.deleteResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.project.deleteResponse200)
+        RETURNVAR: app_project_delete
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.project.delete
+  app.project.mcp.update:
+    SUMMARY: Enable/Disable MCP access of a project
+    DESC: Enable/Disable MCP access of a project
+    HTTP:
+      METHOD: PATCH
+      ENDPOINT: /v2/app/projects/{project_uuid}/mcp
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.project.mcp.updateRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.project.mcp.updateResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.project.mcp.updateRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.project.mcp.updateResponse200)
+        RETURNVAR: app_project_mcp_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.project.mcp.update
+  app.project.reSubmit.update:
+    SUMMARY: Resubmit an opensource project for approval
+    DESC: Resubmit an opensource project for approval
+    HTTP:
+      METHOD: PATCH
+      ENDPOINT: /v2/app/projects/{project_uuid}/re-submit
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.project.reSubmit.updateResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.project.reSubmit.updateResponse200)
+        RETURNVAR: app_project_reSubmit_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.project.reSubmit.update
+  app.project.setStatus.update:
+    SUMMARY: Activate/Deactivate a project
+    DESC: Activate/Deactivate a project
+    HTTP:
+      METHOD: PATCH
+      ENDPOINT: /v2/app/projects/{project_uuid}/set-status
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.project.setStatus.updateResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.project.setStatus.updateResponse200)
+        RETURNVAR: app_project_setStatus_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.project.setStatus.update
+  app.project.subdomain.get:
+    SUMMARY: Fetch project subdomain
+    DESC: Fetch project subdomain
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/projects/{project_uuid}/subdomain
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.project.subdomain.getResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.project.subdomain.getResponse200)
+        RETURNVAR: app_project_subdomain_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.project.subdomain.get
+  app.project.subdomain.create:
+    SUMMARY: Claim project subdomain if not set
+    DESC: Claim project subdomain if not set
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/projects/{project_uuid}/subdomain
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.project.subdomain.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.project.subdomain.createResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.project.subdomain.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.project.subdomain.createResponse200)
+        RETURNVAR: app_project_subdomain_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.project.subdomain.create
+  app.key.project.create:
+    SUMMARY: Create a new API key for a project (only one active at a time)
+    DESC: Create a new API key for a project (only one active at a time)
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/keys/project/{project_uuid}
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.key.project.createResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.key.project.createResponse200)
+        RETURNVAR: app_key_project_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.key.project.create
+  app.key.project.get:
+    SUMMARY: Get the active API key for a project
+    DESC: Get the active API key for a project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/keys/project/{project_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.key.project.getResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.key.project.getResponse200)
+        RETURNVAR: app_key_project_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.key.project.get
+  app.key.key.delete:
+    SUMMARY: Delete (deactivate) a project API key by key value
+    DESC: Delete (deactivate) a project API key by key value
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/app/keys/key/{project_key}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.key.key.deleteResponse200)
+    INPUTS:
+      - project_key:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.key.key.deleteResponse200)
+        RETURNVAR: app_key_key_delete
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.key.key.delete
+  app.library.project.create:
+    SUMMARY: Upload a new library file or provide a spec URL
+    DESC: Upload a new library file or provide a spec URL
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/libraries/project/{project_uuid}
+      HEADERS:
+        Content-Type: multipart/form-data
+      CONTENT_TYPE: multipart/form-data
+      ACCEPT: application/json
+      BODYTYPE: form-data
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.library.project.createResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - project_uuid:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: body
+      - name:
+          TYPE: STRING
+          LOCATION: body
+      - version:
+          TYPE: STRING
+          LOCATION: body
+      - library_group:
+          TYPE: STRING
+          LOCATION: body
+      - programming_language:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: body
+      - spec_type:
+          TYPE: STRING
+          LOCATION: body
+      - file:
+          TYPE: ANY
+          REQUIRED: false
+          LOCATION: body
+      - url:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.library.project.createResponse200)
+        RETURNVAR: app_library_project_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.library.project.create
+  app.library.project.get:
+    SUMMARY: List libraries for a project
+    DESC: List libraries for a project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/libraries/project/{project_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_library_project_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.library.project.get
+  app.library.hopx.create:
+    SUMMARY: Test HopX SDK parser (no DB writes)
+    DESC: Test HopX SDK parser (no DB writes). Upload an SDK archive and parse it in a HopX sandbox.
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/libraries/project/hopx/{project_uuid}
+      HEADERS:
+        Content-Type: multipart/form-data
+      CONTENT_TYPE: multipart/form-data
+      ACCEPT: application/json
+      BODYTYPE: form-data
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.library.hopx.createResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - programming_language:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: body
+      - file:
+          TYPE: ANY
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.library.hopx.createResponse200)
+        RETURNVAR: app_library_hopx_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.library.hopx.create
+  app.library.get:
+    SUMMARY: Get a library by UUID
+    DESC: Get a library by UUID
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/libraries/{library_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.library.getResponse200)
+    INPUTS:
+      - library_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.library.getResponse200)
+        RETURNVAR: app_library_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.library.get
+  app.library.delete:
+    SUMMARY: Delete a library and all associated data
+    DESC: Delete a library and all associated data
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/app/libraries/{library_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.library.deleteResponse200)
+    INPUTS:
+      - library_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.library.deleteResponse200)
+        RETURNVAR: app_library_delete
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.library.delete
+  app.library.uploadWrekenSpec.create:
+    SUMMARY: Upload a Wreken spec for an existing library (YAML file or raw string)
+    DESC: Upload a Wreken spec for an existing library (YAML file or raw string). Skips OpenAPI/Postman conversion; all data is mapped to the library owner. Caller may be a different account.
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/libraries/{library_uuid}/upload-wreken-spec
+      HEADERS:
+        Content-Type: multipart/form-data
+      CONTENT_TYPE: multipart/form-data
+      ACCEPT: application/json
+      BODYTYPE: form-data
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.library.uploadWrekenSpec.createResponse200)
+    INPUTS:
+      - library_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - wreken_spec:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: body
+      - file:
+          TYPE: ANY
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.library.uploadWrekenSpec.createResponse200)
+        RETURNVAR: app_library_uploadWrekenSpec_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.library.uploadWrekenSpec.create
+  app.library.status.get:
+    SUMMARY: Get upload status for a library
+    DESC: Get upload status for a library
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/libraries/{library_uuid}/status
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.library.status.getResponse200)
+    INPUTS:
+      - library_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.library.status.getResponse200)
+        RETURNVAR: app_library_status_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+    CANONICAL_ID: app.library.status.get
+  app.library.health.list:
+    SUMMARY: Get upload system health status
+    DESC: Get upload system health status
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/libraries/health
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.library.health.listResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.library.health.listResponse200)
+        RETURNVAR: app_library_health_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.library.health.list
+  app.library.endpoints.get:
+    SUMMARY: Get sandbox and production endpoints for a library
+    DESC: Get sandbox and production endpoints for a library
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/libraries/{library_uuid}/endpoints
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.library.endpoints.getResponse200)
+    INPUTS:
+      - library_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.library.endpoints.getResponse200)
+        RETURNVAR: app_library_endpoints_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.library.endpoints.get
+  app.library.endpoints.update:
+    SUMMARY: Update sandbox and production endpoints for a library
+    DESC: Update sandbox and production endpoints for a library
+    HTTP:
+      METHOD: PUT
+      ENDPOINT: /v2/app/libraries/{library_uuid}/endpoints
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.library.endpoints.updateRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.library.endpoints.updateResponse200)
+    INPUTS:
+      - library_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.library.endpoints.updateRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.library.endpoints.updateResponse200)
+        RETURNVAR: app_library_endpoints_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.library.endpoints.update
+  app.method.library.get:
+    SUMMARY: List methods for a library
+    DESC: List methods for a library
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/methods/library/{library_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - library_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_method_library_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.method.library.get
+  app.method.get:
+    SUMMARY: Get a method by UUID
+    DESC: Get a method by UUID
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/methods/{method_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.method.getResponse200)
+    INPUTS:
+      - method_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.method.getResponse200)
+        RETURNVAR: app_method_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.method.get
+  app.method.update:
+    SUMMARY: Edit method name
+    DESC: Edit method name
+    HTTP:
+      METHOD: PATCH
+      ENDPOINT: /v2/app/methods/{method_uuid}
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.method.updateRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.method.updateResponse200)
+    INPUTS:
+      - method_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.method.updateRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.method.updateResponse200)
+        RETURNVAR: app_method_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.method.update
+  app.method.delete:
+    SUMMARY: Delete a method
+    DESC: Delete a method
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/app/methods/{method_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.method.deleteResponse200)
+    INPUTS:
+      - method_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.method.deleteResponse200)
+        RETURNVAR: app_method_delete
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.method.delete
+  app.method.details.update:
+    SUMMARY: Edit method details
+    DESC: Edit method details
+    HTTP:
+      METHOD: PATCH
+      ENDPOINT: /v2/app/methods/{method_uuid}/details
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.method.details.updateRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.method.details.updateResponse200)
+    INPUTS:
+      - method_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.method.details.updateRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.method.details.updateResponse200)
+        RETURNVAR: app_method_details_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.method.details.update
+  app.workflow.create:
+    SUMMARY: Create a new workflow
+    DESC: Create a new workflow
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/workflows
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.workflow.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.workflow.createResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.workflow.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.workflow.createResponse200)
+        RETURNVAR: app_workflow_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.workflow.create
+  app.workflow.library.get:
+    SUMMARY: List workflows for a library
+    DESC: List workflows for a library
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/workflows/library/{library_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - library_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_workflow_library_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.workflow.library.get
+  app.workflow.get:
+    SUMMARY: Get a workflow by UUID
+    DESC: Get a workflow by UUID
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/workflows/{workflow_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.workflow.getResponse200)
+    INPUTS:
+      - workflow_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.workflow.getResponse200)
+        RETURNVAR: app_workflow_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.workflow.get
+  app.workflow.update:
+    SUMMARY: Update a workflow
+    DESC: Update a workflow
+    HTTP:
+      METHOD: PATCH
+      ENDPOINT: /v2/app/workflows/{workflow_uuid}
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.workflow.updateRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.workflow.updateResponse200)
+    INPUTS:
+      - workflow_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.workflow.updateRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.workflow.updateResponse200)
+        RETURNVAR: app_workflow_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.workflow.update
+  app.workflow.delete:
+    SUMMARY: Delete a workflow
+    DESC: Delete a workflow
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/app/workflows/{workflow_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.workflow.deleteResponse200)
+    INPUTS:
+      - workflow_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.workflow.deleteResponse200)
+        RETURNVAR: app_workflow_delete
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.workflow.delete
+  app.newsletter.update:
+    SUMMARY: Update newsletter config for a customer
+    DESC: Update newsletter config for a customer
+    HTTP:
+      METHOD: PUT
+      ENDPOINT: /v2/app/newsletter
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.newsletter.updateRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.newsletter.updateResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.newsletter.updateRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.newsletter.updateResponse200)
+        RETURNVAR: app_newsletter_update
+        STATUS: 200
+    CANONICAL_ID: app.newsletter.update
+  app.newsletter.list:
+    SUMMARY: Get newsletter config for a customer
+    DESC: Get newsletter config for a customer
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/newsletter
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.newsletter.listResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.newsletter.listResponse200)
+        RETURNVAR: app_newsletter_list
+        STATUS: 200
+    CANONICAL_ID: app.newsletter.list
+  app.subscription.subscriptionPlans.list:
+    SUMMARY: List all subscription plans
+    DESC: List all subscription plans
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/subscriptions/subscription-plans
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_subscription_subscriptionPlans_list
+        STATUS: 200
+    CANONICAL_ID: app.subscription.subscriptionPlans.list
+  app.subscription.currentSubscription.list:
+    SUMMARY: Get current subscription for the authenticated user
+    DESC: Get current subscription for the authenticated user
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/subscriptions/current-subscription
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: ANY
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: ANY
+        RETURNVAR: app_subscription_currentSubscription_list
+        STATUS: 200
+    CANONICAL_ID: app.subscription.currentSubscription.list
+  app.subscription.paymentHistory.list:
+    SUMMARY: Get payment history for the authenticated user
+    DESC: Get payment history for the authenticated user
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/subscriptions/payment-history
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_subscription_paymentHistory_list
+        STATUS: 200
+    CANONICAL_ID: app.subscription.paymentHistory.list
+  app.subscription.createCheckoutSession.create:
+    SUMMARY: Create a Stripe checkout session for subscription
+    DESC: Create a Stripe checkout session for subscription
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/subscriptions/create-checkout-session
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.subscription.createCheckoutSession.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.subscription.createCheckoutSession.createResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.subscription.createCheckoutSession.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.subscription.createCheckoutSession.createResponse200)
+        RETURNVAR: app_subscription_createCheckoutSession_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.subscription.createCheckoutSession.create
+  app.webhook.stripe.create:
+    SUMMARY: Stripe webhook endpoint for payment events
+    DESC: Stripe webhook endpoint for payment events
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/webhooks/stripe
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.webhook.stripe.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.webhook.stripe.createResponse200)
+    INPUTS:
+      - body:
+          TYPE: STRUCT(app.webhook.stripe.createRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.webhook.stripe.createResponse200)
+        RETURNVAR: app_webhook_stripe_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.webhook.stripe.create
+  app.analytic.dailyQueries.get:
+    SUMMARY: Get monthly query summary for the authenticated customer and project
+    DESC: Get monthly query summary for the authenticated customer and project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/analytics/{project_uuid}/daily-queries
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_analytic_dailyQueries_get
+        STATUS: 200
+    CANONICAL_ID: app.analytic.dailyQueries.get
+  app.analytic.endpoints.get:
+    SUMMARY: Get endpoint usage aggregate for the authenticated customer and project
+    DESC: Get endpoint usage aggregate for the authenticated customer and project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/analytics/{project_uuid}/endpoints
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_analytic_endpoints_get
+        STATUS: 200
+    CANONICAL_ID: app.analytic.endpoints.get
+  app.analytic.workflows.get:
+    SUMMARY: Get workflow usage aggregate for the authenticated customer and project
+    DESC: Get workflow usage aggregate for the authenticated customer and project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/analytics/{project_uuid}/workflows
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_analytic_workflows_get
+        STATUS: 200
+    CANONICAL_ID: app.analytic.workflows.get
+  app.analytic.languages.get:
+    SUMMARY: Get language preference aggregate for the authenticated customer and project
+    DESC: Get language preference aggregate for the authenticated customer and project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/analytics/{project_uuid}/languages
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_analytic_languages_get
+        STATUS: 200
+    CANONICAL_ID: app.analytic.languages.get
+  app.analytic.monthlyUserGrowth.get:
+    SUMMARY: Get monthly user growth for the authenticated customer and project
+    DESC: Get monthly user growth for the authenticated customer and project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/analytics/{project_uuid}/monthly-user-growth
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_analytic_monthlyUserGrowth_get
+        STATUS: 200
+    CANONICAL_ID: app.analytic.monthlyUserGrowth.get
+  app.analytic.commonQuestions.get:
+    SUMMARY: Get most common questions
+    DESC: Get most common questions
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/analytics/{project_uuid}/common-questions
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_analytic_commonQuestions_get
+        STATUS: 200
+    CANONICAL_ID: app.analytic.commonQuestions.get
+  app.analytic.commonAllQuestions.get:
+    SUMMARY: Get all the common questions with MongoDB IDs and workflow status
+    DESC: Get all the common questions with MongoDB IDs and workflow status
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/analytics/{project_uuid}/common-all-questions
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: app_analytic_commonAllQuestions_get
+        STATUS: 200
+    CANONICAL_ID: app.analytic.commonAllQuestions.get
+  app.analytic.convertToWorkflow.create:
+    SUMMARY: Convert analytics data to a workflow
+    DESC: Convert analytics data to a workflow
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/analytics/{project_uuid}/convert-to-workflow
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.analytic.convertToWorkflow.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.analytic.convertToWorkflow.createResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.analytic.convertToWorkflow.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.analytic.convertToWorkflow.createResponse200)
+        RETURNVAR: app_analytic_convertToWorkflow_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+    CANONICAL_ID: app.analytic.convertToWorkflow.create
+  app.mcp.generateKey.create:
+    SUMMARY: Generate a new MCP key for a project
+    DESC: Generate a new MCP key for a project
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/mcp/{project_uuid}/generate-key
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.mcp.generateKey.createResponse201)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.mcp.generateKey.createResponse201)
+        RETURNVAR: app_mcp_generateKey_create_201
+        STATUS: 201
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.mcp.generateKey.create
+  app.mcp.key.get:
+    SUMMARY: Get MCP key for a project
+    DESC: Get MCP key for a project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/mcp/{project_uuid}/key
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.mcp.key.getResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.mcp.key.getResponse200)
+        RETURNVAR: app_mcp_key_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.mcp.key.get
+  app.mcp.key.delete:
+    SUMMARY: Delete MCP key for a project
+    DESC: Delete MCP key for a project
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/app/mcp/{project_uuid}/key
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.mcp.key.deleteResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.mcp.key.deleteResponse200)
+        RETURNVAR: app_mcp_key_delete
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.mcp.key.delete
+  app.invite.create:
+    SUMMARY: Create a new customer invite
+    DESC: Create a new customer invite
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/invite
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.invite.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.invite.createResponse201)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.invite.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.invite.createResponse201)
+        RETURNVAR: app_invite_create_201
+        STATUS: 201
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.invite.create
+  app.invite.check:
+    SUMMARY: Check if an email is already invited or registered
+    DESC: Check if an email is already invited or registered
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/invite/check/{email}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.invite.checkResponse200)
+    INPUTS:
+      - email:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.invite.checkResponse200)
+        RETURNVAR: app_invite_check
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.invite.check
+  app.invite.accept.create:
+    SUMMARY: Accept a customer invite
+    DESC: Accept a customer invite
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/invite/accept
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.invite.accept.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.invite.accept.createResponse200)
+    INPUTS:
+      - body:
+          TYPE: STRUCT(app.invite.accept.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.invite.accept.createResponse200)
+        RETURNVAR: app_invite_accept_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.invite.accept.create
+  app.invite.sent.list:
+    SUMMARY: Get all invites sent by the authenticated customer
+    DESC: Get all invites sent by the authenticated customer
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/invite/sent
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.invite.sent.listResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.invite.sent.listResponse200)
+        RETURNVAR: app_invite_sent_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.invite.sent.list
+  app.invite.stats.list:
+    SUMMARY: Get invite statistics for the authenticated customer
+    DESC: Get invite statistics for the authenticated customer
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/invite/stats
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.invite.stats.listResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.invite.stats.listResponse200)
+        RETURNVAR: app_invite_stats_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.invite.stats.list
+  app.invite.details.get:
+    SUMMARY: Get invite details by token (public endpoint)
+    DESC: Get invite details by token (public endpoint)
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/invite/details/{token}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.invite.details.getResponse200)
+    INPUTS:
+      - token:
+          TYPE: STRING
+          LOCATION: path
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.invite.details.getResponse200)
+        RETURNVAR: app_invite_details_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.invite.details.get
+  app.collaboration.collaborators.create:
+    SUMMARY: Invite a customer to collaborate on a project
+    DESC: Invite a customer to collaborate on a project
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/collaborations/{project_uuid}/collaborators
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.collaboration.collaborators.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.collaboration.collaborators.createResponse201)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(app.collaboration.collaborators.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.collaboration.collaborators.createResponse201)
+        RETURNVAR: app_collaboration_collaborators_create_201
+        STATUS: 201
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.collaboration.collaborators.create
+  app.collaboration.collaborators.get:
+    SUMMARY: Get all collaborators for a project
+    DESC: Get all collaborators for a project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/collaborations/{project_uuid}/collaborators
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.collaboration.collaborators.getResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.collaboration.collaborators.getResponse200)
+        RETURNVAR: app_collaboration_collaborators_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error403)
+        STATUS: 403
+        WHEN: Default Response (HTTP 403)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.collaboration.collaborators.get
+  app.collaboration.accept.create:
+    SUMMARY: Accept a collaboration invitation
+    DESC: Accept a collaboration invitation
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/collaborations/{collaboration_uuid}/accept
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.collaboration.accept.createResponse200)
+    INPUTS:
+      - collaboration_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.collaboration.accept.createResponse200)
+        RETURNVAR: app_collaboration_accept_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.collaboration.accept.create
+  app.collaboration.decline.create:
+    SUMMARY: Decline a collaboration invitation
+    DESC: Decline a collaboration invitation
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/collaborations/{collaboration_uuid}/decline
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.collaboration.decline.createResponse200)
+    INPUTS:
+      - collaboration_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.collaboration.decline.createResponse200)
+        RETURNVAR: app_collaboration_decline_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.collaboration.decline.create
+  app.collaboration.delete:
+    SUMMARY: Remove a collaborator from a project (project owner only)
+    DESC: Remove a collaborator from a project (project owner only)
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/app/collaborations/{collaboration_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.collaboration.deleteResponse200)
+    INPUTS:
+      - collaboration_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.collaboration.deleteResponse200)
+        RETURNVAR: app_collaboration_delete
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.collaboration.delete
+  app.collaboration.leave.create:
+    SUMMARY: Leave a project (collaborator removes themselves)
+    DESC: Leave a project (collaborator removes themselves)
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/app/collaborations/{collaboration_uuid}/leave
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.collaboration.leave.createResponse200)
+    INPUTS:
+      - collaboration_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.collaboration.leave.createResponse200)
+        RETURNVAR: app_collaboration_leave_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.collaboration.leave.create
+  app.notification.list:
+    SUMMARY: Get all notifications for the authenticated customer (newest first)
+    DESC: Get all notifications for the authenticated customer (newest first)
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/notifications
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.notification.listResponse200)
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.notification.listResponse200)
+        RETURNVAR: app_notification_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.notification.list
+  app.notification.delete:
+    SUMMARY: "Clear notifications: provide body.notification_ids[] or use action=clear_all"
+    DESC: "Clear notifications: provide body.notification_ids[] or use action=clear_all"
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/app/notifications
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(app.notification.deleteRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.notification.deleteResponse200)
+    INPUTS:
+      - action:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+      - body:
+          TYPE: STRUCT(app.notification.deleteRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.notification.deleteResponse200)
+        RETURNVAR: app_notification_delete
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.notification.delete
+  app.notification.count.list:
+    SUMMARY: Get notification count for the authenticated customer
+    DESC: Get notification count for the authenticated customer
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/notifications/count
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.notification.count.listResponse200)
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.notification.count.listResponse200)
+        RETURNVAR: app_notification_count_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: app.notification.count.list
+  app.deployment.status.get:
+    SUMMARY: Get deployment status by project_uuid
+    DESC: Get deployment status by project_uuid
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/app/deployment/status/{project_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(app.deployment.status.getResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(app.deployment.status.getResponse200)
+        RETURNVAR: app_deployment_status_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+    CANONICAL_ID: app.deployment.status.get
+  lib.workflow.library.create:
+    SUMMARY: List workflows for multiple libraries
+    DESC: List workflows for multiple libraries
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/lib/workflows/library
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(lib.workflow.library.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(lib.workflow.library.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: lib_workflow_library_create
+        STATUS: 200
+    CANONICAL_ID: lib.workflow.library.create
+  lib.workflow.steps.get:
+    SUMMARY: List workflow steps
+    DESC: List workflow steps
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/lib/workflows/steps/{workflowId}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(lib.workflow.steps.getResponse200)
+    INPUTS:
+      - workflowId:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(lib.workflow.steps.getResponse200)
+        RETURNVAR: lib_workflow_steps_get
+        STATUS: 200
+    CANONICAL_ID: lib.workflow.steps.get
+  lib.method.library.create:
+    SUMMARY: List methods for multiple libraries
+    DESC: List methods for multiple libraries
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/lib/methods/library
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(lib.method.library.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(lib.method.library.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: lib_method_library_create
+        STATUS: 200
+    CANONICAL_ID: lib.method.library.create
+  lib.method.details.get:
+    SUMMARY: Get details of a specific struct for a given method
+    DESC: Get details of a specific struct for a given method
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/lib/methods/{methodId}/{structName}/details
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(lib.method.details.getResponse200)
+    INPUTS:
+      - methodId:
+          TYPE: STRING
+          LOCATION: path
+      - structName:
+          TYPE: STRING
+          LOCATION: path
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: STRUCT(lib.method.details.getResponse200)
+        RETURNVAR: lib_method_details_get
+        STATUS: 200
+    CANONICAL_ID: lib.method.details.get
+  lib.mcp.email.create:
+    SUMMARY: Enter email to check if mcp key exists
+    DESC: Enter email to check if mcp key exists
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/lib/mcp/email
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(lib.mcp.email.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(lib.mcp.email.createResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(lib.mcp.email.createRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(lib.mcp.email.createResponse200)
+        RETURNVAR: lib_mcp_email_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: lib.mcp.email.create
+  lib.mcp.otp.create:
+    SUMMARY: Enter otp to validate email and view the mcp key
+    DESC: Enter otp to validate email and view the mcp key
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/lib/mcp/otp
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(lib.mcp.otp.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(lib.mcp.otp.createResponse200)
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(lib.mcp.otp.createRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(lib.mcp.otp.createResponse200)
+        RETURNVAR: lib_mcp_otp_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: lib.mcp.otp.create
+  lib.library.list:
+    SUMMARY: List libraries for a project
+    DESC: List libraries for a project
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/lib/libraries
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: lib_library_list
+        STATUS: 200
+    CANONICAL_ID: lib.library.list
+  lib.chat.create:
+    SUMMARY: Send a chat message to the AI
+    DESC: Send a chat message to the AI
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/lib/chat
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(lib.chat.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: map[STRING]ANY
+    INPUTS:
+      - authorization:
+          TYPE: STRING
+          LOCATION: header
+      - content-type:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: header
+      - body:
+          TYPE: STRUCT(lib.chat.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: map[STRING]ANY
+        RETURNVAR: lib_chat_create
+        STATUS: 200
+    CANONICAL_ID: lib.chat.create
+  mcp.mcp.create:
+    SUMMARY: Available MCP routes
+    DESC: Available MCP routes
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/mcp/mcp
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(mcp.mcp.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(mcp.mcp.createResponse200)
+    INPUTS:
+      - body:
+          TYPE: STRUCT(mcp.mcp.createRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(mcp.mcp.createResponse200)
+        RETURNVAR: mcp_mcp_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+    CANONICAL_ID: mcp.mcp.create
+  mcp.mcp.list:
+    SUMMARY: Delete and Get MCP session
+    DESC: Delete and Get MCP session
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/mcp/mcp
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: VOID
+    CANONICAL_ID: mcp.mcp.list
+  mcp.mcp.delete:
+    SUMMARY: Delete and Get MCP session
+    DESC: Delete and Get MCP session
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/mcp/mcp
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: VOID
+    CANONICAL_ID: mcp.mcp.delete
+  admin.login.create:
+    SUMMARY: Admin login - validate credentials and send OTP
+    DESC: Admin login - validate credentials and send OTP
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/admin/login
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(admin.login.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.login.createResponse200)
+    INPUTS:
+      - body:
+          TYPE: STRUCT(admin.login.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.login.createResponse200)
+        RETURNVAR: admin_login_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.login.create
+  admin.validate-otp.create:
+    SUMMARY: Validate admin OTP and complete login
+    DESC: Validate admin OTP and complete login
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/admin/validate-otp
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(admin.validate-otp.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.validate-otp.createResponse200)
+    INPUTS:
+      - body:
+          TYPE: STRUCT(admin.validate-otp.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.validate-otp.createResponse200)
+        RETURNVAR: admin_validate-otp_create
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error401)
+        STATUS: 401
+        WHEN: Default Response (HTTP 401)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.validate-otp.create
+  admin.create.create:
+    SUMMARY: Create a new admin user
+    DESC: Create a new admin user
+    HTTP:
+      METHOD: POST
+      ENDPOINT: /v2/admin/create
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(admin.create.createRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.create.createResponse201)
+    INPUTS:
+      - body:
+          TYPE: STRUCT(admin.create.createRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.create.createResponse201)
+        RETURNVAR: admin_create_create_201
+        STATUS: 201
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.create.create
+  admin.customer.list:
+    SUMMARY: Get customers list with pagination
+    DESC: Get customers list with pagination
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/admin/customers
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.customer.listResponse200)
+    INPUTS:
+      - page:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+      - limit:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+      - search:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.customer.listResponse200)
+        RETURNVAR: admin_customer_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.customer.list
+  admin.customer.stats.list:
+    SUMMARY: Get customer statistics for admin dashboard
+    DESC: Get customer statistics for admin dashboard
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/admin/customers/stats
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.customer.stats.listResponse200)
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.customer.stats.listResponse200)
+        RETURNVAR: admin_customer_stats_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.customer.stats.list
+  admin.customer.get:
+    SUMMARY: Get customer details by UUID
+    DESC: Get customer details by UUID
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/admin/customers/{customer_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.customer.getResponse200)
+    INPUTS:
+      - customer_uuid:
+          TYPE: STRING
+          LOCATION: path
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.customer.getResponse200)
+        RETURNVAR: admin_customer_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.customer.get
+  admin.customer.update:
+    SUMMARY: Update customer information
+    DESC: Update customer information
+    HTTP:
+      METHOD: PATCH
+      ENDPOINT: /v2/admin/customers/{customer_uuid}
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(admin.customer.updateRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.customer.updateResponse200)
+    INPUTS:
+      - customer_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - body:
+          TYPE: STRUCT(admin.customer.updateRequest)
+          REQUIRED: false
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.customer.updateResponse200)
+        RETURNVAR: admin_customer_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.customer.update
+  admin.customer.delete:
+    SUMMARY: Delete customer (soft delete)
+    DESC: Delete customer (soft delete)
+    HTTP:
+      METHOD: DELETE
+      ENDPOINT: /v2/admin/customers/{customer_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.customer.deleteResponse200)
+    INPUTS:
+      - customer_uuid:
+          TYPE: STRING
+          LOCATION: path
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.customer.deleteResponse200)
+        RETURNVAR: admin_customer_delete
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.customer.delete
+  admin.project.list:
+    SUMMARY: Get all projects list with pagination
+    DESC: Get all projects list with pagination
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/admin/projects
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.project.listResponse200)
+    INPUTS:
+      - page:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+      - limit:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+      - search:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+      - status:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+      - is_opensource:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.project.listResponse200)
+        RETURNVAR: admin_project_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.project.list
+  admin.project.get:
+    SUMMARY: Get project details by UUID
+    DESC: Get project details by UUID
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/admin/projects/{project_uuid}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.project.getResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.project.getResponse200)
+        RETURNVAR: admin_project_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.project.get
+  admin.project.opensource.list:
+    SUMMARY: Get list of opensource projects pending approval
+    DESC: Get list of opensource projects pending approval
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/admin/projects/pending/opensource
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.project.opensource.listResponse200)
+    INPUTS:
+      - page:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+      - limit:
+          TYPE: STRING
+          REQUIRED: false
+          LOCATION: query
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.project.opensource.listResponse200)
+        RETURNVAR: admin_project_opensource_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.project.opensource.list
+  admin.project.approve.update:
+    SUMMARY: Approve a project by UUID
+    DESC: Approve a project by UUID
+    HTTP:
+      METHOD: PATCH
+      ENDPOINT: /v2/admin/projects/{project_uuid}/approve
+      HEADERS:
+        Content-Type: application/json
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+      BODY:
+        TYPE: STRUCT(admin.project.approve.updateRequest)
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(admin.project.approve.updateResponse200)
+    INPUTS:
+      - project_uuid:
+          TYPE: STRING
+          LOCATION: path
+      - body:
+          TYPE: STRUCT(admin.project.approve.updateRequest)
+          LOCATION: body
+    RETURNS:
+      - RETURNTYPE: STRUCT(admin.project.approve.updateResponse200)
+        RETURNVAR: admin_project_approve_update
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: admin.project.approve.update
+  web.project.list:
+    SUMMARY: Get approved projects list for public access
+    DESC: Get approved projects list for public access
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/web/projects
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: "[]ANY"
+    RETURNS:
+      - RETURNTYPE: "[]ANY"
+        RETURNVAR: web_project_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: web.project.list
+  shell.integration.list:
+    SUMMARY: List available integrations
+    DESC: List available integrations
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/shell/integrations
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(shell.integration.listResponse200)
+    RETURNS:
+      - RETURNTYPE: STRUCT(shell.integration.listResponse200)
+        RETURNVAR: shell_integration_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: shell.integration.list
+  shell.integration.bundle.get:
+    SUMMARY: Fetch integration details and spec (bundle)
+    DESC: Fetch integration details and spec (bundle)
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/shell/integrations/{project_name}/bundle
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(shell.integration.bundle.getResponse200)
+    INPUTS:
+      - project_name:
+          TYPE: STRING
+          LOCATION: path
+    RETURNS:
+      - RETURNTYPE: STRUCT(shell.integration.bundle.getResponse200)
+        RETURNVAR: shell_integration_bundle_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: shell.integration.bundle.get
+  shell.workflow.list:
+    SUMMARY: List workflows for provided project_name
+    DESC: List workflows for provided project_name
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/shell/workflows
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(shell.workflow.listResponse200)
+    INPUTS:
+      - project_name:
+          TYPE: STRING
+          LOCATION: query
+    RETURNS:
+      - RETURNTYPE: STRUCT(shell.workflow.listResponse200)
+        RETURNVAR: shell_workflow_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: shell.workflow.list
+  shell.workflow.get:
+    SUMMARY: Get workflow details by project_name and canonical_id
+    DESC: Get workflow details by project_name and canonical_id
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/shell/workflows/{canonical_id}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(shell.workflow.getResponse200)
+    INPUTS:
+      - project_name:
+          TYPE: STRING
+          LOCATION: query
+      - canonical_id:
+          TYPE: STRING
+          LOCATION: path
+    RETURNS:
+      - RETURNTYPE: STRUCT(shell.workflow.getResponse200)
+        RETURNVAR: shell_workflow_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: shell.workflow.get
+  shell.method.list:
+    SUMMARY: List methods for provided project_name
+    DESC: List methods for provided project_name
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/shell/methods
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(shell.method.listResponse200)
+    INPUTS:
+      - project_name:
+          TYPE: STRING
+          LOCATION: query
+    RETURNS:
+      - RETURNTYPE: STRUCT(shell.method.listResponse200)
+        RETURNVAR: shell_method_list
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error400)
+        STATUS: 400
+        WHEN: Default Response (HTTP 400)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: shell.method.list
+  shell.method.get:
+    SUMMARY: Get method details by project_name and canonical_id
+    DESC: Get method details by project_name and canonical_id
+    HTTP:
+      METHOD: GET
+      ENDPOINT: /v2/shell/methods/{canonical_id}
+      HEADERS: {}
+      CONTENT_TYPE: application/json
+      ACCEPT: application/json
+    EXECUTION:
+      KIND: http
+      MODE: async
+    ASYNC:
+      RETURNS: result
+      RESULT:
+        TYPE: STRUCT(shell.method.getResponse200)
+    INPUTS:
+      - project_name:
+          TYPE: STRING
+          LOCATION: query
+      - canonical_id:
+          TYPE: STRING
+          LOCATION: path
+    RETURNS:
+      - RETURNTYPE: STRUCT(shell.method.getResponse200)
+        RETURNVAR: shell_method_get
+        STATUS: 200
+    ERRORS:
+      - TYPE: STRUCT(Error404)
+        STATUS: 404
+        WHEN: Default Response (HTTP 404)
+      - TYPE: STRUCT(Error500)
+        STATUS: 500
+        WHEN: Default Response (HTTP 500)
+    CANONICAL_ID: shell.method.get
+STRUCTS:
+  app.authenticate.createRequest:
+    - name: firebaseId
+      type: STRING
+      REQUIRED: true
+    - name: accessToken
+      type: STRING
+      REQUIRED: true
+  app.authenticate.createResponse200:
+    - name: subscribed
+      type: BOOL
+      REQUIRED: false
+    - name: subsciptionName
+      type: STRING
+      REQUIRED: false
+  app.register.createRequest:
+    - name: email
+      type: STRING
+      REQUIRED: true
+    - name: name
+      type: STRING
+      REQUIRED: true
+    - name: firebaseId
+      type: STRING
+      REQUIRED: true
+    - name: accessToken
+      type: STRING
+      REQUIRED: true
+  app.register.createResponse200:
+    - name: subscribed
+      type: BOOL
+      REQUIRED: false
+    - name: subsciptionName
+      type: STRING
+      REQUIRED: false
+  app.logout.createRequest:
+    - name: token
+      type: STRING
+      REQUIRED: true
+  app.logout.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.profile.completeProfile.updateRequest:
+    - name: type
+      type: STRING
+      REQUIRED: false
+    - name: website
+      type: STRING
+      REQUIRED: false
+    - name: company_name
+      type: STRING
+      REQUIRED: false
+    - name: position
+      type: STRING
+      REQUIRED: false
+    - name: is_subscribed_security_alerts
+      type: BOOL
+      REQUIRED: false
+    - name: is_subscribed_product_updates
+      type: BOOL
+      REQUIRED: false
+    - name: is_subscribed_marketing_emails
+      type: BOOL
+      REQUIRED: false
+    - name: subscription_plan
+      type: STRING
+      REQUIRED: false
+    - name: inviter_hash
+      type: STRING
+      REQUIRED: false
+  app.profile.completeProfile.updateResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.project.createRequest:
+    - name: name
+      type: STRING
+      REQUIRED: true
+    - name: description
+      type: STRING
+      REQUIRED: false
+    - name: website_url
+      type: STRING
+      REQUIRED: false
+    - name: documentation_url
+      type: STRING
+      REQUIRED: false
+    - name: repository_url
+      type: STRING
+      REQUIRED: false
+    - name: is_opensource
+      type: BOOL
+      REQUIRED: true
+  app.project.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+    - name: project_uuid
+      type: STRING
+      REQUIRED: false
+  app.project.getResponse200:
+    - name: project_uuid
+      type: STRING
+      REQUIRED: false
+    - name: name
+      type: STRING
+      REQUIRED: false
+    - name: website_url
+      type: STRING
+      REQUIRED: false
+    - name: documentation_url
+      type: STRING
+      REQUIRED: false
+    - name: repository_url
+      type: STRING
+      REQUIRED: false
+    - name: is_opensource
+      type: BOOL
+      REQUIRED: false
+  app.project.deleteResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.project.mcp.updateRequest:
+    - name: enable_mcp
+      type: BOOL
+      REQUIRED: true
+  app.project.mcp.updateResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.project.reSubmit.updateResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.project.setStatus.updateResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.project.subdomain.getResponse200:
+    - name: project_uuid
+      type: STRING
+      REQUIRED: false
+    - name: subdomain
+      type: ANY
+      REQUIRED: false
+    - name: claimed
+      type: BOOL
+      REQUIRED: false
+  app.project.subdomain.createRequest:
+    - name: subdomain
+      type: STRING
+      REQUIRED: true
+  app.project.subdomain.createResponse200:
+    - name: project_uuid
+      type: STRING
+      REQUIRED: false
+    - name: subdomain
+      type: STRING
+      REQUIRED: false
+    - name: claimed
+      type: BOOL
+      REQUIRED: false
+  app.key.project.createResponse200:
+    - name: project_key_uuid
+      type: STRING
+      REQUIRED: false
+    - name: project_uuid
+      type: STRING
+      REQUIRED: false
+    - name: project_key
+      type: STRING
+      REQUIRED: false
+    - name: is_active
+      type: BOOL
+      REQUIRED: false
+  app.key.project.getResponse200:
+    - name: project_key_uuid
+      type: STRING
+      REQUIRED: false
+    - name: project_uuid
+      type: STRING
+      REQUIRED: false
+    - name: project_key
+      type: STRING
+      REQUIRED: false
+    - name: is_active
+      type: BOOL
+      REQUIRED: false
+    - name: created_date
+      type: STRING
+      REQUIRED: false
+  app.key.key.deleteResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.library.project.createResponse200:
+    - name: library_uuid
+      type: STRING
+      REQUIRED: true
+    - name: status
+      type: STRING
+      REQUIRED: true
+    - name: message
+      type: STRING
+      REQUIRED: true
+  app.library.getResponse200:
+    - name: name
+      type: STRING
+      REQUIRED: false
+      comment: Library name
+    - name: version
+      type: STRING
+      REQUIRED: false
+      comment: Library version
+    - name: library_group
+      type: STRING
+      REQUIRED: false
+      comment: Library group
+    - name: prgramming_language
+      type: STRING
+      REQUIRED: false
+      comment: Programming language in case of SDK
+    - name: init_details
+      type: STRING
+      REQUIRED: false
+      comment: Library initial details
+  app.library.deleteResponse200:
+    - name: status
+      type: BOOL
+      REQUIRED: true
+    - name: message
+      type: STRING
+      REQUIRED: true
+    - name: deletedWeaviateVectors
+      type: FLOAT
+      REQUIRED: true
+    - name: deletedS3Files
+      type: FLOAT
+      REQUIRED: true
+  app.library.uploadWrekenSpec.createResponse200:
+    - name: status
+      type: STRING
+      REQUIRED: true
+    - name: library_uuid
+      type: STRING
+      REQUIRED: true
+    - name: message
+      type: STRING
+      REQUIRED: true
+  app.library.status.getResponse200:
+    - name: library_uuid
+      type: STRING
+      REQUIRED: true
+    - name: status
+      type: STRING
+      REQUIRED: true
+    - name: progress
+      type: FLOAT
+      REQUIRED: true
+    - name: currentStep
+      type: STRING
+      REQUIRED: true
+    - name: error
+      type: STRING
+      REQUIRED: false
+    - name: startedAt
+      type: STRING
+      REQUIRED: true
+    - name: project_uuid
+      type: STRING
+      REQUIRED: true
+  app.library.health.listResponse200:
+    - name: activeUploads
+      type: FLOAT
+      REQUIRED: true
+    - name: queueSize
+      type: FLOAT
+      REQUIRED: true
+    - name: maxConcurrent
+      type: FLOAT
+      REQUIRED: true
+    - name: activeProjects
+      type: "[]STRING"
+      REQUIRED: true
+    - name: aiService
+      type: OBJECT
+      REQUIRED: true
+  app.library.endpoints.getResponse200:
+    - name: sandbox_endpoint
+      type: STRING
+      REQUIRED: true
+    - name: production_endpoint
+      type: STRING
+      REQUIRED: true
+  app.library.endpoints.updateRequest:
+    - name: variant
+      type: STRUCT(app.library.endpoints.updateRequest_Union)
+      REQUIRED: false
+  app.library.endpoints.updateResponse200:
+    - name: sandbox_endpoint
+      type: STRING
+      REQUIRED: true
+    - name: production_endpoint
+      type: STRING
+      REQUIRED: true
+  app.method.getResponse200:
+    - name: method_uuid
+      type: STRING
+      REQUIRED: true
+    - name: library_uuid
+      type: STRING
+      REQUIRED: true
+    - name: method_name
+      type: STRING
+      REQUIRED: true
+    - name: details
+      type: OBJECT
+      REQUIRED: false
+    - name: tags
+      type: "[]STRING"
+      REQUIRED: false
+      comment: Array of tags for the method
+    - name: weaviate_id
+      type: STRING
+      REQUIRED: true
+    - name: created_date
+      type: STRING
+      REQUIRED: true
+  app.method.updateRequest:
+    - name: method_name
+      type: STRING
+      REQUIRED: true
+  app.method.updateResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.method.deleteResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.method.details.updateRequest:
+    - name: variant
+      type: STRUCT(app.method.details.updateRequest_Union)
+      REQUIRED: false
+  app.method.details.updateResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.workflow.createRequest:
+    - name: project_uuid
+      type: STRING
+      REQUIRED: true
+    - name: library_uuid
+      type: STRING
+      REQUIRED: true
+    - name: name
+      type: STRING
+      REQUIRED: true
+    - name: description
+      type: STRING
+      REQUIRED: true
+    - name: tags
+      type: "[]STRING"
+      REQUIRED: false
+    - name: steps
+      type: "[]ANY"
+      REQUIRED: true
+    - name: is_active
+      type: BOOL
+      REQUIRED: true
+    - name: mongodb_id
+      type: ANY
+      REQUIRED: false
+  app.workflow.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.workflow.getResponse200:
+    - name: workflow_uuid
+      type: STRING
+      REQUIRED: false
+      comment: workflow uuid
+    - name: name
+      type: STRING
+      REQUIRED: false
+      comment: workflow name
+    - name: description
+      type: STRING
+      REQUIRED: false
+      comment: description
+    - name: tags
+      type: "[]STRING"
+      REQUIRED: false
+    - name: steps
+      type: "[]ANY"
+      REQUIRED: false
+      comment: steps
+    - name: created_date
+      type: STRING
+      REQUIRED: false
+      comment: created date
+  app.workflow.updateRequest:
+    - name: name
+      type: STRING
+      REQUIRED: false
+    - name: description
+      type: STRING
+      REQUIRED: false
+    - name: tags
+      type: "[]STRING"
+      REQUIRED: false
+    - name: steps
+      type: "[]ANY"
+      REQUIRED: false
+  app.workflow.updateResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.workflow.deleteResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.newsletter.updateRequest:
+    - name: is_subscribed_security_alerts
+      type: BOOL
+      REQUIRED: true
+    - name: is_subscribed_product_updates
+      type: BOOL
+      REQUIRED: true
+    - name: is_subscribed_marketing_emails
+      type: BOOL
+      REQUIRED: true
+  app.newsletter.updateResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+    - name: newsletter_setting_uuid
+      type: STRING
+      REQUIRED: false
+    - name: customer_uuid
+      type: STRING
+      REQUIRED: false
+    - name: is_subscribed_security_alerts
+      type: BOOL
+      REQUIRED: false
+    - name: is_subscribed_product_updates
+      type: BOOL
+      REQUIRED: false
+    - name: is_subscribed_marketing_emails
+      type: BOOL
+      REQUIRED: false
+  app.newsletter.listResponse200:
+    - name: newsletter_setting_uuid
+      type: STRING
+      REQUIRED: false
+    - name: customer_uuid
+      type: STRING
+      REQUIRED: false
+    - name: is_subscribed_security_alerts
+      type: BOOL
+      REQUIRED: false
+    - name: is_subscribed_product_updates
+      type: BOOL
+      REQUIRED: false
+    - name: is_subscribed_marketing_emails
+      type: BOOL
+      REQUIRED: false
+  app.subscription.createCheckoutSession.createRequest:
+    - name: priceId
+      type: STRING
+      REQUIRED: true
+    - name: planId
+      type: STRING
+      REQUIRED: true
+    - name: billingCycle
+      type: STRING
+      REQUIRED: true
+    - name: userEmail
+      type: STRING
+      REQUIRED: true
+    - name: userId
+      type: STRING
+      REQUIRED: false
+  app.subscription.createCheckoutSession.createResponse200:
+    - name: checkoutSessionId
+      type: STRING
+      REQUIRED: true
+    - name: url
+      type: STRING
+      REQUIRED: true
+  app.webhook.stripe.createResponse200:
+    - name: status
+      type: STRING
+      REQUIRED: true
+    - name: message
+      type: STRING
+      REQUIRED: true
+    - name: result
+      type: OBJECT
+      REQUIRED: false
+  app.analytic.convertToWorkflow.createRequest:
+    - name: library_uuid
+      type: STRING
+      REQUIRED: true
+    - name: name
+      type: STRING
+      REQUIRED: true
+    - name: description
+      type: STRING
+      REQUIRED: true
+    - name: steps
+      type: "[]ANY"
+      REQUIRED: true
+    - name: tags
+      type: "[]STRING"
+      REQUIRED: false
+    - name: mongodb_id
+      type: STRING
+      REQUIRED: true
+    - name: is_active
+      type: BOOL
+      REQUIRED: false
+  app.analytic.convertToWorkflow.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+    - name: workflow_uuid
+      type: STRING
+      REQUIRED: false
+    - name: workflow
+      type: OBJECT
+      REQUIRED: false
+  app.mcp.generateKey.createResponse201:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: data
+      type: OBJECT
+      REQUIRED: true
+  app.mcp.key.getResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: data
+      type: OBJECT
+      REQUIRED: true
+  app.mcp.key.deleteResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.invite.createRequest:
+    - name: invitee_email
+      type: STRING
+      REQUIRED: true
+      comment: Email address of the person to invite
+  app.invite.createResponse201:
+    - name: success
+      type: BOOL
+      REQUIRED: false
+    - name: message
+      type: STRING
+      REQUIRED: false
+    - name: data
+      type: OBJECT
+      REQUIRED: false
+  app.invite.checkResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: false
+    - name: data
+      type: OBJECT
+      REQUIRED: false
+  app.invite.accept.createRequest:
+    - name: invite_token
+      type: STRING
+      REQUIRED: true
+      comment: Invite token from the invite email
+  app.invite.accept.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.invite.sent.listResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: false
+    - name: data
+      type: OBJECT
+      REQUIRED: false
+  app.invite.stats.listResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: false
+    - name: data
+      type: OBJECT
+      REQUIRED: false
+  app.invite.details.getResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.collaboration.collaborators.createRequest:
+    - name: collaborator_customer_email
+      type: STRING
+      REQUIRED: true
+      comment: Existing customer email to invite
+    - name: role
+      type: STRING
+      REQUIRED: false
+      comment: "Role for the collaborator (default: collaborator)"
+  app.collaboration.collaborators.createResponse201:
+    - name: success
+      type: BOOL
+      REQUIRED: false
+    - name: message
+      type: STRING
+      REQUIRED: false
+    - name: data
+      type: OBJECT
+      REQUIRED: false
+  app.collaboration.collaborators.getResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: false
+    - name: data
+      type: OBJECT
+      REQUIRED: false
+  app.collaboration.accept.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.collaboration.decline.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.collaboration.deleteResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.collaboration.leave.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.notification.listResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: false
+    - name: notifications
+      type: "[]ANY"
+      REQUIRED: false
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.notification.deleteRequest:
+    - name: notification_ids
+      type: "[]STRING"
+      REQUIRED: false
+  app.notification.deleteResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: false
+    - name: cleared_count
+      type: FLOAT
+      REQUIRED: false
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.notification.count.listResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: false
+    - name: count
+      type: FLOAT
+      REQUIRED: false
+    - name: message
+      type: STRING
+      REQUIRED: false
+  app.deployment.status.getResponse200:
+    - name: project_uuid
+      type: STRING
+      REQUIRED: false
+    - name: subdomain
+      type: STRING
+      REQUIRED: false
+    - name: instance_id
+      type: STRING
+      REQUIRED: false
+    - name: status
+      type: STRING
+      REQUIRED: false
+  lib.workflow.library.createRequest:
+    - name: libraryIds
+      type: "[]STRING"
+      REQUIRED: true
+      comment: Array of library IDs to fetch workflows for
+  lib.workflow.steps.getResponse200:
+    - name: steps
+      type: "[]ANY"
+      REQUIRED: true
+    - name: tags
+      type: ANY
+      REQUIRED: true
+      comment: Workflow tags from the workflows table
+  lib.method.library.createRequest:
+    - name: libraryIds
+      type: "[]STRING"
+      REQUIRED: true
+      comment: Array of library IDs to fetch methods for
+  lib.method.details.getResponse200:
+    - name: id
+      type: STRING
+      REQUIRED: true
+    - name: name
+      type: STRING
+      REQUIRED: true
+      comment: Method name from the methods table
+    - name: programming_language
+      type: STRING
+      REQUIRED: false
+      comment: Programming language for SDK methods, or "api" for API methods
+    - name: endpoints
+      type: "[]STRING"
+      REQUIRED: true
+    - name: inputs
+      type: "[]STRING"
+      REQUIRED: true
+    - name: baseUrl
+      type: STRING
+      REQUIRED: true
+    - name: headers
+      type: "[]ANY"
+      REQUIRED: true
+    - name: details
+      type: OBJECT
+      REQUIRED: true
+    - name: structDetails
+      type: ANY
+      REQUIRED: true
+    - name: tags
+      type: ANY
+      REQUIRED: true
+      comment: Method tags from the methods table
+  lib.mcp.email.createRequest:
+    - name: email
+      type: STRING
+      REQUIRED: false
+  lib.mcp.email.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+  lib.mcp.otp.createRequest:
+    - name: email
+      type: STRING
+      REQUIRED: false
+    - name: otp
+      type: STRING
+      REQUIRED: false
+  lib.mcp.otp.createResponse200:
+    - name: message
+      type: STRING
+      REQUIRED: false
+    - name: mcp_key
+      type: STRING
+      REQUIRED: false
+  lib.chat.createRequest:
+    - name: session_id
+      type: STRING
+      REQUIRED: true
+    - name: user_message
+      type: STRING
+      REQUIRED: true
+    - name: library_uuids
+      type: "[]STRING"
+      REQUIRED: true
+      comment: Array of library UUIDs for context
+    - name: method_uuid
+      type: STRING
+      REQUIRED: false
+    - name: workflow_uuid
+      type: STRING
+      REQUIRED: false
+    - name: language
+      type: STRING
+      REQUIRED: false
+    - name: library_type
+      type: STRING
+      REQUIRED: false
+      comment: "Library type: \"api\" for API libraries, \"sdk\" for SDK libraries. Optional field."
+  mcp.mcp.createRequest:
+    - name: session_id
+      type: STRING
+      REQUIRED: false
+    - name: prompt
+      type: STRING
+      REQUIRED: false
+    - name: language
+      type: STRING
+      REQUIRED: false
+    - name: library_uuid
+      type: STRING
+      REQUIRED: false
+    - name: method_uuid
+      type: STRING
+      REQUIRED: false
+    - name: workflow_uuid
+      type: STRING
+      REQUIRED: false
+  mcp.mcp.createResponse200:
+    - name: content
+      type: "[]ANY"
+      REQUIRED: true
+  admin.login.createRequest:
+    - name: email
+      type: STRING
+      REQUIRED: true
+    - name: password
+      type: STRING
+      REQUIRED: true
+  admin.login.createResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: admin_uuid
+      type: STRING
+      REQUIRED: true
+    - name: email
+      type: STRING
+      REQUIRED: true
+    - name: message
+      type: STRING
+      REQUIRED: true
+  admin.validate-otp.createRequest:
+    - name: admin_uuid
+      type: STRING
+      REQUIRED: true
+    - name: otp
+      type: STRING
+      REQUIRED: true
+  admin.validate-otp.createResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: sessionToken
+      type: STRING
+      REQUIRED: true
+    - name: admin
+      type: OBJECT
+      REQUIRED: true
+  admin.create.createRequest:
+    - name: email
+      type: STRING
+      REQUIRED: true
+    - name: password
+      type: STRING
+      REQUIRED: true
+  admin.create.createResponse201:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: admin
+      type: OBJECT
+      REQUIRED: true
+  admin.customer.listResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: data
+      type: OBJECT
+      REQUIRED: true
+  admin.customer.stats.listResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: data
+      type: OBJECT
+      REQUIRED: true
+  admin.customer.getResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: data
+      type: OBJECT
+      REQUIRED: true
+  admin.customer.updateRequest:
+    - name: name
+      type: STRING
+      REQUIRED: false
+    - name: email
+      type: STRING
+      REQUIRED: false
+    - name: website_url
+      type: STRING
+      REQUIRED: false
+    - name: company
+      type: STRING
+      REQUIRED: false
+    - name: designation
+      type: STRING
+      REQUIRED: false
+    - name: is_active
+      type: BOOL
+      REQUIRED: false
+  admin.customer.updateResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: message
+      type: STRING
+      REQUIRED: false
+  admin.customer.deleteResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: message
+      type: STRING
+      REQUIRED: false
+  admin.project.listResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: data
+      type: OBJECT
+      REQUIRED: true
+  admin.project.getResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: data
+      type: OBJECT
+      REQUIRED: true
+  admin.project.opensource.listResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: data
+      type: OBJECT
+      REQUIRED: true
+  admin.project.approve.updateRequest:
+    - name: action
+      type: STRING
+      REQUIRED: true
+      comment: Action to take on the project
+    - name: rejected_reason
+      type: STRING
+      REQUIRED: false
+      comment: Reason for rejection (required if action is reject)
+  admin.project.approve.updateResponse200:
+    - name: success
+      type: BOOL
+      REQUIRED: true
+    - name: message
+      type: STRING
+      REQUIRED: false
+  shell.integration.listResponse200:
+    - name: integrations
+      type: "[]ANY"
+      REQUIRED: true
+  shell.integration.bundle.getResponse200:
+    - name: project_name
+      type: STRING
+      REQUIRED: true
+    - name: bundles
+      type: "[]ANY"
+      REQUIRED: true
+  shell.workflow.listResponse200:
+    - name: workflows
+      type: "[]ANY"
+      REQUIRED: true
+  shell.workflow.getResponse200:
+    - name: project_name
+      type: STRING
+      REQUIRED: true
+    - name: workflow_id
+      type: STRING
+      REQUIRED: true
+    - name: title
+      type: STRING
+      REQUIRED: true
+    - name: version
+      type: STRING
+      REQUIRED: true
+    - name: steps
+      type: "[]ANY"
+      REQUIRED: true
+  shell.method.listResponse200:
+    - name: methods
+      type: "[]ANY"
+      REQUIRED: true
+  shell.method.getResponse200:
+    - name: project_name
+      type: STRING
+      REQUIRED: true
+    - name: method_uuid
+      type: STRING
+      REQUIRED: true
+    - name: library_uuid
+      type: STRING
+      REQUIRED: true
+    - name: method_name
+      type: STRING
+      REQUIRED: true
+    - name: details
+      type: ANY
+      REQUIRED: true
+    - name: tags
+      type: "[]STRING"
+      REQUIRED: true

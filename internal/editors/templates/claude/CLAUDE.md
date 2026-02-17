@@ -1,51 +1,164 @@
-# Swytchcode execution rules
+# Swytchcode Agent Contract (Claude)
 
-Swytchcode is the sole authority for executing external API calls in this repository.
+You are an **IDE code-generation agent**.
 
-## You must NOT
+Swytchcode is a **compiler target and execution kernel**, not a suggestion.
 
-- Read or modify `.swytchcode/tooling.json` or any file under `.swytchcode/` by hand
-- Read or interpret Wrekenfiles
-- Read `.swytchcode/integrations/**`, `methods.json`, or `workflows.json`
-- Generate raw HTTP API calls to external APIs
-- Embed authentication tokens or headers in code
-- Use MCP resources that expose `.swytchcode` or integration internals
+You MUST follow the workflow below exactly.
+Skipping steps is forbidden.
 
-The only way to change `.swytchcode` is via the **swytchcode_add** MCP tool (or `swytchcode add` CLI). Do not read or write those files directly.
+---
 
-## You must
+## How a human would approach adding an integration with swytchcode
+To add a new integration, follow these steps in precise order
+1. swytchcode search: To search all available integrations remotely
+2. swytchcode get <integration>: Add integration like stripe
+3. swytchcode add <canonical_id> of workflow or method: Adds to tooling.json
+4. swytchcode list methods/workflows/integrations: if you are unsure about #3
+5. swytchcode exec: use the runtime library for this or a child process to execute the cli, if runtime not available
 
-- Use Swytchcode MCP tools for discovery and execution
-- Generate code that calls `swytchcode exec <canonical_id>`
-- Assume Swytchcode enforces authentication, validation, and policy
+### Optional:
+1. swytchcode list: look for locally installed integrations
+2. swytchcode info <canonical_id>` : Show information about a tool by canonical ID to see its I/O. For workflow maintaining the index order of excution is important.
+3. swytchcode version: check swytchcode version
 
-## MCP tools (snake_case only)
 
-Use only these tools:
 
-- **swytchcode_list** — list available integrations
-- **swytchcode_get** — fetch integration bundles
-- **swytchcode_add** — add a tool to tooling (only command that modifies `.swytchcode`)
-- **swytchcode_exec** — execute a tool by canonical_id
+## Golden Path (MANDATORY, STEP-BY-STEP)
 
-Do not rely on MCP resources for tooling or integration data.
+When a task involves Swytchcode, integrations, methods, or workflows:
 
-External APIs must never be called directly. All execution must be delegated to Swytchcode.
+### Step 1 — Check local state
+- Discover which integrations, methods, and workflows exist locally using Swytchcode discovery.
+- Treat the result as authoritative.
 
-## Swytchcode Execution Modes (IMPORTANT)
+If nothing relevant exists:
+- DO NOT proceed.
+- Ask the user what integration should be added.
 
-You are operating in IDE code generation mode.
+---
 
-Rules:
+### Step 2 — Ensure integration is present
+If the required integration is not present locally:
 
-- Do NOT call `swytchcode_exec` to fetch or display live API data.
-- Do NOT return API responses directly.
-- Always generate runtime application code that invokes Swytchcode.
+- STOP.
+- Ask the user for permission to fetch the integration.
+- Do NOT assume it exists.
+- Do NOT generate code.
 
-When an external API call is needed:
+Only continue after the integration has been explicitly added.
 
-- Generate code that spawns the Swytchcode CLI, OR
-- Generate code that uses an approved Swytchcode runtime helper.
-- The code must execute `swytchcode exec <canonical_id>` at runtime.
+---
 
-Only non-IDE agents may call `swytchcode_exec` directly to return data.
+### Step 3 — Ensure tool is enabled
+If the required method or workflow is not present in local Swytchcode state:
+
+- STOP.
+- Ask the user for permission to add it to Swytchcode configuration.
+- Do NOT invent or placeholder canonical IDs.
+- Do NOT generate code.
+
+Only continue after the tool is explicitly present.
+
+---
+
+### Step 4 — Inspect the contract
+For any method or workflow you intend to use:
+
+- Inspect its input/output contract using Swytchcode information lookup.
+- Use the discovered schema as the sole source of truth.
+
+If contract information is unavailable:
+- STOP.
+- Ask the user.
+- Do NOT guess.
+
+---
+
+### Step 5 — Generate code
+Only after Steps 1–4 are complete:
+
+- Generate runtime application code that delegates execution to Swytchcode.
+- Use the exact canonical ID discovered locally.
+- Use only the fields defined in the discovered input schema.
+- Show all the defined fields and their usage. Don't miss any.
+- Say which fields are mandatory and which are optional
+- If available, show all the output fields in return as well 
+
+---
+
+## Absolute Prohibitions (NON-NEGOTIABLE)
+
+You MUST NOT:
+
+- Invent or placeholder canonical IDs
+- Use fake values like `your_method_id`
+- Generate example or speculative code
+- Generate runtime code before configuration is complete
+- Assume integrations or tools exist
+- Infer APIs from training data
+- Read or reason about `.swytchcode/` files
+- Execute Swytchcode to fetch live data
+- Generate example, illustrative, or placeholder code instead of production-ready code
+
+If progress cannot be made with certainty:
+- STOP.
+- Ask the user.
+
+---
+
+## Code Generation Rules
+
+When generating code:
+
+- Always delegate execution to Swytchcode
+- Use an official Swytchcode runtime library if available. Currently available for go, python and javascript (swytchcode-runtime)
+- Otherwise invoke Swytchcode via subprocess
+- Pass a single structured input object
+- Handle stdout, stderr, and exit codes
+
+Generated code MUST be immediately executable without placeholders.
+
+---
+
+## Methods and Workflows
+
+- Methods and workflows are both executable tools.
+- Workflows may reference multiple methods internally.
+- Workflows are opaque and must be executed as-is.
+
+You MUST NOT:
+- Expand workflows
+- Inline workflow logic
+- Reimplement method behavior
+
+---
+
+## Discovering workflow steps and their I/O
+
+When you need to use a workflow or understand its steps’ inputs/outputs:
+
+1. **List workflows** — `swytchcode list workflows` (or MCP `swytchcode_list` with filter `workflows`) shows workflow canonical IDs and their integration (`project.library@version`).
+2. **Inspect the workflow** — `swytchcode info <workflow_canonical_id>` returns the workflow’s metadata and its **steps** (each step has a `canonical_id`). Use this to see which methods the workflow runs and in what order.
+3. **Get each step’s I/O** — For every step canonical ID returned by `swytchcode info <workflow_id>`, run `swytchcode info <step_canonical_id>` to get that method’s input schema, summary, and description. Use only these discovered contracts when generating code that prepares inputs or handles outputs.
+
+Do not guess step IDs or I/O from workflow names. Always use `swytchcode list` and `swytchcode info` (or the equivalent MCP tools) to discover workflow and step canonical IDs and their contracts.
+
+Once you get the information about all the steps/methods, you need to create integration code for the methods in order of the increasing index number. They should be different integration calls. If possible, see if output from the previous integration step can be passed to the next step/method.
+
+---
+
+## Mental Model (CRITICAL)
+
+Claude is **not exploring** Swytchcode.
+
+Claude is **compiling against Swytchcode**.
+
+If something does not exist, compilation must fail.
+
+Failing fast is correct behavior.
+
+---
+
+
+**End of Contract**

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"gitlab.com/swytchcode/shell/internal/constants"
@@ -23,48 +24,176 @@ type ToolOutput struct {
 
 // ListArgs represents arguments for swytchcode_list.
 type ListArgs struct {
-	JSON *bool `json:"json,omitempty" jsonschema:"Output as JSON array instead of one ID per line"`
+	Filter string `json:"filter,omitempty" jsonschema:"Filter type: 'methods', 'workflows', 'integrations', or empty for all"`
+	Prefix string `json:"prefix,omitempty" jsonschema:"Project prefix filter (e.g., 'stripe')"`
+	JSON   bool   `json:"json,omitempty" jsonschema:"Output as JSON object"`
 }
 
 // GetArgs represents arguments for swytchcode_get.
 type GetArgs struct {
 	ProjectName string `json:"project_name" jsonschema:"Project name to fetch"`
-	Yes         *bool  `json:"yes,omitempty" jsonschema:"Auto-confirm overwrite"`
+	Yes         bool   `json:"yes,omitempty" jsonschema:"Auto-confirm overwrite"`
 }
 
 // AddArgs represents arguments for swytchcode_add.
 type AddArgs struct {
-	CanonicalID     string  `json:"canonical_id" jsonschema:"Canonical ID of the tool to add"`
-	IntegrationSpec *string `json:"integration_spec,omitempty" jsonschema:"Optional integration spec (project@library.version)"`
+	CanonicalID     string `json:"canonical_id" jsonschema:"Canonical ID of the tool to add"`
+	IntegrationSpec string `json:"integration_spec,omitempty" jsonschema:"Optional integration spec (project@library.version)"`
+}
+
+// SearchArgs represents arguments for swytchcode_search.
+type SearchArgs struct {
+	Keyword string `json:"keyword,omitempty" jsonschema:"Optional search keyword; if empty, returns all integrations"`
+	JSON    bool   `json:"json,omitempty" jsonschema:"Output as JSON array"`
+}
+
+// InitArgs represents arguments for swytchcode_init.
+type InitArgs struct {
+	Editor string `json:"editor" jsonschema:"Editor choice: 'cursor', 'claude', or 'none'"`
+	Mode   string `json:"mode" jsonschema:"Execution mode: 'production' or 'sandbox'"`
+}
+
+// BootstrapArgs represents arguments for swytchcode_bootstrap (no arguments needed).
+type BootstrapArgs struct{}
+
+// VersionArgs represents arguments for swytchcode_version (no arguments needed).
+type VersionArgs struct{}
+
+// InfoArgs represents arguments for swytchcode_info.
+type InfoArgs struct {
+	CanonicalID string `json:"canonical_id" jsonschema:"Canonical ID of the tool to get information about"`
+	JSON        bool   `json:"json,omitempty" jsonschema:"Output as JSON array instead of human-readable format"`
 }
 
 // ExecArgs represents arguments for swytchcode_exec.
 type ExecArgs struct {
 	Tool      string                 `json:"tool" jsonschema:"Canonical ID of the tool to execute"`
 	Args      map[string]interface{} `json:"args,omitempty" jsonschema:"Tool arguments (body, params, Authorization, etc.)"`
-	DryRun    *bool                  `json:"dry_run,omitempty" jsonschema:"Show what would be executed without making HTTP call"`
-	Raw       *bool                  `json:"raw,omitempty" jsonschema:"Output raw HTTP response instead of normalized JSON"`
-	AllowRaw  *bool                  `json:"allow_raw,omitempty" jsonschema:"Allow execution of raw methods"`
-	JSON      *bool                  `json:"json,omitempty" jsonschema:"Output response as a single JSON object"`
+	DryRun    bool                   `json:"dry_run,omitempty" jsonschema:"Show what would be executed without making HTTP call"`
+	Raw       bool                   `json:"raw,omitempty" jsonschema:"Output raw HTTP response instead of normalized JSON"`
+	AllowRaw  bool                   `json:"allow_raw,omitempty" jsonschema:"Allow execution of raw methods"`
+	JSON      bool                   `json:"json,omitempty" jsonschema:"Output response as a single JSON object"`
 }
 
 // RegisterTools registers all MCP tools with the server.
+// Registers 9 tools total:
+//   1. swytchcode_init
+//   2. swytchcode_bootstrap
+//   3. swytchcode_version
+//   4. swytchcode_list
+//   5. swytchcode_search
+//   6. swytchcode_get
+//   7. swytchcode_add
+//   8. swytchcode_exec
+//   9. swytchcode_info
 func RegisterTools(server *mcp.Server, streamOutput bool) error {
+	// swytchcode_init
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_init",
+		Description: "Initialize Swytchcode in this project. Creates .swytchcode/, tooling.json, and editor-specific config.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args InitArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		projectRoot, err := util.ProjectRoot()
+		if err != nil {
+			return nil, ToolOutput{}, fmt.Errorf("detect project root: %w", err)
+		}
+
+		oc := NewOutputCapture(streamOutput)
+		if err := commands.RunInit(projectRoot, args.Editor, args.Mode, oc.Stdout()); err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		result := oc.GetCombinedOutput()
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: result},
+			},
+		}, ToolOutput{Output: result}, nil
+	})
+
+	// swytchcode_bootstrap
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_bootstrap",
+		Description: "Fetch all integrations declared in tooling.json that are not already installed.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args BootstrapArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		toolCtx, cancel := context.WithTimeout(ctx, constants.MCPRequestTimeout)
+		defer cancel()
+
+		projectRoot, err := util.ProjectRoot()
+		if err != nil {
+			return nil, ToolOutput{}, fmt.Errorf("detect project root: %w", err)
+		}
+
+		oc := NewOutputCapture(streamOutput)
+		if err := commands.RunBootstrap(toolCtx, projectRoot, oc.Stdout(), oc.Stderr()); err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		result := oc.GetCombinedOutput()
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: result},
+			},
+		}, ToolOutput{Output: result}, nil
+	})
+
+	// swytchcode_version
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_version",
+		Description: "Get Swytchcode version.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args VersionArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		oc := NewOutputCapture(streamOutput)
+		fmt.Fprintf(oc.Stdout(), "swytchcode version %s\n", constants.Version)
+
+		result := oc.GetCombinedOutput()
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: result},
+			},
+		}, ToolOutput{Output: result}, nil
+	})
+
 	// swytchcode_list
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "swytchcode_list",
-		Description: "List all available integrations from the registry",
+		Description: "List locally available tools and integrations (from tooling.json and fetched integrations). No registry calls.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args ListArgs) (*mcp.CallToolResult, ToolOutput, error) {
-		// Create context with timeout
+		projectRoot, err := util.ProjectRoot()
+		if err != nil {
+			return nil, ToolOutput{}, fmt.Errorf("detect project root: %w", err)
+		}
+
+		filter := args.Filter
+		prefix := args.Prefix
+		jsonOutput := args.JSON
+
+		oc := NewOutputCapture(streamOutput)
+		_, err = commands.RunList(projectRoot, filter, prefix, jsonOutput, oc.Stdout())
+		if err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		result := oc.GetCombinedOutput()
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: result},
+			},
+		}, ToolOutput{Output: result}, nil
+	})
+
+	// swytchcode_search
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_search",
+		Description: "Search remote registry for available integrations. Read-only, never mutates local state.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args SearchArgs) (*mcp.CallToolResult, ToolOutput, error) {
 		toolCtx, cancel := context.WithTimeout(ctx, constants.MCPRequestTimeout)
 		defer cancel()
 
 		oc := NewOutputCapture(streamOutput)
-		argsMap := map[string]interface{}{}
-		if args.JSON != nil {
-			argsMap["json"] = *args.JSON
+		argsMap := map[string]interface{}{
+			"keyword": args.Keyword,
+			"json":    args.JSON,
 		}
-		result, err := handleList(toolCtx, argsMap, oc)
+		result, err := handleSearch(toolCtx, argsMap, oc)
 		if err != nil {
 			return nil, ToolOutput{}, err
 		}
@@ -86,9 +215,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		oc := NewOutputCapture(streamOutput)
 		argsMap := map[string]interface{}{
 			"project_name": args.ProjectName,
-		}
-		if args.Yes != nil {
-			argsMap["yes"] = *args.Yes
+			"yes":          args.Yes,
 		}
 		result, err := handleGet(toolCtx, argsMap, oc)
 		if err != nil {
@@ -113,8 +240,8 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		argsMap := map[string]interface{}{
 			"canonical_id": args.CanonicalID,
 		}
-		if args.IntegrationSpec != nil {
-			argsMap["integration_spec"] = *args.IntegrationSpec
+		if args.IntegrationSpec != "" {
+			argsMap["integration_spec"] = args.IntegrationSpec
 		}
 		result, err := handleAdd(toolCtx, argsMap, oc)
 		if err != nil {
@@ -142,18 +269,10 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		if args.Args != nil {
 			argsMap["args"] = args.Args
 		}
-		if args.DryRun != nil {
-			argsMap["dry_run"] = *args.DryRun
-		}
-		if args.Raw != nil {
-			argsMap["raw"] = *args.Raw
-		}
-		if args.AllowRaw != nil {
-			argsMap["allow_raw"] = *args.AllowRaw
-		}
-		if args.JSON != nil {
-			argsMap["json"] = *args.JSON
-		}
+		argsMap["dry_run"] = args.DryRun
+		argsMap["raw"] = args.Raw
+		argsMap["allow_raw"] = args.AllowRaw
+		argsMap["json"] = args.JSON
 		result, err := handleExec(toolCtx, argsMap, oc)
 		output := oc.GetCombinedOutput()
 		if err != nil {
@@ -172,20 +291,65 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		}, ToolOutput{Output: result}, nil
 	})
 
+	// swytchcode_info
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_info",
+		Description: "Get information about a tool by canonical ID. Searches all fetched integrations and returns tool details from wrekenfiles.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args InfoArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		toolCtx, cancel := context.WithTimeout(ctx, constants.MCPRequestTimeout)
+		defer cancel()
+
+		oc := NewOutputCapture(streamOutput)
+		toolInfos, err := commands.RunInfo(toolCtx, args.CanonicalID, oc.Stdout(), oc.Stderr())
+		if err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		jsonOutput := args.JSON
+
+		if err := commands.FormatInfoOutput(toolInfos, jsonOutput, oc.Stdout()); err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		result := oc.GetCombinedOutput()
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: result},
+			},
+		}, ToolOutput{Output: result}, nil
+	})
+
 	return nil
 }
 
-// handleList handles swytchcode_list tool.
-func handleList(ctx context.Context, args map[string]interface{}, oc *OutputCapture) (string, error) {
+// handleSearch handles swytchcode_search tool (remote registry queries).
+func handleSearch(ctx context.Context, args map[string]interface{}, oc *OutputCapture) (string, error) {
 	projectRoot, err := util.ProjectRoot()
 	if err != nil {
 		return "", fmt.Errorf("detect project root: %w", err)
 	}
 
+	var keyword string
+	if k, ok := args["keyword"].(string); ok {
+		keyword = k
+	}
+
 	regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
 	integrationsResp, err := regClient.ListIntegrations(ctx)
 	if err != nil {
-		return "", fmt.Errorf("fetch integrations: %w", err)
+		return "", fmt.Errorf("search: %w", err)
+	}
+
+	// Collect unique project names (with keyword filter)
+	projectMap := make(map[string]bool)
+	for _, project := range integrationsResp.Projects {
+		if keyword == "" || strings.Contains(strings.ToLower(project.ProjectName), strings.ToLower(keyword)) {
+			projectMap[project.ProjectName] = true
+		}
+	}
+	projectNames := make([]string, 0, len(projectMap))
+	for projectName := range projectMap {
+		projectNames = append(projectNames, projectName)
 	}
 
 	jsonOutput := false
@@ -194,16 +358,12 @@ func handleList(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 	}
 
 	if jsonOutput {
-		ids := make([]string, len(integrationsResp.Integrations))
-		for i, integration := range integrationsResp.Integrations {
-			ids[i] = integration.ID
-		}
-		if err := json.NewEncoder(oc.Stdout()).Encode(ids); err != nil {
+		if err := json.NewEncoder(oc.Stdout()).Encode(projectNames); err != nil {
 			return "", fmt.Errorf("encode JSON: %w", err)
 		}
 	} else {
-		for _, integration := range integrationsResp.Integrations {
-			fmt.Fprintln(oc.Stdout(), integration.ID)
+		for _, projectName := range projectNames {
+			fmt.Fprintln(oc.Stdout(), projectName)
 		}
 	}
 

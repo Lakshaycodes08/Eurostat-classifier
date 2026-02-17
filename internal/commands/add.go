@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+	"gitlab.com/swytchcode/shell/internal/registry"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
 
@@ -196,13 +197,6 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 		}
 	}
 
-	// Read wrekenfile and extract tool details
-	wrekenPath := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version, "wrekenfile.yaml")
-	toolEntry, err := findMethodInWrekenfile(wrekenPath, canonicalID)
-	if err != nil {
-		return fmt.Errorf("%s %q not found in wrekenfile: %w", toolType, canonicalID, err)
-	}
-
 	// Load tooling.json
 	toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
 	data, err := os.ReadFile(toolingPath)
@@ -222,36 +216,142 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 		tooling["tools"] = tools
 	}
 
-	// Extract tool details from wrekenfile entry
-	summary := ""
-	desc := ""
-	var inputs interface{}
-
-	if summaryRaw, ok := toolEntry["SUMMARY"]; ok {
-		if summaryStr, ok := summaryRaw.(string); ok {
-			summary = summaryStr
-		}
-	}
-	if descRaw, ok := toolEntry["DESC"]; ok {
-		if descStr, ok := descRaw.(string); ok {
-			desc = descStr
-		}
-	}
-	if inputsRaw, ok := toolEntry["INPUTS"]; ok {
-		inputs = inputsRaw
-	}
-
-	// Build tool entry
 	projectLibrary := fmt.Sprintf("%s.%s", project, library)
-	toolEntryMap := map[string]interface{}{
-		"summary":     summary,
-		"integration": fmt.Sprintf("%s@%s", projectLibrary, version),
-		"type":        toolType,
-		"desc":        desc,
-		"inputs":      inputs,
+	wrekenPath := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version, "wrekenfile.yaml")
+	wreken, err := LoadWrekenfile(wrekenPath)
+	if err != nil {
+		return fmt.Errorf("load wrekenfile: %w", err)
 	}
 
-	tools[canonicalID] = toolEntryMap
+	if toolType == "workflow" {
+		// Handle workflow: define steps within the workflow entry (no top-level method entries for steps)
+		workflowsPath := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version, "workflows.json")
+		entry, err := findWorkflowEntryInWorkflowsJSON(workflowsPath, canonicalID)
+		if err != nil {
+			return fmt.Errorf("workflow %q not found in workflows.json: %w", canonicalID, err)
+		}
+		workflow, err := workflowFromEntry(entry, canonicalID)
+		if err != nil {
+			return err
+		}
+
+		integrationStr := fmt.Sprintf("%s@%s", projectLibrary, version)
+
+		// Build steps as array of step definitions (full method details nested inside workflow)
+		stepsArray := make([]interface{}, 0, len(workflow.Steps))
+		for index, step := range workflow.Steps {
+			methodEntry, err := findMethodInWrekenfile(wrekenPath, step.CanonicalID)
+			if err != nil {
+				fmt.Fprintf(stderr, "Warning: method %q from workflow step not found in wrekenfile: %v\n", step.CanonicalID, err)
+				continue
+			}
+
+			summary := ""
+			desc := ""
+			var inputs interface{}
+			if summaryRaw, ok := methodEntry["SUMMARY"]; ok {
+				if summaryStr, ok := summaryRaw.(string); ok {
+					summary = summaryStr
+				}
+			}
+			if descRaw, ok := methodEntry["DESC"]; ok {
+				if descStr, ok := descRaw.(string); ok {
+					desc = descStr
+				}
+			}
+			if inputsRaw, ok := methodEntry["INPUTS"]; ok {
+				inputs = inputsRaw
+				if resolved, err := ResolveInputs(wreken, inputsRaw); err != nil {
+					fmt.Fprintf(stderr, "Warning: resolve STRUCTs for step %q: %v (using raw inputs)\n", step.CanonicalID, err)
+				} else if resolved != nil {
+					inputs = resolved
+				}
+			}
+
+			stepDef := map[string]interface{}{
+				"canonical_id": step.CanonicalID,
+				"name":        step.Name,
+				"summary":     summary,
+				"desc":        desc,
+				"inputs":      inputs,
+				"integration": integrationStr,
+				"index":       index,
+			}
+			if returnsRaw, ok := methodEntry["RETURNS"]; ok {
+				if output, err := ResolveReturns(wreken, returnsRaw); err != nil {
+					fmt.Fprintf(stderr, "Warning: resolve STRUCTs for step %q returns: %v (output omitted)\n", step.CanonicalID, err)
+				} else if output != nil {
+					stepDef["output"] = output
+				}
+			}
+			stepsArray = append(stepsArray, stepDef)
+		}
+
+		// Add single workflow entry with steps defined inside it
+		workflowEntryMap := map[string]interface{}{
+			"name":        workflow.Name,
+			"integration": integrationStr,
+			"type":        "workflow",
+			"steps":       stepsArray,
+		}
+
+		tools[canonicalID] = workflowEntryMap
+		fmt.Fprintf(stdout, "Added workflow %q with %d step(s) to tooling.json (integration: %s)\n", canonicalID, len(stepsArray), projectLibrary)
+	} else {
+		// Handle method: read from wrekenfile and add
+		toolEntry, err := findMethodInWrekenfile(wrekenPath, canonicalID)
+		if err != nil {
+			return fmt.Errorf("%s %q not found in wrekenfile: %w", toolType, canonicalID, err)
+		}
+
+		// Extract tool details from wrekenfile entry
+		summary := ""
+		desc := ""
+		var inputs interface{}
+
+		if summaryRaw, ok := toolEntry["SUMMARY"]; ok {
+			if summaryStr, ok := summaryRaw.(string); ok {
+				summary = summaryStr
+			}
+		}
+		if descRaw, ok := toolEntry["DESC"]; ok {
+			if descStr, ok := descRaw.(string); ok {
+				desc = descStr
+			}
+		}
+		if inputsRaw, ok := toolEntry["INPUTS"]; ok {
+			inputs = inputsRaw
+			if resolved, err := ResolveInputs(wreken, inputsRaw); err != nil {
+				return fmt.Errorf("resolve STRUCTs in INPUTS: %w", err)
+			} else if resolved != nil {
+				inputs = resolved
+			}
+		}
+
+		var output interface{}
+		if returnsRaw, ok := toolEntry["RETURNS"]; ok {
+			resolved, err := ResolveReturns(wreken, returnsRaw)
+			if err != nil {
+				return fmt.Errorf("resolve STRUCTs in RETURNS: %w", err)
+			}
+			output = resolved
+		}
+
+		// Build tool entry
+		toolEntryMap := map[string]interface{}{
+			"summary":     summary,
+			"integration": fmt.Sprintf("%s@%s", projectLibrary, version),
+			"type":        toolType,
+			"desc":        desc,
+			"inputs":      inputs,
+		}
+		if output != nil {
+			toolEntryMap["output"] = output
+		}
+
+		tools[canonicalID] = toolEntryMap
+		fmt.Fprintf(stdout, "Added %s %q to tooling.json (integration: %s)\n", toolType, canonicalID, projectLibrary)
+	}
 
 	// Ensure integration is tracked in tooling.json (key is project.library)
 	integrations, ok := tooling["integrations"].(map[string]interface{})
@@ -275,7 +375,6 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 		return fmt.Errorf("write tooling.json: %w", err)
 	}
 
-	fmt.Fprintf(stdout, "Added %s %q to tooling.json (integration: %s)\n", toolType, canonicalID, projectLibrary)
 	return nil
 }
 
@@ -296,6 +395,33 @@ func ParseIntegrationSpec(spec string) (project, library, version string) {
 	version = strings.TrimSpace(rest[lastDot+1:])
 
 	return project, library, version
+}
+
+// workflowFromEntry converts a workflow entry map (from workflows.json) into registry.Workflow.
+func workflowFromEntry(wMap map[string]interface{}, canonicalID string) (*registry.Workflow, error) {
+	name, _ := wMap["name"].(string)
+	stepsRaw, ok := wMap["steps"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("workflow steps must be an array")
+	}
+	var steps []registry.WorkflowStep
+	for _, sRaw := range stepsRaw {
+		sMap, ok := sRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		stepName, _ := sMap["name"].(string)
+		stepID, _ := sMap["canonical_id"].(string)
+		steps = append(steps, registry.WorkflowStep{
+			Name:        stepName,
+			CanonicalID: stepID,
+		})
+	}
+	return &registry.Workflow{
+		Name:        name,
+		CanonicalID: canonicalID,
+		Steps:       steps,
+	}, nil
 }
 
 // findMethodInWrekenfile reads a wrekenfile YAML and finds a method by canonical_id key.
