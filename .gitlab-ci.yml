@@ -42,7 +42,9 @@ goreleaser:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   script:
-    # GITLAB_TOKEN is automatically available from CI/CD variables
+    # Unset and re-export GITLAB_TOKEN to avoid masked variable issues
+    - unset GITLAB_TOKEN
+    - export GITLAB_TOKEN="${CI_JOB_TOKEN}"
     - goreleaser release --clean
   artifacts:
     when: always
