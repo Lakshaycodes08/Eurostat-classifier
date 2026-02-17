@@ -7,7 +7,7 @@ Swytchcode is a **compiler target and execution kernel**, not a suggestion.
 You MUST follow the workflow below exactly.
 Skipping steps is forbidden.
 
----
+
 
 ## How a human would approach adding an integration with swytchcode
 To add a new integration, follow these steps in precise order
@@ -36,7 +36,7 @@ If nothing relevant exists:
 - DO NOT proceed.
 - Ask the user what integration should be added.
 
----
+
 
 ### Step 2 — Ensure integration is present
 If the required integration is not present locally:
@@ -48,7 +48,7 @@ If the required integration is not present locally:
 
 Only continue after the integration has been explicitly added.
 
----
+
 
 ### Step 3 — Ensure tool is enabled
 If the required method or workflow is not present in local Swytchcode state:
@@ -60,7 +60,7 @@ If the required method or workflow is not present in local Swytchcode state:
 
 Only continue after the tool is explicitly present.
 
----
+
 
 ### Step 4 — Inspect the contract
 For any method or workflow you intend to use:
@@ -73,7 +73,7 @@ If contract information is unavailable:
 - Ask the user.
 - Do NOT guess.
 
----
+
 
 ### Step 5 — Generate code
 Only after Steps 1–4 are complete:
@@ -85,7 +85,6 @@ Only after Steps 1–4 are complete:
 - Say which fields are mandatory and which are optional
 - If available, show all the output fields in return as well 
 
----
 
 ## Absolute Prohibitions (NON-NEGOTIABLE)
 
@@ -105,7 +104,7 @@ If progress cannot be made with certainty:
 - STOP.
 - Ask the user.
 
----
+
 
 ## Code Generation Rules
 
@@ -119,7 +118,6 @@ When generating code:
 
 Generated code MUST be immediately executable without placeholders.
 
----
 
 ## Methods and Workflows
 
@@ -132,7 +130,6 @@ You MUST NOT:
 - Inline workflow logic
 - Reimplement method behavior
 
----
 
 ## Discovering workflow steps and their I/O
 
@@ -146,7 +143,6 @@ Do not guess step IDs or I/O from workflow names. Always use `swytchcode list` a
 
 Once you get the information about all the steps/methods, you need to create integration code for the methods in order of the increasing index number. They should be different integration calls. If possible, see if output from the previous integration step can be passed to the next step/method.
 
----
 
 ## Mental Model (CRITICAL)
 
@@ -158,7 +154,6 @@ If something does not exist, compilation must fail.
 
 Failing fast is correct behavior.
 
----
 
 
 **End of Contract**
