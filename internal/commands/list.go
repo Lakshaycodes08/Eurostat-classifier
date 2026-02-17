@@ -10,11 +10,17 @@ import (
 	"strings"
 )
 
+// ListEntry is a tool (method or workflow) with its integration for identification.
+type ListEntry struct {
+	CanonicalID  string `json:"canonical_id"`
+	Integration  string `json:"integration"` // project.library@version
+}
+
 // ListResult represents the result of listing local state.
 type ListResult struct {
-	Methods      []string `json:"methods,omitempty"`
-	Workflows    []string `json:"workflows,omitempty"`
-	Integrations []string `json:"integrations,omitempty"`
+	Methods      []ListEntry `json:"methods,omitempty"`
+	Workflows    []ListEntry `json:"workflows,omitempty"`
+	Integrations []string    `json:"integrations,omitempty"`
 }
 
 // RunList lists locally available tools and integrations (no registry calls).
@@ -40,28 +46,36 @@ func RunList(projectRoot, filter, prefix string, jsonOutput bool, stdout io.Writ
 			return nil, fmt.Errorf("encode JSON: %w", err)
 		}
 	} else {
-		// Human-readable output
+		// Human-readable output: show canonical_id and project.library@version for identification
 		if filter == "" || filter == "methods" {
+			fmt.Fprintln(stdout, "Methods:")
 			if len(methods) > 0 {
-				fmt.Fprintln(stdout, "Methods:")
-				for _, m := range methods {
-					fmt.Fprintf(stdout, "  %s\n", m)
+				for _, e := range methods {
+					if e.Integration != "" {
+						fmt.Fprintf(stdout, "  %s  %s\n", e.CanonicalID, e.Integration)
+					} else {
+						fmt.Fprintf(stdout, "  %s\n", e.CanonicalID)
+					}
 				}
-				fmt.Fprintln(stdout)
 			}
+			fmt.Fprintln(stdout)
 		}
 		if filter == "" || filter == "workflows" {
+			fmt.Fprintln(stdout, "Workflows:")
 			if len(workflows) > 0 {
-				fmt.Fprintln(stdout, "Workflows:")
-				for _, w := range workflows {
-					fmt.Fprintf(stdout, "  %s\n", w)
+				for _, e := range workflows {
+					if e.Integration != "" {
+						fmt.Fprintf(stdout, "  %s  %s\n", e.CanonicalID, e.Integration)
+					} else {
+						fmt.Fprintf(stdout, "  %s\n", e.CanonicalID)
+					}
 				}
-				fmt.Fprintln(stdout)
 			}
+			fmt.Fprintln(stdout)
 		}
 		if filter == "" || filter == "integrations" {
+			fmt.Fprintln(stdout, "Integrations:")
 			if len(integrations) > 0 {
-				fmt.Fprintln(stdout, "Integrations:")
 				for _, i := range integrations {
 					fmt.Fprintf(stdout, "  %s\n", i)
 				}
@@ -72,88 +86,138 @@ func RunList(projectRoot, filter, prefix string, jsonOutput bool, stdout io.Writ
 	return result, nil
 }
 
-// getLocalState reads local state from tooling.json and integrations directory.
-func getLocalState(projectRoot, filter, prefix string) (methods []string, workflows []string, integrations []string, err error) {
-	// Read tooling.json for methods and workflows
-	toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
-	if data, err := os.ReadFile(toolingPath); err == nil {
-		var tooling map[string]interface{}
-		if err := json.Unmarshal(data, &tooling); err == nil {
-			if toolsRaw, ok := tooling["tools"].(map[string]interface{}); ok {
-				for canonicalID, toolRaw := range toolsRaw {
-					tool, ok := toolRaw.(map[string]interface{})
-					if !ok {
-						continue
-					}
-
-					toolType, _ := tool["type"].(string)
-					integration, _ := tool["integration"].(string)
-
-					// Check prefix filter (project name from integration)
-					if prefix != "" {
-						// Extract project name from integration (e.g., "stripe.stripe@v1" -> "stripe")
-						project := extractProjectFromIntegration(integration)
-						if project != prefix {
-							continue
-						}
-					}
-
-					if toolType == "method" && (filter == "" || filter == "methods") {
-						methods = append(methods, canonicalID)
-					} else if toolType == "workflow" && (filter == "" || filter == "workflows") {
-						workflows = append(workflows, canonicalID)
-					}
-				}
-			}
+// getLocalState reads local state by scanning .swytchcode/integrations recursively.
+// Methods and workflows are discovered from methods.json and workflows.json in each integration.
+// prefix is used as a filter pattern: match canonical_id or project name (case-insensitive substring/project match).
+func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, workflows []ListEntry, integrations []string, err error) {
+	integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations")
+	if _, statErr := os.Stat(integrationsDir); statErr != nil {
+		if filter == "methods" || filter == "workflows" {
+			return nil, nil, nil, fmt.Errorf("integrations directory not found at %s: run 'swytchcode get <project>' first", integrationsDir)
 		}
+		return nil, nil, nil, nil
 	}
 
-	// Read integrations directory for fetched integrations
-	if filter == "" || filter == "integrations" {
-		integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations")
-		if entries, err := os.ReadDir(integrationsDir); err == nil {
-			integrationMap := make(map[string]bool)
-			for _, projectEntry := range entries {
-				if !projectEntry.IsDir() {
+	// Walk project/library/version and collect methods, workflows, and integration names
+	integrationSet := make(map[string]bool)
+
+	projectEntries, _ := os.ReadDir(integrationsDir)
+	for _, projectEntry := range projectEntries {
+		if !projectEntry.IsDir() {
+			continue
+		}
+		projectName := projectEntry.Name()
+		projectPath := filepath.Join(integrationsDir, projectName)
+
+		libraryEntries, _ := os.ReadDir(projectPath)
+		for _, libraryEntry := range libraryEntries {
+			if !libraryEntry.IsDir() {
+				continue
+			}
+			libraryName := libraryEntry.Name()
+			libraryPath := filepath.Join(projectPath, libraryName)
+
+			versionEntries, _ := os.ReadDir(libraryPath)
+			for _, versionEntry := range versionEntries {
+				if !versionEntry.IsDir() {
 					continue
 				}
-				projectName := projectEntry.Name()
-				if prefix != "" && projectName != prefix {
+				version := versionEntry.Name()
+				versionPath := filepath.Join(libraryPath, version)
+				wrekenPath := filepath.Join(versionPath, "wrekenfile.yaml")
+				if _, err := os.Stat(wrekenPath); err != nil {
 					continue
+				}
+				integration := fmt.Sprintf("%s.%s@%s", projectName, libraryName, version)
+				integrationSet[integration] = true
+
+				// Methods from methods.json
+				if filter == "" || filter == "methods" {
+					methodsPath := filepath.Join(versionPath, "methods.json")
+					if data, readErr := os.ReadFile(methodsPath); readErr == nil {
+						var out map[string]interface{}
+						if json.Unmarshal(data, &out) == nil {
+							if methodsList, ok := out["methods"].([]interface{}); ok {
+								for _, mRaw := range methodsList {
+									mMap, ok := mRaw.(map[string]interface{})
+									if !ok {
+										continue
+									}
+									canonicalID, _ := mMap["canonical_id"].(string)
+									if canonicalID == "" {
+										continue
+									}
+									if !matchesPattern(canonicalID, integration, projectName, prefix) {
+										continue
+									}
+									methods = append(methods, ListEntry{CanonicalID: canonicalID, Integration: integration})
+								}
+							}
+						}
+					}
 				}
 
-				projectPath := filepath.Join(integrationsDir, projectName)
-				if libraryEntries, err := os.ReadDir(projectPath); err == nil {
-					for _, libraryEntry := range libraryEntries {
-						if !libraryEntry.IsDir() {
-							continue
-						}
-						libraryName := libraryEntry.Name()
-						libraryPath := filepath.Join(projectPath, libraryName)
-						if versionEntries, err := os.ReadDir(libraryPath); err == nil {
-							for _, versionEntry := range versionEntries {
-								if !versionEntry.IsDir() {
-									continue
-								}
-								version := versionEntry.Name()
-								// Check if wrekenfile exists (valid integration)
-								wrekenPath := filepath.Join(libraryPath, version, "wrekenfile.yaml")
-								if _, err := os.Stat(wrekenPath); err == nil {
-									integration := fmt.Sprintf("%s.%s@%s", projectName, libraryName, version)
-									integrationMap[integration] = true
+				// Workflows from workflows.json
+				if filter == "" || filter == "workflows" {
+					workflowsPath := filepath.Join(versionPath, "workflows.json")
+					if data, readErr := os.ReadFile(workflowsPath); readErr == nil {
+						var out map[string]interface{}
+						if json.Unmarshal(data, &out) == nil {
+							if workflowsList, ok := out["workflows"].([]interface{}); ok {
+								for _, wRaw := range workflowsList {
+									wMap, ok := wRaw.(map[string]interface{})
+									if !ok {
+										continue
+									}
+									canonicalID, _ := wMap["canonical_id"].(string)
+									if canonicalID == "" {
+										continue
+									}
+									if !matchesPattern(canonicalID, integration, projectName, prefix) {
+										continue
+									}
+									workflows = append(workflows, ListEntry{CanonicalID: canonicalID, Integration: integration})
 								}
 							}
 						}
 					}
 				}
 			}
-			for integration := range integrationMap {
-				integrations = append(integrations, integration)
+		}
+	}
+
+	// Build integrations list (optionally filtered by prefix as project name)
+	if filter == "" || filter == "integrations" {
+		for integration := range integrationSet {
+			if prefix != "" {
+				project := extractProjectFromIntegration(integration)
+				if !strings.EqualFold(project, prefix) && !strings.Contains(strings.ToLower(integration), strings.ToLower(prefix)) {
+					continue
+				}
 			}
+			integrations = append(integrations, integration)
 		}
 	}
 
 	return methods, workflows, integrations, nil
+}
+
+// matchesPattern returns true if pattern is empty, or if canonical_id or project name matches (case-insensitive).
+func matchesPattern(canonicalID, integration, projectName, pattern string) bool {
+	if pattern == "" {
+		return true
+	}
+	pattern = strings.ToLower(pattern)
+	if strings.Contains(strings.ToLower(canonicalID), pattern) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(projectName), pattern) {
+		return true
+	}
+	if strings.Contains(strings.ToLower(integration), pattern) {
+		return true
+	}
+	return false
 }
 
 // extractProjectFromIntegration extracts project name from integration string (e.g., "stripe.stripe@v1" -> "stripe").

@@ -45,7 +45,7 @@ var initCmd = &cobra.Command{
 		if interactive && editorChoice == "" {
 			// Interactive mode: prompt for editor selection
 			fmt.Println()
-			_, editorChoice = util.SelectWithRetry("Which editor do you use?", []string{"cursor", "copilot", "claude", "none"})
+			_, editorChoice = util.SelectWithRetry("Which editor do you use?", []string{"cursor", "claude", "none"})
 		}
 
 		modeChoice := strings.ToLower(initMode)
@@ -66,7 +66,7 @@ var initCmd = &cobra.Command{
 }
 
 func init() {
-	initCmd.Flags().StringVar(&initEditor, "editor", "", "cursor | copilot | claude | none")
+	initCmd.Flags().StringVar(&initEditor, "editor", "", "cursor | claude | none")
 	initCmd.Flags().StringVar(&initMode, "mode", "", "production | sandbox")
 	initCmd.Flags().BoolVar(&initNonInteractive, "non-interactive", false, "disable prompts; suitable for CI")
 }

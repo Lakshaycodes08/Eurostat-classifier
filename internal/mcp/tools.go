@@ -24,33 +24,32 @@ type ToolOutput struct {
 
 // ListArgs represents arguments for swytchcode_list.
 type ListArgs struct {
-	Filter *string `json:"filter,omitempty" jsonschema:"Filter type: 'methods', 'workflows', 'integrations', or empty for all"`
-	Prefix *string `json:"prefix,omitempty" jsonschema:"Project prefix filter (e.g., 'stripe')"`
-	JSON   *bool   `json:"json,omitempty" jsonschema:"Output as JSON object"`
+	Filter string `json:"filter,omitempty" jsonschema:"Filter type: 'methods', 'workflows', 'integrations', or empty for all"`
+	Prefix string `json:"prefix,omitempty" jsonschema:"Project prefix filter (e.g., 'stripe')"`
+	JSON   bool   `json:"json,omitempty" jsonschema:"Output as JSON object"`
 }
 
 // GetArgs represents arguments for swytchcode_get.
 type GetArgs struct {
 	ProjectName string `json:"project_name" jsonschema:"Project name to fetch"`
-	Yes         *bool  `json:"yes,omitempty" jsonschema:"Auto-confirm overwrite"`
+	Yes         bool   `json:"yes,omitempty" jsonschema:"Auto-confirm overwrite"`
 }
 
 // AddArgs represents arguments for swytchcode_add.
 type AddArgs struct {
-	CanonicalID     string  `json:"canonical_id" jsonschema:"Canonical ID of the tool to add"`
-	IntegrationSpec *string `json:"integration_spec,omitempty" jsonschema:"Optional integration spec (project@library.version)"`
+	CanonicalID     string `json:"canonical_id" jsonschema:"Canonical ID of the tool to add"`
+	IntegrationSpec string `json:"integration_spec,omitempty" jsonschema:"Optional integration spec (project@library.version)"`
 }
 
 // SearchArgs represents arguments for swytchcode_search.
 type SearchArgs struct {
-	Filter  *string `json:"filter,omitempty" jsonschema:"Filter type: 'integrations' or 'methods'"`
-	Keyword *string `json:"keyword,omitempty" jsonschema:"Search keyword"`
-	JSON    *bool   `json:"json,omitempty" jsonschema:"Output as JSON array"`
+	Keyword string `json:"keyword,omitempty" jsonschema:"Optional search keyword; if empty, returns all integrations"`
+	JSON    bool   `json:"json,omitempty" jsonschema:"Output as JSON array"`
 }
 
 // InitArgs represents arguments for swytchcode_init.
 type InitArgs struct {
-	Editor string `json:"editor" jsonschema:"Editor choice: 'cursor', 'copilot', 'claude', or 'none'"`
+	Editor string `json:"editor" jsonschema:"Editor choice: 'cursor', 'claude', or 'none'"`
 	Mode   string `json:"mode" jsonschema:"Execution mode: 'production' or 'sandbox'"`
 }
 
@@ -63,17 +62,17 @@ type VersionArgs struct{}
 // InfoArgs represents arguments for swytchcode_info.
 type InfoArgs struct {
 	CanonicalID string `json:"canonical_id" jsonschema:"Canonical ID of the tool to get information about"`
-	JSON        *bool  `json:"json,omitempty" jsonschema:"Output as JSON array instead of human-readable format"`
+	JSON        bool   `json:"json,omitempty" jsonschema:"Output as JSON array instead of human-readable format"`
 }
 
 // ExecArgs represents arguments for swytchcode_exec.
 type ExecArgs struct {
 	Tool      string                 `json:"tool" jsonschema:"Canonical ID of the tool to execute"`
 	Args      map[string]interface{} `json:"args,omitempty" jsonschema:"Tool arguments (body, params, Authorization, etc.)"`
-	DryRun    *bool                  `json:"dry_run,omitempty" jsonschema:"Show what would be executed without making HTTP call"`
-	Raw       *bool                  `json:"raw,omitempty" jsonschema:"Output raw HTTP response instead of normalized JSON"`
-	AllowRaw  *bool                  `json:"allow_raw,omitempty" jsonschema:"Allow execution of raw methods"`
-	JSON      *bool                  `json:"json,omitempty" jsonschema:"Output response as a single JSON object"`
+	DryRun    bool                   `json:"dry_run,omitempty" jsonschema:"Show what would be executed without making HTTP call"`
+	Raw       bool                   `json:"raw,omitempty" jsonschema:"Output raw HTTP response instead of normalized JSON"`
+	AllowRaw  bool                   `json:"allow_raw,omitempty" jsonschema:"Allow execution of raw methods"`
+	JSON      bool                   `json:"json,omitempty" jsonschema:"Output response as a single JSON object"`
 }
 
 // RegisterTools registers all MCP tools with the server.
@@ -163,18 +162,9 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 			return nil, ToolOutput{}, fmt.Errorf("detect project root: %w", err)
 		}
 
-		filter := ""
-		if args.Filter != nil {
-			filter = *args.Filter
-		}
-		prefix := ""
-		if args.Prefix != nil {
-			prefix = *args.Prefix
-		}
-		jsonOutput := false
-		if args.JSON != nil {
-			jsonOutput = *args.JSON
-		}
+		filter := args.Filter
+		prefix := args.Prefix
+		jsonOutput := args.JSON
 
 		oc := NewOutputCapture(streamOutput)
 		_, err = commands.RunList(projectRoot, filter, prefix, jsonOutput, oc.Stdout())
@@ -199,15 +189,9 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		defer cancel()
 
 		oc := NewOutputCapture(streamOutput)
-		argsMap := map[string]interface{}{}
-		if args.Filter != nil {
-			argsMap["filter"] = *args.Filter
-		}
-		if args.Keyword != nil {
-			argsMap["keyword"] = *args.Keyword
-		}
-		if args.JSON != nil {
-			argsMap["json"] = *args.JSON
+		argsMap := map[string]interface{}{
+			"keyword": args.Keyword,
+			"json":    args.JSON,
 		}
 		result, err := handleSearch(toolCtx, argsMap, oc)
 		if err != nil {
@@ -231,9 +215,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		oc := NewOutputCapture(streamOutput)
 		argsMap := map[string]interface{}{
 			"project_name": args.ProjectName,
-		}
-		if args.Yes != nil {
-			argsMap["yes"] = *args.Yes
+			"yes":          args.Yes,
 		}
 		result, err := handleGet(toolCtx, argsMap, oc)
 		if err != nil {
@@ -258,8 +240,8 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		argsMap := map[string]interface{}{
 			"canonical_id": args.CanonicalID,
 		}
-		if args.IntegrationSpec != nil {
-			argsMap["integration_spec"] = *args.IntegrationSpec
+		if args.IntegrationSpec != "" {
+			argsMap["integration_spec"] = args.IntegrationSpec
 		}
 		result, err := handleAdd(toolCtx, argsMap, oc)
 		if err != nil {
@@ -287,18 +269,10 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		if args.Args != nil {
 			argsMap["args"] = args.Args
 		}
-		if args.DryRun != nil {
-			argsMap["dry_run"] = *args.DryRun
-		}
-		if args.Raw != nil {
-			argsMap["raw"] = *args.Raw
-		}
-		if args.AllowRaw != nil {
-			argsMap["allow_raw"] = *args.AllowRaw
-		}
-		if args.JSON != nil {
-			argsMap["json"] = *args.JSON
-		}
+		argsMap["dry_run"] = args.DryRun
+		argsMap["raw"] = args.Raw
+		argsMap["allow_raw"] = args.AllowRaw
+		argsMap["json"] = args.JSON
 		result, err := handleExec(toolCtx, argsMap, oc)
 		output := oc.GetCombinedOutput()
 		if err != nil {
@@ -331,10 +305,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 			return nil, ToolOutput{}, err
 		}
 
-		jsonOutput := false
-		if args.JSON != nil {
-			jsonOutput = *args.JSON
-		}
+		jsonOutput := args.JSON
 
 		if err := commands.FormatInfoOutput(toolInfos, jsonOutput, oc.Stdout()); err != nil {
 			return nil, ToolOutput{}, err
@@ -366,7 +337,7 @@ func handleSearch(ctx context.Context, args map[string]interface{}, oc *OutputCa
 	regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
 	integrationsResp, err := regClient.ListIntegrations(ctx)
 	if err != nil {
-		return "", fmt.Errorf("search integrations: %w", err)
+		return "", fmt.Errorf("search: %w", err)
 	}
 
 	// Collect unique project names (with keyword filter)

@@ -22,9 +22,9 @@ func RunInit(projectRoot, editor, mode string, stdout io.Writer) error {
 	}
 
 	// Validate editor
-	validEditors := map[string]bool{"cursor": true, "copilot": true, "claude": true, "none": true}
+	validEditors := map[string]bool{"cursor": true, "claude": true, "none": true}
 	if editor != "" && !validEditors[editor] {
-		return fmt.Errorf("unknown editor %q (expected cursor|copilot|claude|none)", editor)
+		return fmt.Errorf("unknown editor %q (expected cursor|claude|none)", editor)
 	}
 
 	swytchDir := filepath.Join(projectRoot, ".swytchcode")
@@ -82,10 +82,6 @@ func RunInit(projectRoot, editor, mode string, stdout io.Writer) error {
 		case "cursor":
 			if err := editors.WriteCursorRules(projectRoot); err != nil {
 				return fmt.Errorf("write Cursor rules: %w", err)
-			}
-		case "copilot":
-			if err := editors.WriteCopilotConfig(projectRoot); err != nil {
-				return fmt.Errorf("write Copilot config: %w", err)
 			}
 		case "claude":
 			if err := editors.WriteClaudeConfig(projectRoot); err != nil {

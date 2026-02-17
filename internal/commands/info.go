@@ -23,7 +23,8 @@ type ToolInfo struct {
 	Integration  string                 `json:"integration"` // "project.library@version"
 	Summary      string                 `json:"summary,omitempty"`
 	Description  string                 `json:"description,omitempty"`
-	Inputs       interface{}            `json:"inputs,omitempty"`
+	Inputs       interface{}            `json:"inputs,omitempty"`  // Resolved to scalars when STRUCTS available
+	Output       interface{}            `json:"output,omitempty"`   // Resolved return schema when RETURNS/STRUCTS available
 	Wrekenfile   map[string]interface{} `json:"wrekenfile,omitempty"` // Full entry from wrekenfile
 }
 
@@ -45,35 +46,80 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 		return nil, fmt.Errorf("canonical ID %q not found in any fetched integrations", canonicalID)
 	}
 
-	// For each match, read the wrekenfile and extract tool details
+	// For each match, get tool details from wrekenfile (methods) or workflows.json (workflows)
 	var toolInfos []ToolInfo
 	for _, match := range matches {
-		wrekenPath := filepath.Join(projectRoot, ".swytchcode", "integrations", match.Project, match.Library, match.Version, "wrekenfile.yaml")
-		
-		toolEntry, err := findToolInWrekenfile(wrekenPath, canonicalID, match.ToolType)
+		integrationsBase := filepath.Join(projectRoot, ".swytchcode", "integrations", match.Project, match.Library, match.Version)
+		var toolEntry map[string]interface{}
+		var err error
+
+		if match.ToolType == "workflow" {
+			workflowsPath := filepath.Join(integrationsBase, "workflows.json")
+			toolEntry, err = findWorkflowEntryInWorkflowsJSON(workflowsPath, canonicalID)
+		} else {
+			wrekenPath := filepath.Join(integrationsBase, "wrekenfile.yaml")
+			toolEntry, err = findToolInWrekenfile(wrekenPath, canonicalID, match.ToolType)
+		}
+
 		if err != nil {
-			fmt.Fprintf(stderr, "Warning: failed to read wrekenfile for %s.%s@%s: %v\n", match.Project, match.Library, match.Version, err)
+			fmt.Fprintf(stderr, "Warning: failed to read tool data for %s.%s@%s: %v\n", match.Project, match.Library, match.Version, err)
 			continue
 		}
 
-		// Extract common fields
+		// Extract common fields (wrekenfile uses SUMMARY/DESC/INPUTS; workflows.json uses summary/desc/steps)
 		summary := ""
-		if summaryRaw, ok := toolEntry["SUMMARY"]; ok {
-			if summaryStr, ok := summaryRaw.(string); ok {
-				summary = summaryStr
+		for _, key := range []string{"SUMMARY", "summary"} {
+			if summaryRaw, ok := toolEntry[key]; ok {
+				if summaryStr, ok := summaryRaw.(string); ok {
+					summary = summaryStr
+					break
+				}
 			}
 		}
 
 		description := ""
-		if descRaw, ok := toolEntry["DESC"]; ok {
-			if descStr, ok := descRaw.(string); ok {
-				description = descStr
+		for _, key := range []string{"DESC", "desc", "description"} {
+			if descRaw, ok := toolEntry[key]; ok {
+				if descStr, ok := descRaw.(string); ok {
+					description = descStr
+					break
+				}
 			}
 		}
 
 		var inputs interface{}
-		if inputsRaw, ok := toolEntry["INPUTS"]; ok {
-			inputs = inputsRaw
+		var output interface{}
+		if match.ToolType == "method" {
+			wrekenPath := filepath.Join(integrationsBase, "wrekenfile.yaml")
+			wreken, loadErr := LoadWrekenfile(wrekenPath)
+			if loadErr == nil {
+				if inputsRaw, ok := toolEntry["INPUTS"]; ok {
+					if resolved, err := ResolveInputs(wreken, inputsRaw); err != nil {
+						fmt.Fprintf(stderr, "Warning: resolve STRUCTs for inputs: %v (showing raw inputs)\n", err)
+						inputs = inputsRaw
+					} else if resolved != nil {
+						inputs = resolved
+					} else {
+						inputs = inputsRaw
+					}
+				}
+				if returnsRaw, ok := toolEntry["RETURNS"]; ok {
+					if resolved, err := ResolveReturns(wreken, returnsRaw); err != nil {
+						fmt.Fprintf(stderr, "Warning: resolve STRUCTs for returns: %v (output omitted)\n", err)
+					} else if resolved != nil {
+						output = resolved
+					}
+				}
+			}
+			if inputs == nil && toolEntry["INPUTS"] != nil {
+				inputs = toolEntry["INPUTS"]
+			}
+		} else {
+			if inputsRaw, ok := toolEntry["INPUTS"]; ok {
+				inputs = inputsRaw
+			} else if stepsRaw, ok := toolEntry["steps"]; ok {
+				inputs = stepsRaw
+			}
 		}
 
 		projectLibrary := fmt.Sprintf("%s.%s", match.Project, match.Library)
@@ -89,6 +135,7 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 			Summary:     summary,
 			Description: description,
 			Inputs:      inputs,
+			Output:      output,
 			Wrekenfile:  toolEntry,
 		}
 
@@ -142,6 +189,42 @@ func findToolInWrekenfile(wrekenPath, canonicalID, toolType string) (map[string]
 	return toolMap, nil
 }
 
+// findWorkflowEntryInWorkflowsJSON reads workflows.json and returns the workflow entry as a map.
+// Used for "info" when the tool is a workflow, so we do not depend on a WORKFLOWS section in the wrekenfile.
+func findWorkflowEntryInWorkflowsJSON(workflowsPath, canonicalID string) (map[string]interface{}, error) {
+	data, err := os.ReadFile(workflowsPath)
+	if err != nil {
+		return nil, fmt.Errorf("read workflows.json: %w", err)
+	}
+
+	var out map[string]interface{}
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, fmt.Errorf("parse workflows.json: %w", err)
+	}
+
+	workflowsRaw, ok := out["workflows"]
+	if !ok {
+		return nil, fmt.Errorf("workflows section not found in workflows.json")
+	}
+
+	workflows, ok := workflowsRaw.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("workflows must be an array")
+	}
+
+	for _, wRaw := range workflows {
+		wMap, ok := wRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if id, ok := wMap["canonical_id"].(string); ok && id == canonicalID {
+			return wMap, nil
+		}
+	}
+
+	return nil, fmt.Errorf("workflow %q not found in workflows.json", canonicalID)
+}
+
 // FormatInfoOutput formats tool info for display.
 func FormatInfoOutput(toolInfos []ToolInfo, jsonOutput bool, stdout io.Writer) error {
 	if jsonOutput {
@@ -167,6 +250,12 @@ func FormatInfoOutput(toolInfos []ToolInfo, jsonOutput bool, stdout io.Writer) e
 			inputsJSON, err := json.MarshalIndent(info.Inputs, "", "  ")
 			if err == nil {
 				fmt.Fprintf(stdout, "Inputs:\n%s\n", inputsJSON)
+			}
+		}
+		if info.Output != nil {
+			outputJSON, err := json.MarshalIndent(info.Output, "", "  ")
+			if err == nil {
+				fmt.Fprintf(stdout, "Output:\n%s\n", outputJSON)
 			}
 		}
 	}

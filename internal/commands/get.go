@@ -63,6 +63,7 @@ func RunGet(ctx context.Context, projectName string, yes bool, stdout, stderr io
 		fmt.Fprintf(stderr, "✗ Failed to fetch workflows: %v\n", err)
 		return fmt.Errorf("fetch workflows for project %q: %w", projectName, err)
 	}
+	registry.FillEmptyWorkflowNames(workflowsResp)
 	methodsResp, err := regClient.ListMethods(ctx, projectName)
 	if err != nil {
 		spinner.Stop()

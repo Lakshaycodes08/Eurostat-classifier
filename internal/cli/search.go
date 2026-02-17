@@ -19,65 +19,47 @@ var (
 
 // searchCmd implements `swytchcode search` - searches remote registry.
 var searchCmd = &cobra.Command{
-	Use:   "search [integrations|methods] [keyword]",
+	Use:   "search [keyword]",
 	Short: "Search remote registry for available integrations",
-	Long:  "Searches the remote registry for available integrations. Read-only, never mutates local state.",
+	Long:  "Searches the remote registry for available integrations. With no keyword, lists all; with a keyword, returns matching project names. Read-only, never mutates local state.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		projectRoot, err := util.ProjectRoot()
 		if err != nil {
 			return fmt.Errorf("detect project root: %w", err)
 		}
 
-		var filter string // "integrations" or "methods" (methods is optional for now)
-		var keyword string
-
+		keyword := ""
 		if len(args) > 0 {
-			filter = args[0]
-			if len(args) > 1 {
-				keyword = args[1]
-			} else if filter != "integrations" && filter != "methods" {
-				// If first arg is not a filter, treat it as keyword
-				keyword = filter
-				filter = "integrations"
-			}
-		} else {
-			filter = "integrations"
+			keyword = args[0]
 		}
 
 		regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
 		ctx := context.Background()
 
-		if filter == "integrations" || filter == "" {
-			integrationsResp, err := regClient.ListIntegrations(ctx)
-			if err != nil {
-				return fmt.Errorf("search integrations: %w", err)
-			}
+		integrationsResp, err := regClient.ListIntegrations(ctx)
+		if err != nil {
+			return fmt.Errorf("search: %w", err)
+		}
 
-			// Collect unique project names
-			projectMap := make(map[string]bool)
-			for _, project := range integrationsResp.Projects {
-				if keyword == "" || strings.Contains(strings.ToLower(project.ProjectName), strings.ToLower(keyword)) {
-					projectMap[project.ProjectName] = true
-				}
+		// Collect unique project names (all if no keyword, else matching keyword)
+		projectMap := make(map[string]bool)
+		for _, project := range integrationsResp.Projects {
+			if keyword == "" || strings.Contains(strings.ToLower(project.ProjectName), strings.ToLower(keyword)) {
+				projectMap[project.ProjectName] = true
 			}
-			projectNames := make([]string, 0, len(projectMap))
-			for projectName := range projectMap {
-				projectNames = append(projectNames, projectName)
-			}
+		}
+		projectNames := make([]string, 0, len(projectMap))
+		for projectName := range projectMap {
+			projectNames = append(projectNames, projectName)
+		}
 
-			if searchJSON {
-				if err := json.NewEncoder(os.Stdout).Encode(projectNames); err != nil {
-					return fmt.Errorf("encode JSON: %w", err)
-				}
-			} else {
-				for _, projectName := range projectNames {
-					fmt.Println(projectName)
-				}
+		if searchJSON {
+			if err := json.NewEncoder(os.Stdout).Encode(projectNames); err != nil {
+				return fmt.Errorf("encode JSON: %w", err)
 			}
-		} else if filter == "methods" {
-			// Methods search not implemented yet - return empty for now
-			if searchJSON {
-				fmt.Println("[]")
+		} else {
+			for _, projectName := range projectNames {
+				fmt.Println(projectName)
 			}
 		}
 

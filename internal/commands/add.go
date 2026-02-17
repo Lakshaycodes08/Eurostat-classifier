@@ -218,35 +218,37 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 
 	projectLibrary := fmt.Sprintf("%s.%s", project, library)
 	wrekenPath := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version, "wrekenfile.yaml")
+	wreken, err := LoadWrekenfile(wrekenPath)
+	if err != nil {
+		return fmt.Errorf("load wrekenfile: %w", err)
+	}
 
 	if toolType == "workflow" {
-		// Handle workflow: read from workflows.json, add each step method, then add workflow entry
+		// Handle workflow: define steps within the workflow entry (no top-level method entries for steps)
 		workflowsPath := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version, "workflows.json")
-		workflow, err := findWorkflowInWorkflowsJSON(workflowsPath, canonicalID)
+		entry, err := findWorkflowEntryInWorkflowsJSON(workflowsPath, canonicalID)
 		if err != nil {
 			return fmt.Errorf("workflow %q not found in workflows.json: %w", canonicalID, err)
 		}
+		workflow, err := workflowFromEntry(entry, canonicalID)
+		if err != nil {
+			return err
+		}
 
-		// Add each method from workflow steps
-		addedMethods := 0
+		integrationStr := fmt.Sprintf("%s@%s", projectLibrary, version)
+
+		// Build steps as array of step definitions (full method details nested inside workflow)
+		stepsArray := make([]interface{}, 0, len(workflow.Steps))
 		for index, step := range workflow.Steps {
-			// Skip if method already exists
-			if _, exists := tools[step.CanonicalID]; exists {
-				continue
-			}
-
-			// Look up method in wrekenfile
 			methodEntry, err := findMethodInWrekenfile(wrekenPath, step.CanonicalID)
 			if err != nil {
 				fmt.Fprintf(stderr, "Warning: method %q from workflow step not found in wrekenfile: %v\n", step.CanonicalID, err)
 				continue
 			}
 
-			// Extract method details
 			summary := ""
 			desc := ""
 			var inputs interface{}
-
 			if summaryRaw, ok := methodEntry["SUMMARY"]; ok {
 				if summaryStr, ok := summaryRaw.(string); ok {
 					summary = summaryStr
@@ -259,43 +261,42 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 			}
 			if inputsRaw, ok := methodEntry["INPUTS"]; ok {
 				inputs = inputsRaw
+				if resolved, err := ResolveInputs(wreken, inputsRaw); err != nil {
+					fmt.Fprintf(stderr, "Warning: resolve STRUCTs for step %q: %v (using raw inputs)\n", step.CanonicalID, err)
+				} else if resolved != nil {
+					inputs = resolved
+				}
 			}
 
-			// Add method with index
-			methodEntryMap := map[string]interface{}{
+			stepDef := map[string]interface{}{
+				"canonical_id": step.CanonicalID,
+				"name":        step.Name,
 				"summary":     summary,
-				"integration": fmt.Sprintf("%s@%s", projectLibrary, version),
-				"type":        "method",
 				"desc":        desc,
 				"inputs":      inputs,
-				"index":       index, // Preserve order in workflow
+				"integration": integrationStr,
+				"index":       index,
 			}
-
-			tools[step.CanonicalID] = methodEntryMap
-			addedMethods++
+			if returnsRaw, ok := methodEntry["RETURNS"]; ok {
+				if output, err := ResolveReturns(wreken, returnsRaw); err != nil {
+					fmt.Fprintf(stderr, "Warning: resolve STRUCTs for step %q returns: %v (output omitted)\n", step.CanonicalID, err)
+				} else if output != nil {
+					stepDef["output"] = output
+				}
+			}
+			stepsArray = append(stepsArray, stepDef)
 		}
 
-		// Build workflow steps array for tooling.json (just canonical_ids in order)
-		stepsArray := make([]string, len(workflow.Steps))
-		for i, step := range workflow.Steps {
-			stepsArray[i] = step.CanonicalID
-		}
-
-		// Add workflow entry
+		// Add single workflow entry with steps defined inside it
 		workflowEntryMap := map[string]interface{}{
 			"name":        workflow.Name,
-			"integration": fmt.Sprintf("%s@%s", projectLibrary, version),
+			"integration": integrationStr,
 			"type":        "workflow",
 			"steps":       stepsArray,
 		}
 
 		tools[canonicalID] = workflowEntryMap
-
-		if addedMethods > 0 {
-			fmt.Fprintf(stdout, "Added workflow %q with %d method(s) to tooling.json (integration: %s)\n", canonicalID, addedMethods, projectLibrary)
-		} else {
-			fmt.Fprintf(stdout, "Added workflow %q to tooling.json (integration: %s)\n", canonicalID, projectLibrary)
-		}
+		fmt.Fprintf(stdout, "Added workflow %q with %d step(s) to tooling.json (integration: %s)\n", canonicalID, len(stepsArray), projectLibrary)
 	} else {
 		// Handle method: read from wrekenfile and add
 		toolEntry, err := findMethodInWrekenfile(wrekenPath, canonicalID)
@@ -320,6 +321,20 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 		}
 		if inputsRaw, ok := toolEntry["INPUTS"]; ok {
 			inputs = inputsRaw
+			if resolved, err := ResolveInputs(wreken, inputsRaw); err != nil {
+				return fmt.Errorf("resolve STRUCTs in INPUTS: %w", err)
+			} else if resolved != nil {
+				inputs = resolved
+			}
+		}
+
+		var output interface{}
+		if returnsRaw, ok := toolEntry["RETURNS"]; ok {
+			resolved, err := ResolveReturns(wreken, returnsRaw)
+			if err != nil {
+				return fmt.Errorf("resolve STRUCTs in RETURNS: %w", err)
+			}
+			output = resolved
 		}
 
 		// Build tool entry
@@ -329,6 +344,9 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 			"type":        toolType,
 			"desc":        desc,
 			"inputs":      inputs,
+		}
+		if output != nil {
+			toolEntryMap["output"] = output
 		}
 
 		tools[canonicalID] = toolEntryMap
@@ -379,68 +397,31 @@ func ParseIntegrationSpec(spec string) (project, library, version string) {
 	return project, library, version
 }
 
-// findWorkflowInWorkflowsJSON reads workflows.json and finds a workflow by canonical_id.
-func findWorkflowInWorkflowsJSON(workflowsPath, canonicalID string) (*registry.Workflow, error) {
-	data, err := os.ReadFile(workflowsPath)
-	if err != nil {
-		return nil, fmt.Errorf("read workflows.json: %w", err)
-	}
-
-	var workflowsResp map[string]interface{}
-	if err := json.Unmarshal(data, &workflowsResp); err != nil {
-		return nil, fmt.Errorf("parse workflows.json: %w", err)
-	}
-
-	workflowsRaw, ok := workflowsResp["workflows"]
+// workflowFromEntry converts a workflow entry map (from workflows.json) into registry.Workflow.
+func workflowFromEntry(wMap map[string]interface{}, canonicalID string) (*registry.Workflow, error) {
+	name, _ := wMap["name"].(string)
+	stepsRaw, ok := wMap["steps"].([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("workflows section not found in workflows.json")
+		return nil, fmt.Errorf("workflow steps must be an array")
 	}
-
-	workflows, ok := workflowsRaw.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("workflows must be an array")
-	}
-
-	for _, wRaw := range workflows {
-		wMap, ok := wRaw.(map[string]interface{})
+	var steps []registry.WorkflowStep
+	for _, sRaw := range stepsRaw {
+		sMap, ok := sRaw.(map[string]interface{})
 		if !ok {
 			continue
 		}
-
-		id, ok := wMap["canonical_id"].(string)
-		if !ok || id != canonicalID {
-			continue
-		}
-
-		// Found the workflow, parse it
-		name, _ := wMap["name"].(string)
-		stepsRaw, ok := wMap["steps"].([]interface{})
-		if !ok {
-			return nil, fmt.Errorf("workflow steps must be an array")
-		}
-
-		var steps []registry.WorkflowStep
-		for _, sRaw := range stepsRaw {
-			sMap, ok := sRaw.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			stepName, _ := sMap["name"].(string)
-			stepID, _ := sMap["canonical_id"].(string)
-			steps = append(steps, registry.WorkflowStep{
-				Name:        stepName,
-				CanonicalID: stepID,
-			})
-		}
-
-		return &registry.Workflow{
-			Name:        name,
-			CanonicalID: canonicalID,
-			Steps:       steps,
-		}, nil
+		stepName, _ := sMap["name"].(string)
+		stepID, _ := sMap["canonical_id"].(string)
+		steps = append(steps, registry.WorkflowStep{
+			Name:        stepName,
+			CanonicalID: stepID,
+		})
 	}
-
-	return nil, fmt.Errorf("workflow %q not found in workflows.json", canonicalID)
+	return &registry.Workflow{
+		Name:        name,
+		CanonicalID: canonicalID,
+		Steps:       steps,
+	}, nil
 }
 
 // findMethodInWrekenfile reads a wrekenfile YAML and finds a method by canonical_id key.

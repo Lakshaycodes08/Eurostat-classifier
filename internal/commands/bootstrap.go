@@ -178,6 +178,7 @@ func fetchIntegration(ctx context.Context, regClient *registry.Client, projectRo
 	if err != nil {
 		return fmt.Errorf("fetch workflows: %w", err)
 	}
+	registry.FillEmptyWorkflowNames(workflowsResp)
 	methodsResp, err := regClient.ListMethods(ctx, projectName)
 	if err != nil {
 		return fmt.Errorf("fetch methods: %w", err)
