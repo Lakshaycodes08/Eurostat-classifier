@@ -1,0 +1,61 @@
+project_name: swytchcode
+
+before:
+  hooks:
+    - go mod download
+    - go mod verify
+
+builds:
+  - id: swytchcode
+    main: ./cmd/swytchcode
+    binary: swytchcode
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      # Embed version from tag (e.g. v0.1.0 -> 0.1.0)
+      - -X gitlab.com/swytchcode/shell/internal/constants.Version={{.Version}}
+
+archives:
+  - id: tgz
+    format: tar.gz
+    name_template: "swytchcode_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+  - id: zip
+    format: zip
+    name_template: "swytchcode_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+release:
+  # Creates/updates a GitLab Release and uploads artifacts.
+  # Note: In a private project, release assets are not publicly downloadable
+  # unless you publish them elsewhere (e.g. GitLab Pages) or make the project public.
+  gitlab:
+    owner: swytchcode
+    name: cli
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+

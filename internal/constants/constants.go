@@ -33,7 +33,7 @@ const (
 // Application configuration (build-time constants)
 const (
 	// Version is the Swytchcode shell version.
-	Version = "0.0.25"
+	Version = "0.1.0"
 
 	// RegistryURL is the default registry base URL (build-time constant).
 	// Set this at build time; runtime environment variables are not used.
