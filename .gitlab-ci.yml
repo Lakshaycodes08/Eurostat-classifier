@@ -38,11 +38,13 @@ auto_tag:
 # 2) Build & publish on tags.
 goreleaser:
   stage: release
-  image: goreleaser/goreleaser:latest
+  image:
+    name: goreleaser/goreleaser:latest
+    entrypoint: [""]
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   script:
-    - goreleaser release --config .goreleaser.yml --clean
+    - goreleaser release --clean
   artifacts:
     when: always
     paths:
