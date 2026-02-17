@@ -25,6 +25,9 @@ auto_tag:
         echo "https://gitlab.com/swytchcode/cli/-/settings/ci_cd"
         exit 1
       fi
+    # Configure Git user identity for tag creation
+    - git config --global user.email "ci@gitlab.com"
+    - git config --global user.name "GitLab CI"
     # Push tags using a token with read_repository + write_repository scopes
     # Use project path format: swytchcode/shell (URL-encoded: swytchcode%2Fshell)
     - git remote set-url origin "https://oauth2:${GITLAB_TOKEN}@gitlab.com/swytchcode/shell.git"
