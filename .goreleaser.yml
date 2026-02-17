@@ -47,7 +47,7 @@ release:
   # unless you publish them elsewhere (e.g. GitLab Pages) or make the project public.
   gitlab:
     owner: swytchcode
-    name: cli
+    repo: cli
 
 changelog:
   sort: asc
