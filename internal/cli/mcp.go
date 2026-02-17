@@ -98,14 +98,7 @@ Supports both stdio and HTTP transports.`,
 			cmd := exec.Command(executable, args...)
 			
 			// Platform-specific daemonization
-			if runtime.GOOS != "windows" {
-				// Unix/Linux/macOS: create new session, detach from terminal
-				cmd.SysProcAttr = &syscall.SysProcAttr{
-					Setsid: true, // Create new session (detach from terminal)
-				}
-			}
-			// Windows: No special flags needed - process will run independently
-			// Windows processes don't need Setsid (Unix concept)
+			cmd.SysProcAttr = getSysProcAttr()
 			
 			// Redirect stdin/stdout/stderr to null device (cross-platform)
 			// The child process will handle log file redirection if --log-file is specified
