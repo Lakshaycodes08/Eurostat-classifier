@@ -45,7 +45,7 @@ goreleaser:
     # Unset and re-export GITLAB_TOKEN to avoid masked variable issues
     - unset GITLAB_TOKEN
     - export GITLAB_TOKEN="${CI_JOB_TOKEN}"
-    - goreleaser release --clean
+    - goreleaser release --config .goreleaser.yml --clean
   artifacts:
     when: always
     paths:
