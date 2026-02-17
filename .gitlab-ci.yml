@@ -42,7 +42,10 @@ goreleaser:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   script:
-    - goreleaser release --config .goreleaser.yml --clean
+    - |
+      goreleaser release \
+        --config .goreleaser.yml \
+        --clean
   artifacts:
     when: always
     paths:
