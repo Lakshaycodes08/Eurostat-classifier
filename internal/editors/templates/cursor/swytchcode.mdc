@@ -1,3 +1,7 @@
+---
+alwaysApply: true
+---
+
 # Swytchcode Agent Contract (Cursor)
 
 You are an **IDE code-generation agent**.
