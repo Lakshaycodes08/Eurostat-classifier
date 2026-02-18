@@ -3,56 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Swytchcode – Secure execution layer for AI agents and CLIs</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Swytchcode CLI</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #1a1a1a; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    p { margin: 0.75rem 0; }
+    a { color: #0066cc; }
+    ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+  </style>
 </head>
 <body>
-  <nav>
-    <a href="./">Swytchcode</a>
-    <a href="install/">Install</a>
-    <a href="docs/overview.html">Docs</a>
-    <a href="docs/security.html">Security</a>
-    <a href="docs/cli.html">CLI</a>
-    <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki</a>
-  </nav>
-  <main>
-    <h1>Swytchcode</h1>
-    <p class="muted" style="font-size: 1.1rem;"><strong>A secure execution layer for AI agents and CLIs.</strong></p>
-    <p>Run AI-driven actions locally with deterministic behavior, policy control, and zero implicit side effects.</p>
+  <h1>Swytchcode CLI</h1>
+  <p>A secure execution layer for AI agents and CLIs. Run tools deterministically via <code>swytchcode exec</code>; <code>tooling.json</code> defines what is allowed.</p>
 
-    <div class="cta">
-      <a href="install/">Install</a>
-      <a href="docs/overview.html" class="secondary">Docs</a>
-      <a href="https://gitlab.com/swytchcode/cli/-/wiki" class="secondary">GitLab Wiki</a>
-    </div>
+  <h2>Links</h2>
+  <ul>
+    <li><a href="https://swytchcode.com">swytchcode.com</a> – main website</li>
+    <li><a href="releases/latest/">Releases</a> – binaries and checksums (latest)</li>
+    <li><a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki</a> – docs, CLI reference, integrations</li>
+  </ul>
 
-    <h2>What problem we solve</h2>
-    <p>AI tools can plan, but they shouldn’t execute freely. Swytchcode is the <strong>execution authority</strong>: no hidden side effects, no agent improvisation.</p>
-    <ul>
-      <li><strong>Deterministic execution</strong> – Same inputs → same outputs; no prompt-based execution.</li>
-      <li><strong>Policy-driven control</strong> – <code>tooling.json</code> is the single source of truth for what is allowed.</li>
-      <li><strong>Local-first</strong> – No runtime registry calls; exec uses only local config and integrations.</li>
-      <li><strong>Tooling.json as contract</strong> – Human-readable, machine-enforced.</li>
-    </ul>
-
-    <h2>Who it’s for</h2>
-    <ul>
-      <li>Platform engineers and security-conscious teams</li>
-      <li>AI-assisted dev workflows (Cursor, Claude)</li>
-      <li>Teams that want explicit boundaries between planning and execution</li>
-    </ul>
-
-    <h2>What makes it different</h2>
-    <ul>
-      <li>No “agent autonomy” – agents call <code>swytchcode exec</code>; they don’t run arbitrary code.</li>
-      <li>No prompt-based execution – inputs and outputs are JSON; failures are explicit.</li>
-      <li>Explicit CLI boundary – <code>swytch exec</code> is the only integration entrypoint.</li>
-      <li>Human-readable + machine-enforced policies.</li>
-    </ul>
-
-    <footer>
-      <p>Binaries: <a href="releases/latest/">releases/latest</a> · Source &amp; Wiki: <a href="https://gitlab.com/swytchcode/cli">GitLab</a></p>
-    </footer>
-  </main>
+  <p style="margin-top: 2rem; color: #666; font-size: 0.9rem;">Install: <code>curl -fsSL https://swytchcode.gitlab.io/cli/install.sh | sh</code></p>
 </body>
 </html>
