@@ -4,20 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Concepts – Swytchcode Docs</title>
-  <link rel="stylesheet" href="/cli/style.css">
+  <link rel="stylesheet" href="../style.css">
 </head>
 <body>
   <nav>
-    <a href="/cli/">Swytchcode</a>
-    <a href="/cli/install/">Install</a>
-    <a href="/cli/docs/overview.html">Docs</a>
-    <a href="/cli/docs/security.html">Security</a>
-    <a href="/cli/docs/cli.html">CLI</a>
+    <a href="../">Swytchcode</a>
+    <a href="../install/">Install</a>
+    <a href="overview.html">Docs</a>
+    <a href="security.html">Security</a>
+    <a href="cli.html">CLI</a>
     <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki</a>
   </nav>
   <main>
     <h1>Concepts</h1>
-    <p>Deeper dive into how Swytchcode works. For a quick pass, see <a href="/cli/docs/overview.html">Overview</a>.</p>
+    <p>Deeper dive into how Swytchcode works. For a quick pass, see <a href="overview.html">Overview</a>.</p>
 
     <h2>Execution model</h2>
     <p><code>swytchcode exec</code> is the only integration entrypoint. Editors and agents must not interpret policy or retry on their own; they call exec and respect its exit codes and JSON output.</p>
@@ -32,7 +32,7 @@
     <p>Errors are explicit: exit codes and structured error payloads. “Tool not found” and “integration not installed” are fatal; agents should not fall back to alternative execution paths.</p>
 
     <footer>
-      <a href="/cli/docs/overview.html">Overview</a> · <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki → Core Concepts</a>
+      <a href="overview.html">Overview</a> · <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki → Core Concepts</a>
     </footer>
   </main>
 </body>
