@@ -36,3 +36,5 @@ go.work.sum
 .cursor/
 .DS_Store
 /swytchcode
+.version
+dist/
