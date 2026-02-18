@@ -69,9 +69,12 @@ After a tag is created (auto or manual):
    - Or: `https://swytchcode.gitlab.io/cli/releases/latest/`
    - Should see downloadable binaries
 
-3. **Test Download:**
+3. **Test Download (or use the one-liner install):**
    ```bash
-   # Example: macOS Apple Silicon
+   # One-liner install (detects OS/arch, verifies checksums, installs to /usr/local/bin or ~/.local/bin)
+   curl -fsSL https://swytchcode.gitlab.io/cli/install.sh | sh
+
+   # Or manual: macOS Apple Silicon
    curl -L "https://swytchcode.gitlab.io/cli/releases/latest/swytchcode_darwin_arm64.tar.gz" | tar xz
    ./swytchcode --version
    ```
