@@ -72,6 +72,9 @@ pages:
     - cp -R public/releases/"$CI_COMMIT_TAG" public/releases/latest
     # Install scripts at root (one-liner URLs unchanged)
     - cp -v install.sh install.ps1 public/
+    # Verify multi-page site (GitLab serves everything under public/ at your project path)
+    - echo "Published files:"
+    - find public -type f | sort
   artifacts:
     paths:
       - public
