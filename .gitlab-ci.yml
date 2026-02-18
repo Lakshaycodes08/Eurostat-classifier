@@ -52,8 +52,7 @@ goreleaser:
       - dist/
     expire_in: 1 week
 
-# 3) Publish binaries publicly via GitLab Pages (works even if repo is private, depending on Pages settings).
-# This provides unauthenticated curl downloads from the Pages URL.
+# 3) Publish site + binaries via GitLab Pages (landing, install, docs, releases).
 pages:
   stage: pages
   image: alpine:3.19
@@ -63,23 +62,16 @@ pages:
     - job: goreleaser
       artifacts: true
   script:
+    # Site: copy Pages content (landing, install, docs, examples, roadmap)
+    - mkdir -p public
+    - cp -R pages/* public/
+    # Release artifacts
     - mkdir -p public/releases/"$CI_COMMIT_TAG"
     - cp -v dist/*.tar.gz dist/*.zip dist/checksums.txt public/releases/"$CI_COMMIT_TAG"/
-    # Convenience "latest" pointer (static copy). Overwrites on each release.
     - rm -rf public/releases/latest
     - cp -R public/releases/"$CI_COMMIT_TAG" public/releases/latest
-    # Basic index
-    - |
-      cat > public/index.html <<'EOF'
-      <!doctype html>
-      <html>
-      <head><meta charset="utf-8"><title>swytchcode releases</title></head>
-      <body>
-        <h1>swytchcode releases</h1>
-        <p>Artifacts are under <code>/releases/&lt;tag&gt;/</code> and <code>/releases/latest/</code>.</p>
-      </body>
-      </html>
-      EOF
+    # Install scripts at root (one-liner URLs unchanged)
+    - cp -v install.sh install.ps1 public/
   artifacts:
     paths:
       - public

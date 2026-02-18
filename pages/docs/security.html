@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Security & Trust – Swytchcode Docs</title>
+  <link rel="stylesheet" href="/cli/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/cli/">Swytchcode</a>
+    <a href="/cli/install/">Install</a>
+    <a href="/cli/docs/overview.html">Docs</a>
+    <a href="/cli/docs/security.html" class="here">Security</a>
+    <a href="/cli/docs/cli.html">CLI</a>
+    <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki</a>
+  </nav>
+  <main>
+    <h1>Security & Trust</h1>
+    <p><strong>Swytchcode treats AI as a planner, not an executor.</strong> Execution is explicit, local, and policy-bound.</p>
+
+    <h2>Local execution</h2>
+    <p>Tools run on your machine. No execution is delegated to remote services. Network calls happen only when a tool is explicitly defined to do so (e.g. an HTTP method).</p>
+
+    <h2>No runtime registry</h2>
+    <p><code>swytchcode exec</code> uses only <code>tooling.json</code> and local integration bundles under <code>.swytchcode/integrations/</code>. There is no “phone home” during execution.</p>
+
+    <h2>tooling.json is the single source of truth</h2>
+    <p>Only tools listed in <code>tooling.json</code> can be executed. Human-readable, machine-enforced. No hidden allowlists; no policy interpretation by agents.</p>
+
+    <h2>No hidden retries</h2>
+    <p>Failures surface as exit codes and structured JSON. No silent retries. No agent-side interpretation of policy – if a tool isn’t in tooling.json or an integration isn’t found, exec fails explicitly.</p>
+
+    <h2>Explicit failure</h2>
+    <p>“Integration not found” and “tool not in tooling.json” are hard errors. Agents are expected to stop and report, not improvise.</p>
+
+    <footer>
+      <a href="/cli/docs/overview.html">Overview</a> · <a href="/cli/docs/cli.html">CLI</a> · <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki → Security Model</a>
+    </footer>
+  </main>
+</body>
+</html>

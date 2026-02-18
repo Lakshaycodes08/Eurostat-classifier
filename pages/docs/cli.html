@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CLI Reference – Swytchcode Docs</title>
+  <link rel="stylesheet" href="/cli/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/cli/">Swytchcode</a>
+    <a href="/cli/install/">Install</a>
+    <a href="/cli/docs/overview.html">Docs</a>
+    <a href="/cli/docs/security.html">Security</a>
+    <a href="/cli/docs/cli.html" class="here">CLI</a>
+    <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki</a>
+  </nav>
+  <main>
+    <h1>CLI Reference</h1>
+    <p>Short reference. For full spec (inputs, outputs, exit codes, JSON schema), see the <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki → CLI Reference</a>.</p>
+
+    <table>
+      <thead>
+        <tr><th>Command</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>swytchcode -v</code> / <code>--version</code></td><td>Show version</td></tr>
+        <tr><td><code>swytchcode init</code></td><td>One-time setup: <code>.swytchcode/</code>, <code>tooling.json</code>, editor rules (Cursor / Claude)</td></tr>
+        <tr><td><code>swytchcode get &lt;project&gt;</code></td><td>Fetch integration bundle; does not add to tooling.json</td></tr>
+        <tr><td><code>swytchcode bootstrap</code></td><td>Fetch all integrations in tooling.json (CI-friendly)</td></tr>
+        <tr><td><code>swytchcode list</code></td><td>List tools and integrations from tooling.json + local integrations</td></tr>
+        <tr><td><code>swytchcode list methods [pattern]</code></td><td>List methods (optional filter)</td></tr>
+        <tr><td><code>swytchcode list workflows [pattern]</code></td><td>List workflows (optional filter)</td></tr>
+        <tr><td><code>swytchcode list integrations</code></td><td>List fetched integrations only</td></tr>
+        <tr><td><code>swytchcode search [keyword]</code></td><td>Search remote registry</td></tr>
+        <tr><td><code>swytchcode add [spec] &lt;canonical_id&gt;</code></td><td>Add a tool to tooling.json</td></tr>
+        <tr><td><code>swytchcode info &lt;canonical_id&gt;</code></td><td>Show tool info (inputs/output)</td></tr>
+        <tr><td><code>swytchcode exec [canonical_id]</code></td><td><strong>Single execution path</strong> – CLI args or JSON stdin; <code>--json</code>, <code>--raw</code>, <code>--dry-run</code></td></tr>
+        <tr><td><code>swytchcode mcp serve</code></td><td>Start MCP server (stdio/HTTP)</td></tr>
+        <tr><td><code>swytchcode mcp status</code> / <code>mcp stop</code></td><td>Daemon status / stop</td></tr>
+      </tbody>
+    </table>
+
+    <footer>
+      <a href="/cli/docs/overview.html">Overview</a> · <a href="/cli/docs/security.html">Security</a> · <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki (full CLI spec)</a>
+    </footer>
+  </main>
+</body>
+</html>

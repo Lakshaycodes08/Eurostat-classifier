@@ -5,6 +5,22 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 **`tooling.json` defines what is trusted.**  
 **Wrekenfiles define what is possible.**
 
+### Install (macOS / Linux)
+
+```bash
+curl -fsSL https://swytchcode.gitlab.io/cli/install.sh | sh
+```
+
+Optional: `VERSION=v0.1.0` for a specific release, `INSTALL_DIR=/path` to choose install location (default: `/usr/local/bin` if writable, else `~/.local/bin`).
+
+**Windows (PowerShell):**
+
+```powershell
+irm https://swytchcode.gitlab.io/cli/install.ps1 | iex
+```
+
+---
+
 ## Commands at a glance
 
 | Command | Purpose |

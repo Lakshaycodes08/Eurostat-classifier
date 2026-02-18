@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cursor – Swytchcode Examples</title>
+  <link rel="stylesheet" href="/cli/style.css">
+</head>
+<body>
+  <nav>
+    <a href="/cli/">Swytchcode</a>
+    <a href="/cli/install/">Install</a>
+    <a href="/cli/docs/overview.html">Docs</a>
+    <a href="/cli/docs/security.html">Security</a>
+    <a href="/cli/docs/cli.html">CLI</a>
+    <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki</a>
+  </nav>
+  <main>
+    <h1>Cursor integration</h1>
+    <p>Use Swytchcode from Cursor so the agent calls <code>swytchcode exec</code> instead of running tools directly.</p>
+    <ol>
+      <li>Install Swytchcode: <a href="/cli/install/">Install</a></li>
+      <li>In your project: <code>swytchcode init --editor=cursor</code></li>
+      <li>Add tools to <code>tooling.json</code> with <code>swytchcode add &lt;canonical_id&gt;</code></li>
+      <li>Cursor uses the rule in <code>.cursor/rules/swytchcode.mdc</code> to delegate execution to <code>swytchcode exec</code>.</li>
+    </ol>
+    <p>For full integration details, see <a href="https://gitlab.com/swytchcode/cli/-/wiki">Wiki → Integrations → Cursor</a>.</p>
+    <footer>
+      <a href="/cli/examples/frontend-agent.html">Frontend / agent example</a> · <a href="/cli/docs/overview.html">Overview</a>
+    </footer>
+  </main>
+</body>
+</html>
