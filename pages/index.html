@@ -15,6 +15,7 @@
     }
     h1 { font-size: 1.6rem; margin-bottom: 0.75rem; }
     h2 { font-size: 1.1rem; margin-top: 2rem; }
+    h3 { font-size: 0.95rem; margin: 1rem 0 0.4rem; font-weight: 600; }
     p { margin: 0.75rem 0; }
     a { color: #0066cc; text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -73,9 +74,16 @@
 
   <h2>Install</h2>
 
+  <h3>macOS / Linux</h3>
   <div class="install-block">
     <code id="install-cmd">curl -fsSL https://cli.swytchcode.com/install.sh | sh</code>
     <button type="button" class="copy-btn" id="copy-btn" aria-label="Copy install command">Copy</button>
+  </div>
+
+  <h3>Windows (PowerShell)</h3>
+  <div class="install-block">
+    <code id="install-cmd-win">irm https://cli.swytchcode.com/install.ps1 | iex</code>
+    <button type="button" class="copy-btn" id="copy-btn-win" aria-label="Copy Windows install command">Copy</button>
   </div>
 
   <p class="note">
@@ -95,20 +103,24 @@
 
   <script>
     (function () {
-      var btn = document.getElementById('copy-btn');
-      var code = document.getElementById('install-cmd');
-      if (!btn || !code) return;
-      btn.addEventListener('click', function () {
-        var text = code.textContent;
-        navigator.clipboard.writeText(text).then(function () {
-          btn.textContent = 'Copied!';
-          btn.classList.add('copied');
-          setTimeout(function () {
-            btn.textContent = 'Copy';
-            btn.classList.remove('copied');
-          }, 2000);
+      function wireCopy(btnId, codeId) {
+        var btn = document.getElementById(btnId);
+        var code = document.getElementById(codeId);
+        if (!btn || !code) return;
+        btn.addEventListener('click', function () {
+          var text = code.textContent;
+          navigator.clipboard.writeText(text).then(function () {
+            btn.textContent = 'Copied!';
+            btn.classList.add('copied');
+            setTimeout(function () {
+              btn.textContent = 'Copy';
+              btn.classList.remove('copied');
+            }, 2000);
+          });
         });
-      });
+      }
+      wireCopy('copy-btn', 'install-cmd');
+      wireCopy('copy-btn-win', 'install-cmd-win');
     })();
   </script>
 </body>

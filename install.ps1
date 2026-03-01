@@ -1,5 +1,5 @@
 # Install swytchcode from GitLab Releases (Windows).
-# Usage: irm https://<pages-url>/install.ps1 | iex
+# Usage: irm https://cli.swytchcode.com/install.ps1 | iex
 # Env: $env:VERSION (default: latest), $env:INSTALL_DIR (override install path), $env:BASE_URL (override release base).
 
 $ErrorActionPreference = "Stop"
@@ -7,7 +7,7 @@ $BinaryName = "swytchcode"
 $ReleaseBase = if ($env:BASE_URL) { $env:BASE_URL } else { "https://gitlab.com/swytchcode/cli/-/releases" }
 $Version = if ($env:VERSION) { $env:VERSION } else { "latest" }
 
-$arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { "amd64" }
+$arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $artifactName = "${BinaryName}_windows_${arch}.zip"
 $downloadBase = if ($Version -eq "latest") {
     "${ReleaseBase}/permalink/latest/downloads"

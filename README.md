@@ -7,12 +7,17 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 
 ### Install
 
+**macOS / Linux:**
 ```bash
 curl -fsSL https://cli.swytchcode.com/install.sh | sh
 ```
-
 Optional: `VERSION=v0.1.0` for a specific release, `INSTALL_DIR=/path` to choose install location (default: `/usr/local/bin` if writable, else `~/.local/bin`).
 
+**Windows (PowerShell):**
+```powershell
+irm https://cli.swytchcode.com/install.ps1 | iex
+```
+Optional: `$env:VERSION="v0.1.0"` for a specific release, `$env:INSTALL_DIR="C:\path"` to choose install location (default: `%LOCALAPPDATA%\Programs\swytchcode\bin`, added to user PATH automatically).
 
 **More:** [GitLab Pages](https://cli.swytchcode.com/) · [swytchcode.com](https://swytchcode.com)
 
