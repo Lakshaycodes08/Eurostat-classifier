@@ -33,5 +33,6 @@ func init() {
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(mcpCmd)
+	rootCmd.AddCommand(checkCmd)
 }
 
