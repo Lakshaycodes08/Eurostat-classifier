@@ -21,5 +21,5 @@ func ConfigFromProjectRoot(projectRoot string) *Config {
 
 // APIBasePath returns the full API base path with version prefix.
 func (c *Config) APIBasePath() string {
-	return c.BaseURL + "/v2/shell"
+	return c.BaseURL + "/v2/cli"
 }

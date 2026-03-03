@@ -266,7 +266,7 @@ swytchcode search stripe --json
 - `--json`: Output as JSON array instead of one project name per line
 
 **What it does:**
-- Calls `GET /v2/shell/integrations` endpoint
+- Calls `GET /v2/cli/integrations` endpoint
 - With no keyword: returns all project names from the registry
 - With keyword: returns project names that contain the keyword (case-insensitive)
 - Read-only operation — does not download or modify local state

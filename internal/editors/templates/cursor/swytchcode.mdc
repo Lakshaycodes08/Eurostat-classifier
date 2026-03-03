@@ -25,6 +25,9 @@ To add a new integration, follow these steps in precise order
 1. swytchcode list: look for locally installed integrations
 2. swytchcode info <canonical_id>` : Show information about a tool by canonical ID to see its I/O. For workflow maintaining the index order of excution is important.
 3. swytchcode version: check swytchcode version
+4. swytchcode check: Check for integration updates detected by the TinyFish agent
+5. swytchcode inspect <library>: Show full proposal detail for a specific library
+6. swytchcode upgrade <library>: Approve a pending update proposal (requires user login)
 
 
 
@@ -146,6 +149,50 @@ When you need to use a workflow or understand its steps’ inputs/outputs:
 Do not guess step IDs or I/O from workflow names. Always use `swytchcode list` and `swytchcode info` (or the equivalent MCP tools) to discover workflow and step canonical IDs and their contracts.
 
 Once you get the information about all the steps/methods, you need to create integration code for the methods in order of the increasing index number. They should be different integration calls. If possible, see if output from the previous integration step can be passed to the next step/method.
+
+
+## Keeping integrations up to date
+
+The TinyFish agent continuously monitors your integrations for breaking changes and new
+versions. When updates are detected, proposals are created and retrievable via CLI.
+
+### Checking for updates
+
+```
+swytchcode check
+```
+
+- Exits `0`: all integrations up to date
+- Exits `1`: one or more **major** (breaking) proposals exist — treat this as a build signal
+
+Output format:
+```
+[!] stripe   v1.0.0 -> v2.0.0   major    Breaking changes — new auth flow required
+[!] twilio   v3.1.0 -> v3.2.0   minor    Added new messaging endpoints
+```
+
+### Inspecting a proposal
+
+```
+swytchcode inspect <library>
+```
+
+Shows confidence score and full summary for the named library's proposal.
+
+### Approving an upgrade
+
+```
+swytchcode upgrade <library>
+```
+
+Requires user login (`swytchcode login`). Not available to service tokens.
+Triggers spec fetch and library reprocessing on the backend.
+
+### When to use these in agent workflows
+
+- After any `swytchcode exec` that fails unexpectedly: run `swytchcode check` to see if a breaking integration change is the cause.
+- In CI/CD: use `swytchcode check` exit code as a gate — exit 1 blocks the pipeline.
+- Do NOT auto-approve upgrades without explicit user confirmation.
 
 
 ## Mental Model (CRITICAL)

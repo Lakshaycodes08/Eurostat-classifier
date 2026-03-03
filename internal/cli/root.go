@@ -34,5 +34,10 @@ func init() {
 	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(mcpCmd)
 	rootCmd.AddCommand(checkCmd)
+	rootCmd.AddCommand(loginCmd)
+	rootCmd.AddCommand(logoutCmd)
+	rootCmd.AddCommand(whoamiCmd)
+	rootCmd.AddCommand(inspectCmd)
+	rootCmd.AddCommand(upgradeCmd)
 }
 

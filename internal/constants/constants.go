@@ -33,11 +33,11 @@ const (
 // Application configuration (build-time constants)
 const (
 	// Version is the Swytchcode shell version.
-	Version = "1.0.0"
+	Version = "1.0.2"
 
 	// RegistryURL is the default registry base URL (build-time constant).
 	// Set this at build time; runtime environment variables are not used.
-	RegistryURL = "https://api-v2.swytchcode.com"
+	// RegistryURL = "https://api-v2.swytchcode.com"
 	// RegistryURL = "https://dev-api-v2.swytchcode.world"
-	// RegistryURL = "http://localhost"
+	RegistryURL = "http://localhost"
 )
