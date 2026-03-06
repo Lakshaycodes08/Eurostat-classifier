@@ -33,6 +33,8 @@ type proposalDetail struct {
 	SpecPatch               any     `json:"spec_patch"`
 }
 
+var inspectProject string
+
 var inspectCmd = &cobra.Command{
 	Use:   "inspect <library>",
 	Short: "Show full proposal detail for a library",
@@ -48,11 +50,11 @@ Example:
 
 		apiURL := os.Getenv("SWYTCHCODE_API_URL")
 		if apiURL == "" {
-			apiURL = "http://localhost:80"
+			apiURL = "https://api-v2.swytchcode.com"
 		}
-		projectUUID := os.Getenv("SWYTCHCODE_PROJECT_UUID")
-		if projectUUID == "" {
-			fmt.Fprintln(os.Stderr, "Error: SWYTCHCODE_PROJECT_UUID is not set")
+		projectUUID, err := auth.ResolveProjectUUID(inspectProject)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			os.Exit(2)
 		}
 
@@ -130,6 +132,10 @@ Example:
 		})
 		return nil
 	},
+}
+
+func init() {
+	inspectCmd.Flags().StringVar(&inspectProject, "project", "", "Project UUID (overrides SWYTCHCODE_PROJECT_UUID)")
 }
 
 func fetchProposalDetail(apiURL, token, proposalUUID string) (*proposalDetail, error) {

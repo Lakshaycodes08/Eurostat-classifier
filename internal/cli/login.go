@@ -24,7 +24,7 @@ Use --open to have the CLI open the browser automatically.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		apiURL := os.Getenv("SWYTCHCODE_API_URL")
 		if apiURL == "" {
-			apiURL = "http://localhost:80"
+			apiURL = "https://api-v2.swytchcode.com"
 		}
 
 		cfg := commands.LoginConfig{APIURL: apiURL}

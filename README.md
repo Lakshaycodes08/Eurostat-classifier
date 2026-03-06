@@ -5,6 +5,15 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 **`tooling.json` defines what is trusted.**  
 **Wrekenfiles define what is possible.**
 
+### Docs
+
+- [Architecture](docs/architecture.md) – modules and data flow (CLI, kernel, registry, MCP, editors).
+- [Execution model](docs/execution-model.md) – how `swytchcode exec` works end-to-end.
+- [Config spec](docs/config-spec.md) – `tooling.json` and `manifest.json`.
+- [CLI reference](docs/cli-reference.md) – commands, inputs/outputs, exit codes.
+- [MCP & integrations](docs/mcp-and-integrations.md) – MCP server and editor integrations.
+- [Install & upgrade](docs/install-upgrade.md) – install scripts (including Windows) and upgrade behavior.
+
 ### Install
 
 **macOS / Linux:**

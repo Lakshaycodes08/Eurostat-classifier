@@ -16,6 +16,8 @@ import (
 	"gitlab.com/swytchcode/shell/internal/telemetry"
 )
 
+var upgradeProject string
+
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade <library>",
 	Short: "Approve a pending integration proposal",
@@ -32,11 +34,11 @@ Example:
 
 		apiURL := os.Getenv("SWYTCHCODE_API_URL")
 		if apiURL == "" {
-			apiURL = "http://localhost:80"
+			apiURL = "https://api-v2.swytchcode.com"
 		}
-		projectUUID := os.Getenv("SWYTCHCODE_PROJECT_UUID")
-		if projectUUID == "" {
-			fmt.Fprintln(os.Stderr, "Error: SWYTCHCODE_PROJECT_UUID is not set")
+		projectUUID, err := auth.ResolveProjectUUID(upgradeProject)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
 			os.Exit(2)
 		}
 
@@ -78,4 +80,8 @@ Example:
 		})
 		return err
 	},
+}
+
+func init() {
+	upgradeCmd.Flags().StringVar(&upgradeProject, "project", "", "Project UUID (overrides SWYTCHCODE_PROJECT_UUID)")
 }

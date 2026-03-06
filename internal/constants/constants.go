@@ -37,7 +37,6 @@ const (
 
 	// RegistryURL is the default registry base URL (build-time constant).
 	// Set this at build time; runtime environment variables are not used.
-	// RegistryURL = "https://api-v2.swytchcode.com"
 	// RegistryURL = "https://dev-api-v2.swytchcode.world"
-	RegistryURL = "http://localhost"
+	RegistryURL = "https://api-v2.swytchcode.com"
 )
