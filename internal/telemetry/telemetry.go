@@ -40,7 +40,7 @@ func Send(apiURL, token string, ev Event) {
 	go func() {
 		if err := send(apiURL, token, ev); err != nil {
 			// Intentionally silent — telemetry failures must not surface to users.
-			_ = fmt.Sprintf("telemetry: %v", err)
+			_ = err
 		}
 	}()
 }

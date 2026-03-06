@@ -52,7 +52,8 @@ Example:
 		}
 		projectUUID := os.Getenv("SWYTCHCODE_PROJECT_UUID")
 		if projectUUID == "" {
-			return fmt.Errorf("SWYTCHCODE_PROJECT_UUID is not set")
+			fmt.Fprintln(os.Stderr, "Error: SWYTCHCODE_PROJECT_UUID is not set")
+			os.Exit(2)
 		}
 
 		// inspect requires a user session for the app endpoint.
@@ -60,16 +61,8 @@ Example:
 		if err != nil {
 			return fmt.Errorf("not logged in — run `swytchcode login`")
 		}
-		if session.IsExpired() {
-			if session.RefreshToken == "" {
-				return fmt.Errorf("session expired — run `swytchcode login`")
-			}
-			if err := session.Refresh(apiURL); err != nil {
-				return err
-			}
-			if err := auth.Save(session); err != nil {
-				return fmt.Errorf("save refreshed session: %w", err)
-			}
+		if err := auth.RefreshIfExpired(session, apiURL); err != nil {
+			return err
 		}
 
 		// Step 1: find the proposal UUID by library name.

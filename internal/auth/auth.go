@@ -83,6 +83,22 @@ func Delete() error {
 	return nil
 }
 
+// RefreshIfExpired auto-refreshes s if it is expired and saves the updated session.
+// Returns nil immediately if the session is still valid.
+// Returns an error if expired with no refresh token, or if the refresh/save fails.
+func RefreshIfExpired(s *AuthSession, apiURL string) error {
+	if !s.IsExpired() {
+		return nil
+	}
+	if s.RefreshToken == "" {
+		return fmt.Errorf("session expired — run `swytchcode login`")
+	}
+	if err := s.Refresh(apiURL); err != nil {
+		return err
+	}
+	return Save(s)
+}
+
 // IsExpired reports whether the session token has expired (with 60s safety buffer).
 func (s *AuthSession) IsExpired() bool {
 	return time.Now().Unix() >= s.ExpiresAt-60

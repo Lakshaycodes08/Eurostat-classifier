@@ -36,7 +36,8 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 		}
 		projectUUID := os.Getenv("SWYTCHCODE_PROJECT_UUID")
 		if projectUUID == "" {
-			return fmt.Errorf("SWYTCHCODE_PROJECT_UUID is not set")
+			fmt.Fprintln(os.Stderr, "Error: SWYTCHCODE_PROJECT_UUID is not set")
+			os.Exit(2)
 		}
 
 		// Soft-fail auth: if neither service token nor session is available,
