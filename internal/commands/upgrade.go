@@ -98,6 +98,9 @@ func approveProposal(apiURL, token, proposalUUID string) error {
 	if resp.StatusCode == http.StatusUnauthorized {
 		return fmt.Errorf("unauthorized — `swytchcode upgrade` requires user login, not a service token")
 	}
+	if resp.StatusCode == http.StatusBadRequest {
+		return fmt.Errorf("proposal is not pending approval — it may already be approved or applied")
+	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("approve returned %d", resp.StatusCode)
 	}

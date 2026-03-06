@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	"gitlab.com/swytchcode/shell/internal/auth"
 	"gitlab.com/swytchcode/shell/internal/commands"
+	"gitlab.com/swytchcode/shell/internal/constants"
+	"gitlab.com/swytchcode/shell/internal/telemetry"
 )
 
 var upgradeCmd = &cobra.Command{
@@ -43,7 +45,15 @@ Example:
 			return fmt.Errorf("not logged in — run `swytchcode login` (service tokens cannot approve upgrades)")
 		}
 		if session.IsExpired() {
-			return fmt.Errorf("session expired — run `swytchcode login`")
+			if session.RefreshToken == "" {
+				return fmt.Errorf("session expired — run `swytchcode login`")
+			}
+			if err := session.Refresh(apiURL); err != nil {
+				return err
+			}
+			if err := auth.Save(session); err != nil {
+				return fmt.Errorf("save refreshed session: %w", err)
+			}
 		}
 
 		confirm := func(prompt string) bool {
@@ -56,11 +66,23 @@ Example:
 			return answer == "y" || answer == "yes"
 		}
 
-		return commands.RunUpgrade(commands.UpgradeConfig{
+		err = commands.RunUpgrade(commands.UpgradeConfig{
 			APIURL:      apiURL,
 			Token:       session.AccessToken,
 			ProjectUUID: projectUUID,
 			Library:     library,
 		}, confirm, os.Stdout)
+		outcome := "success"
+		if err != nil {
+			outcome = "failure"
+		}
+		telemetry.Send(apiURL, session.AccessToken, telemetry.Event{
+			Command:     "upgrade",
+			ProjectUUID: projectUUID,
+			LibraryName: library,
+			Outcome:     outcome,
+			CLIVersion:  constants.Version,
+		})
+		return err
 	},
 }

@@ -3,12 +3,15 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 	"gitlab.com/swytchcode/shell/internal/auth"
 	"gitlab.com/swytchcode/shell/internal/commands"
+	"gitlab.com/swytchcode/shell/internal/constants"
+	"gitlab.com/swytchcode/shell/internal/telemetry"
 )
 
 var checkCmd = &cobra.Command{
@@ -40,14 +43,35 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 		// pass an empty token and let the server return 401 with a clean error.
 		token, _, _ := auth.ResolveToken()
 
+		outcome := "success"
 		hasBreaking, err := commands.RunCheck(commands.CheckConfig{
 			APIURL:      apiURL,
 			Token:       token,
 			ProjectUUID: projectUUID,
 		}, os.Stdout)
 		if err != nil {
-			return err
+			outcome = "failure"
+			telemetry.Send(apiURL, token, telemetry.Event{
+				Command:     "check",
+				ProjectUUID: projectUUID,
+				Outcome:     outcome,
+				CLIVersion:  constants.Version,
+			})
+			var limitErr *commands.ExecLimitError
+			if errors.As(err, &limitErr) {
+				fmt.Fprintln(os.Stderr, "Error:", limitErr.Error())
+				os.Exit(2)
+			}
+			// auth / network / server errors → exit 2
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(2)
 		}
+		telemetry.Send(apiURL, token, telemetry.Event{
+			Command:     "check",
+			ProjectUUID: projectUUID,
+			Outcome:     outcome,
+			CLIVersion:  constants.Version,
+		})
 		if hasBreaking {
 			os.Exit(1)
 		}

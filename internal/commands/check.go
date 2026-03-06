@@ -38,6 +38,21 @@ type CheckResponse struct {
 	Proposals []Proposal `json:"proposals"`
 }
 
+// ExecLimitError is returned when the backend responds with 429 (monthly exec limit reached).
+type ExecLimitError struct {
+	Current    int
+	Limit      int
+	UpgradeURL string
+}
+
+func (e *ExecLimitError) Error() string {
+	msg := fmt.Sprintf("monthly CLI executions used: %d / %d", e.Current, e.Limit)
+	if e.UpgradeURL != "" {
+		msg += fmt.Sprintf(" — upgrade your plan: %s", e.UpgradeURL)
+	}
+	return msg
+}
+
 // CheckConfig holds the configuration for a check run.
 type CheckConfig struct {
 	APIURL      string // base URL of the backend API
@@ -75,6 +90,19 @@ func FetchProposals(cfg CheckConfig) ([]Proposal, error) {
 
 	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, fmt.Errorf("unauthorized — run `swytchcode login` or set SWYTCHCODE_TOKEN")
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		var limitResp struct {
+			Current    int    `json:"current"`
+			Limit      int    `json:"limit"`
+			UpgradeURL string `json:"upgrade_url"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&limitResp)
+		return nil, &ExecLimitError{
+			Current:    limitResp.Current,
+			Limit:      limitResp.Limit,
+			UpgradeURL: limitResp.UpgradeURL,
+		}
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned %d", resp.StatusCode)

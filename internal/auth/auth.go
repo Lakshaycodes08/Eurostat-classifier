@@ -5,8 +5,11 @@
 package auth
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -15,6 +18,7 @@ import (
 // AuthSession is the credential stored in ~/.swytchcode/auth.json after `swytchcode login`.
 type AuthSession struct {
 	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token,omitempty"`
 	CustomerUUID string `json:"customer_uuid"`
 	Email        string `json:"email"`
 	ExpiresAt    int64  `json:"expires_at"` // Unix timestamp
@@ -79,9 +83,54 @@ func Delete() error {
 	return nil
 }
 
-// IsExpired reports whether the session token has expired.
+// IsExpired reports whether the session token has expired (with 60s safety buffer).
 func (s *AuthSession) IsExpired() bool {
-	return time.Now().Unix() >= s.ExpiresAt
+	return time.Now().Unix() >= s.ExpiresAt-60
+}
+
+// Refresh calls POST /v2/cli/auth/refresh, updates the session in place, and persists it.
+// On auth failure (400/401) it deletes the session file so the user must re-login.
+func (s *AuthSession) Refresh(apiURL string) error {
+	body, _ := json.Marshal(map[string]string{"refresh_token": s.RefreshToken})
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost,
+		apiURL+"/v2/cli/auth/refresh", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build refresh request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("token refresh failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusBadRequest {
+		_ = Delete()
+		return fmt.Errorf("session expired — run `swytchcode login` again")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("refresh returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"` // seconds
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("decode refresh response: %w", err)
+	}
+	s.AccessToken = result.AccessToken
+	if result.RefreshToken != "" {
+		s.RefreshToken = result.RefreshToken
+	}
+	if result.ExpiresIn > 0 {
+		s.ExpiresAt = time.Now().Unix() + int64(result.ExpiresIn) - 60
+	}
+	return nil
 }
 
 // ResolveToken returns a bearer token for API calls, trying in order:
@@ -99,7 +148,19 @@ func ResolveToken() (token string, fromSession bool, err error) {
 		return "", false, fmt.Errorf("not logged in — run `swytchcode login` or set SWYTCHCODE_TOKEN")
 	}
 	if s.IsExpired() {
-		return "", false, fmt.Errorf("session expired — run `swytchcode login`")
+		if s.RefreshToken == "" {
+			return "", false, fmt.Errorf("session expired — run `swytchcode login`")
+		}
+		apiURL := os.Getenv("SWYTCHCODE_API_URL")
+		if apiURL == "" {
+			apiURL = "http://localhost:80"
+		}
+		if err := s.Refresh(apiURL); err != nil {
+			return "", false, err
+		}
+		if err := Save(s); err != nil {
+			return "", false, fmt.Errorf("save refreshed session: %w", err)
+		}
 	}
 	return s.AccessToken, true, nil
 }

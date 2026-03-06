@@ -33,6 +33,7 @@ type startResponse struct {
 type pollResponse struct {
 	Status       string `json:"status"`        // "pending" | "expired" | "verified"
 	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"` // nullable until web app sends it
 	CustomerUUID string `json:"customer_uuid"`
 	Email        string `json:"email"`
 }
@@ -74,9 +75,10 @@ func RunLogin(cfg LoginConfig, w io.Writer) error {
 		case "verified":
 			session := &auth.AuthSession{
 				AccessToken:  result.AccessToken,
+				RefreshToken: result.RefreshToken,
 				CustomerUUID: result.CustomerUUID,
 				Email:        result.Email,
-				ExpiresAt:    time.Now().Unix() + 3600,
+				ExpiresAt:    time.Now().Unix() + 3600 - 60, // 55-minute safety buffer
 			}
 			if err := auth.Save(session); err != nil {
 				return fmt.Errorf("save session: %w", err)
