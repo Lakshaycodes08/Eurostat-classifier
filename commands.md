@@ -25,9 +25,9 @@ Confirm binary exists:
 | **Service token** | `SWYTCHCODE_TOKEN` env var → `Authorization: Bearer <token>` | Agents, CI/CD |
 | **User login** | Firebase JWT in `~/.swytchcode/auth.json` via `swytchcode login` | Human developers |
 
-`check` accepts either. `inspect` uses service token for the first request (proposals list) but
-requires user login for the second request (proposal detail via `appAuthMiddleware`). `upgrade`
-requires user login only.
+`check` accepts either. `inspect` requires user login for both requests (proposals list and
+proposal detail via `appAuthMiddleware`) — service tokens are not accepted. `upgrade` requires
+user login only.
 
 ### Exit codes
 
@@ -42,7 +42,8 @@ requires user login only.
 ## 3. Service token setup (agents / CI)
 
 ```bash
-export SWYTCHCODE_API_URL=http://localhost:80
+# SWYTCHCODE_API_URL defaults to https://api-v2.swytchcode.com — only set to override (e.g. staging)
+export SWYTCHCODE_API_URL=https://api-v2.swytchcode.com
 export SWYTCHCODE_TOKEN=<value of INTERNAL_AGENT_TOKEN from backend .env>
 export SWYTCHCODE_PROJECT_UUID=<your project UUID>
 ```
@@ -149,8 +150,22 @@ exit code: 0
 
 ---
 
-## 8. check — missing project UUID
+## 8. check — project UUID resolution
 
+Project UUID is resolved in this order:
+1. `--project <uuid>` flag
+2. `SWYTCHCODE_PROJECT_UUID` environment variable
+
+```bash
+# Via flag (overrides env var)
+./swytchcode check --project <your project UUID>
+
+# Via env var
+export SWYTCHCODE_PROJECT_UUID=<your project UUID>
+./swytchcode check
+```
+
+If neither is set:
 ```bash
 unset SWYTCHCODE_PROJECT_UUID
 ./swytchcode check
@@ -159,13 +174,8 @@ echo "exit code: $?"
 
 Expected output:
 ```
-Error: SWYTCHCODE_PROJECT_UUID is not set
+Error: no project specified — use --project or set SWYTCHCODE_PROJECT_UUID
 exit code: 2
-```
-
-Re-export after test:
-```bash
-export SWYTCHCODE_PROJECT_UUID=<your project UUID>
 ```
 
 ---
@@ -177,6 +187,8 @@ the second request hits `appAuthMiddleware`).
 
 ```bash
 ./swytchcode inspect stripe
+# or with explicit project
+./swytchcode inspect stripe --project <uuid>
 ```
 
 Internally makes two requests:
@@ -229,6 +241,8 @@ Approve a pending proposal (requires user login — not a service token):
 
 ```bash
 ./swytchcode upgrade stripe
+# or with explicit project
+./swytchcode upgrade stripe --project <uuid>
 ```
 
 Expected prompt for a major change:

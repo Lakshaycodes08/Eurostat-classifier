@@ -66,6 +66,6 @@ func send(apiURL, token string, ev Event) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 	return nil
 }

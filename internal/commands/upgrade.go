@@ -85,10 +85,9 @@ func approveProposal(apiURL, token, proposalUUID string) error {
 	if err != nil {
 		return fmt.Errorf("build approve request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{Timeout: constants.HTTPClientTimeout}
+	client := constants.NewHTTPClient(constants.HTTPClientTimeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("approve request failed: %w", err)

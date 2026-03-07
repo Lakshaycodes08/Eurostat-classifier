@@ -9,10 +9,11 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "swytchcode",
-	Short: "Swytchcode execution kernel",
-	Long:  "Swytchcode is the single execution authority for tools. Editors, agents, and languages are guests.",
-	Version: constants.Version,
+	Use:          "swytchcode",
+	Short:        "Swytchcode execution kernel",
+	Long:         "Swytchcode is the single execution authority for tools. Editors, agents, and languages are guests.",
+	Version:      constants.Version,
+	SilenceUsage: true,
 }
 
 // Execute is the main entrypoint invoked by cmd/swytchcode/main.go.

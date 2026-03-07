@@ -6,31 +6,21 @@ This document summarizes concrete refactor ideas based on the current codebase a
 
 ### 1.1 Small config layer
 
-**Problem:** Core URLs and tokens are spread across `internal/constants/constants.go`, CLI commands, and auth helpers:
+**Status: Partially implemented.**
 
-- `constants.RegistryURL` (registry base URL).
-- Default `SWYTCHCODE_API_URL` = `https://api-v2.swytchcode.com` in several commands and `auth.go`.
-- `constants.MCPBearerToken` used directly by `internal/mcp/transport.go`.
+**What was done:**
 
-**Proposal:**
+- `constants.RegistryURL` updated to the production URL (`https://api-v2.swytchcode.com`).
+- All CLI commands (`check.go`, `login.go`, `inspect.go`, `upgrade.go`) and `auth.go` now use `SWYTCHCODE_API_URL` env var with a consistent fallback to `https://api-v2.swytchcode.com`. No more localhost defaults.
+- Auth session timing magic numbers extracted to named constants (`SessionTokenDurationSecs`, `SessionRefreshBufferSecs`, `AuthRequestTimeout`).
+- Project UUID resolution centralized in `auth.ResolveProjectUUID()` (flag → `SWYTCHCODE_PROJECT_UUID` env var → error).
 
-- Introduce a lightweight `internal/config` package that centralizes:
-  - `RegistryBaseURL()` – returns the registry URL, resolving in order:
-    1. Build-time constant (production).
-    2. Optional env override (`SWYTCHCODE_REGISTRY_URL`) for dev/staging.
-  - `BackendAPIURL()` – returns the CLI backend base URL, resolving in order:
-    1. `SWYTCHCODE_API_URL` env var (already used).
-    2. Build-time default (current `https://api-v2.swytchcode.com`).
-  - `MCPBearer()` – returns the MCP HTTP bearer token, resolving in order:
-    1. Env var (e.g. `SWYTCHCODE_MCP_BEARER`).
-    2. Build-time default (current `MCPBearerToken` value).
+**What remains:**
 
-- Update:
-  - `internal/registry/config.go` to call `config.RegistryBaseURL()`.
-  - `auth.go`, `check.go`, `login.go`, `inspect.go`, `upgrade.go` to use `config.BackendAPIURL()` instead of re-implementing the default in each file.
-  - `internal/mcp/transport.go` to use `config.MCPBearer()` instead of hardcoding `MCPBearerToken`.
+- `constants.MCPBearerToken` is still hardcoded in `internal/mcp/transport.go`. A `SWYTCHCODE_MCP_BEARER` env override would allow dev/staging overrides without rebuilding.
+- `internal/registry/config.go` does not support a `SWYTCHCODE_REGISTRY_URL` env override; the registry URL is fixed at build time via `constants.RegistryURL`.
 
-**Benefits:** Single place to adjust URLs and tokens; clearer dev/staging overrides; smaller changes when domains move.
+A dedicated `internal/config` package (as originally proposed) is not strictly necessary now that the env var override pattern is consistently applied, but could still reduce code duplication if the number of commands grows.
 
 ## 2. Install scripts (especially Windows)
 

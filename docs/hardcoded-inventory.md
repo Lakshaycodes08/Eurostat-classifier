@@ -78,16 +78,6 @@ This file catalogs notable hardcoded values in the Swytchcode CLI codebase and w
 
 **Implication:** MCP HTTP transport uses a fixed bearer token; for production this should likely become configurable (env var or config file) and documented.
 
-## 6. Legacy docs (optional cleanup)
-
-- **`cli.md`, `commands.md`, `CLI_CHANGES.md`** (if still intended to ship)
-  - Contain examples referencing:
-    - `https://app.swytchcode.com/cli-auth?...`
-    - `SWYTCHCODE_API_URL=http://localhost:80`
-    - `https://app.swytchcode.com/billing`
-
-These appear to be early/auxiliary docs; if they are not meant for end users anymore, they can be archived or moved under a `legacy/` docs section.
-
 ---
 
 This inventory is the basis for refactor proposals. The main candidates for change are:

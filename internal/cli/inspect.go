@@ -147,7 +147,7 @@ func fetchProposalDetail(apiURL, token, proposalUUID string) (*proposalDetail, e
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	client := &http.Client{}
+	client := constants.NewHTTPClient(constants.HTTPClientTimeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("inspect request failed: %w", err)

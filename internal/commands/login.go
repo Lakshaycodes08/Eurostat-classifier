@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"gitlab.com/swytchcode/shell/internal/auth"
@@ -43,7 +44,7 @@ const maxPollAttempts = 200
 // RunLogin executes the device-flow login. It prints progress to w and saves
 // the session to ~/.swytchcode/auth.json on success.
 func RunLogin(cfg LoginConfig, w io.Writer) error {
-	client := &http.Client{Timeout: constants.HTTPClientTimeout}
+	client := constants.NewHTTPClient(constants.HTTPClientTimeout)
 
 	// Step 1: start device flow
 	startResp, err := startDeviceFlow(client, cfg.APIURL)
@@ -51,11 +52,15 @@ func RunLogin(cfg LoginConfig, w io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(w, "Visit the URL below to log in:\n\n  %s\n\n", startResp.VerificationURL)
-	if cfg.OnURL != nil {
-		cfg.OnURL(startResp.VerificationURL)
+	verificationURL := resolveURL(cfg.APIURL, startResp.VerificationURL)
+	fmt.Fprintf(w, "To sign in, open this URL in your browser:\n\n  %s\n\n", verificationURL)
+	if startResp.UserCode != "" {
+		fmt.Fprintf(w, "Your confirmation code: %s\n", startResp.UserCode)
 	}
-	fmt.Fprintf(w, "Waiting for browser authentication...\n")
+	if cfg.OnURL != nil {
+		cfg.OnURL(verificationURL)
+	}
+	fmt.Fprintf(w, "Waiting for authorization...\n")
 
 	pollInterval := time.Duration(startResp.PollIntervalMs) * time.Millisecond
 	if pollInterval == 0 {
@@ -78,7 +83,7 @@ func RunLogin(cfg LoginConfig, w io.Writer) error {
 				RefreshToken: result.RefreshToken,
 				CustomerUUID: result.CustomerUUID,
 				Email:        result.Email,
-				ExpiresAt:    time.Now().Unix() + 3600 - 60, // 55-minute safety buffer
+				ExpiresAt:    time.Now().Unix() + constants.SessionTokenDurationSecs,
 			}
 			if err := auth.Save(session); err != nil {
 				return fmt.Errorf("save session: %w", err)
@@ -99,7 +104,7 @@ func RunLogin(cfg LoginConfig, w io.Writer) error {
 
 func startDeviceFlow(client *http.Client, apiURL string) (*startResponse, error) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost,
-		apiURL+"/v2/cli/auth/start", http.NoBody)
+		apiURL+"/v2/cli/auth/start", bytes.NewReader([]byte("{}")))
 	if err != nil {
 		return nil, fmt.Errorf("build start request: %w", err)
 	}
@@ -148,4 +153,18 @@ func pollDeviceFlow(client *http.Client, apiURL, deviceCode string) (*pollRespon
 		return nil, fmt.Errorf("decode poll response: %w", err)
 	}
 	return &result, nil
+}
+
+// resolveURL resolves ref against base if ref is relative (no scheme).
+// If ref is already absolute, it is returned unchanged.
+func resolveURL(base, ref string) string {
+	u, err := url.Parse(ref)
+	if err != nil || u.IsAbs() {
+		return ref
+	}
+	b, err := url.Parse(base)
+	if err != nil {
+		return ref
+	}
+	return b.ResolveReference(u).String()
 }

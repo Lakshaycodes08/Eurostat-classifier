@@ -22,8 +22,8 @@ This document summarizes the Swytchcode CLI surface, with a focus on inputs, out
 | `swytchcode mcp status` / `swytchcode mcp stop` | Daemon status / stop. |
 | `swytchcode check` | Check for integration update proposals from the backend. |
 | `swytchcode login` / `logout` / `whoami` | Manage CLI auth sessions. |
-| `swytchcode inspect` | Inspect account/project and integration usage via the backend. |
-| `swytchcode upgrade` | Check or trigger CLI upgrade behavior via the backend. |
+| `swytchcode inspect <library> [--project <uuid>]` | Show full proposal detail for a library (requires login). |
+| `swytchcode upgrade <library> [--project <uuid>]` | Approve a pending integration update proposal (requires login). |
 
 ## swytchcode exec
 
@@ -198,4 +198,6 @@ See backend-specific docs for exact payloads and behavior. From the CLI’s pers
 - Resolve project UUIDs and tokens via `internal/auth`.
 - Call backend endpoints for account/project/introspection and plan/usage info.
 - Exit with non-zero codes on auth/network/server errors, printing clear messages on stderr.
+
+`check`, `inspect`, and `upgrade` accept `--project <uuid>` to override `SWYTCHCODE_PROJECT_UUID`.
 

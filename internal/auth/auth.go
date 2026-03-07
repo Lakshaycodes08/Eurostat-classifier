@@ -13,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"gitlab.com/swytchcode/shell/internal/constants"
 )
 
 // AuthSession is the credential stored in ~/.swytchcode/auth.json after `swytchcode login`.
@@ -99,9 +101,9 @@ func RefreshIfExpired(s *AuthSession, apiURL string) error {
 	return Save(s)
 }
 
-// IsExpired reports whether the session token has expired (with 60s safety buffer).
+// IsExpired reports whether the session token has expired (with a safety buffer).
 func (s *AuthSession) IsExpired() bool {
-	return time.Now().Unix() >= s.ExpiresAt-60
+	return time.Now().Unix() >= s.ExpiresAt-constants.SessionRefreshBufferSecs
 }
 
 // Refresh calls POST /v2/cli/auth/refresh, updates the session in place, and persists it.
@@ -116,7 +118,7 @@ func (s *AuthSession) Refresh(apiURL string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := constants.NewHTTPClient(constants.AuthRequestTimeout)
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("token refresh failed: %w", err)
@@ -144,7 +146,7 @@ func (s *AuthSession) Refresh(apiURL string) error {
 		s.RefreshToken = result.RefreshToken
 	}
 	if result.ExpiresIn > 0 {
-		s.ExpiresAt = time.Now().Unix() + int64(result.ExpiresIn) - 60
+		s.ExpiresAt = time.Now().Unix() + int64(result.ExpiresIn)
 	}
 	return nil
 }

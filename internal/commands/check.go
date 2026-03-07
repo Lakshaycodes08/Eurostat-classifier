@@ -81,7 +81,7 @@ func FetchProposals(cfg CheckConfig) ([]Proposal, error) {
 		req.Header.Set("Authorization", "Bearer "+cfg.Token)
 	}
 
-	httpClient := &http.Client{Timeout: constants.HTTPClientTimeout}
+	httpClient := constants.NewHTTPClient(constants.HTTPClientTimeout)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)

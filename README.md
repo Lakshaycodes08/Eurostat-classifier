@@ -51,6 +51,12 @@ Optional: `$env:VERSION="v0.1.0"` for a specific release, `$env:INSTALL_DIR="C:\
 | `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec` |
 | `swytchcode mcp status` | Check if MCP server is running (daemon mode) |
 | `swytchcode mcp stop` | Stop MCP server (daemon mode) |
+| `swytchcode login` | Device-flow browser login; saves session to `~/.swytchcode/auth.json` |
+| `swytchcode logout` | Delete saved session |
+| `swytchcode whoami` | Show current session (email, customer UUID, expiry) |
+| `swytchcode check [--project <uuid>]` | Check for integration update proposals; exits 1 on breaking changes |
+| `swytchcode inspect <library> [--project <uuid>]` | Show full proposal detail for a library (requires login) |
+| `swytchcode upgrade <library> [--project <uuid>]` | Approve a pending integration update proposal (requires login) |
 
 ---
 
@@ -69,7 +75,7 @@ swytchcode --version
 
 **Output:**
 ```
-swytchcode version 0.0.1
+swytchcode version 1.0.2
 ```
 
 The version is a build-time constant defined in `internal/constants/constants.go`. To change the version, update `constants.Version` and rebuild.
@@ -515,6 +521,85 @@ swytchcode mcp stop
 - `"MCP server is not running (stale PID file removed)"` — PID file existed but process was not running
 - `"stop MCP server: %w"` — Failed to send stop signal
 
+---
+
+### Cloud commands (login / logout / whoami / check / inspect / upgrade)
+
+These commands require authentication via user session (`swytchcode login`) or a service token (`SWYTCHCODE_TOKEN`). They contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode.com`).
+
+#### `swytchcode login`
+
+Opens a browser-based device-flow login. Saves the session to `~/.swytchcode/auth.json` on success.
+
+```bash
+swytchcode login
+```
+
+#### `swytchcode logout`
+
+Deletes the saved session file (`~/.swytchcode/auth.json`).
+
+```bash
+swytchcode logout
+```
+
+#### `swytchcode whoami`
+
+Prints the current session: email, customer UUID, and token expiry.
+
+```bash
+swytchcode whoami
+```
+
+#### `swytchcode check [--project <uuid>]`
+
+Fetches integration update proposals for the project and prints a summary.
+
+```bash
+swytchcode check
+swytchcode check --project <project-uuid>
+```
+
+**Flags:**
+- `--project <uuid>`: Project UUID (overrides `SWYTCHCODE_PROJECT_UUID` env var)
+
+**Exit codes:**
+- `0` — No proposals (or no breaking ones)
+- `1` — Breaking-impact proposals found
+- `2` — CLI/auth error
+
+Requires `SWYTCHCODE_TOKEN` or `~/.swytchcode/auth.json`. Project UUID from `--project` flag or `SWYTCHCODE_PROJECT_UUID`.
+
+#### `swytchcode inspect <library> [--project <uuid>]`
+
+Shows full proposal detail for the named library (two-step: looks up proposal UUID, then fetches detail).
+
+```bash
+swytchcode inspect stripe
+swytchcode inspect stripe --project <project-uuid>
+```
+
+**Flags:**
+- `--project <uuid>`: Project UUID (overrides `SWYTCHCODE_PROJECT_UUID` env var)
+
+Requires user login (`swytchcode login`). Project UUID from `--project` flag or `SWYTCHCODE_PROJECT_UUID`.
+
+#### `swytchcode upgrade <library> [--project <uuid>]`
+
+Approves a pending integration update proposal for the named library.
+
+```bash
+swytchcode upgrade stripe
+swytchcode upgrade stripe --project <project-uuid>
+```
+
+**Flags:**
+- `--project <uuid>`: Project UUID (overrides `SWYTCHCODE_PROJECT_UUID` env var)
+
+Requires user login (`swytchcode login`). Project UUID from `--project` flag or `SWYTCHCODE_PROJECT_UUID`.
+
+See `commands.md` for full verification detail on these commands.
+
 **Flags:**
 - `-d`: Run in daemon mode (properly daemonized background process). The server runs in a new session, completely detached from the terminal. Returns control immediately. Creates PID file at `.swytchcode/mcp.pid` for `status` and `stop` commands. Requires `--transport http`.
 - `--log-file <path>`: Path to log file (only used in daemon mode; if not provided, logs are suppressed)
@@ -557,7 +642,7 @@ swytchcode mcp stop
 
 **swytchcode_version**
 - Parameters: None
-- Returns: Version string (e.g., `"swytchcode version 0.0.1\n"`).
+- Returns: Version string (e.g., `"swytchcode version 1.0.2\n"`).
 
 **swytchcode_list**
 - Parameters: `filter` (string, optional) — Filter type: `"methods"`, `"workflows"`, `"integrations"`, or empty for all; `prefix` (string, optional) — Pattern to filter by canonical_id or project name (case-insensitive); `json` (boolean, optional) — Output as JSON object

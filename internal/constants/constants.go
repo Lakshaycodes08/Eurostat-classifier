@@ -1,7 +1,12 @@
 // constants.go defines shared constants for timeouts, MCP settings, and other configuration.
 package constants
 
-import "time"
+import (
+	"crypto/tls"
+	"net/http"
+	"os"
+	"time"
+)
 
 // HTTP client timeouts
 const (
@@ -18,6 +23,19 @@ const (
 	HTTPMaxIdleConnsPerHost = 10
 )
 
+// Auth session timing
+const (
+	// SessionTokenDurationSecs is the lifetime of a Firebase JWT issued at login.
+	SessionTokenDurationSecs int64 = 3600
+
+	// SessionRefreshBufferSecs is how many seconds before expiry to treat a token as expired.
+	// Firebase ID tokens last 3600s; refresh when less than 300s remain.
+	SessionRefreshBufferSecs int64 = 300
+
+	// AuthRequestTimeout is the timeout for authentication HTTP requests (login, refresh).
+	AuthRequestTimeout = 10 * time.Second
+)
+
 // MCP server configuration
 const (
 	// MCPDefaultPort is the default port for HTTP transport.
@@ -29,6 +47,17 @@ const (
 	// MCPRequestTimeout is the timeout for MCP tool execution.
 	MCPRequestTimeout = 5 * time.Minute
 )
+
+// NewHTTPClient returns an *http.Client with the given timeout.
+// When SWYTCHCODE_INSECURE=1 is set, TLS certificate verification is skipped
+// (intended for local dev with self-signed certificates only).
+func NewHTTPClient(timeout time.Duration) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if os.Getenv("SWYTCHCODE_INSECURE") == "1" {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+	}
+	return &http.Client{Timeout: timeout, Transport: transport}
+}
 
 // Application configuration (build-time constants)
 const (
