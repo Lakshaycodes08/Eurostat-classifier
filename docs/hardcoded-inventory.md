@@ -1,5 +1,7 @@
 # Hardcoded values inventory
 
+*For maintainers; not part of user-facing docs.*
+
 This file catalogs notable hardcoded values in the Swytchcode CLI codebase and where they appear. It’s grouped by area so we can decide what should remain fixed and what should be configurable.
 
 ## 1. Core configuration and API endpoints

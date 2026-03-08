@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"gitlab.com/swytchcode/shell/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/constants"
 )
 
 // HTTPServer wraps HTTP transport for MCP.

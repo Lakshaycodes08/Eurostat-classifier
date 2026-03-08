@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/shell/internal/auth"
-	"gitlab.com/swytchcode/shell/internal/commands"
-	"gitlab.com/swytchcode/shell/internal/telemetry"
+	"gitlab.com/swytchcode/cli/internal/auth"
+	"gitlab.com/swytchcode/cli/internal/commands"
+	"gitlab.com/swytchcode/cli/internal/telemetry"
 )
 
 var upgradeCmd = &cobra.Command{

@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // Exit codes are part of the public contract and must not change casually.

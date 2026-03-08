@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	"gitlab.com/swytchcode/shell/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/constants"
 )
 
 // ExecuteDryRun outputs what would be executed without making the HTTP call.

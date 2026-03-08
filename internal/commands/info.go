@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // ToolInfo represents information about a tool (method or workflow).

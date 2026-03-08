@@ -12,9 +12,9 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/shell/internal/constants"
-	"gitlab.com/swytchcode/shell/internal/mcp"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/mcp"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 var (

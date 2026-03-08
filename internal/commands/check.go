@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"gitlab.com/swytchcode/shell/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/constants"
 )
 
 // ANSI color codes for terminal output.

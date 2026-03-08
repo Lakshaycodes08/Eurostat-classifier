@@ -4,7 +4,7 @@ package registry
 import (
 	"os"
 
-	"gitlab.com/swytchcode/shell/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/constants"
 )
 
 // Config holds the registry API configuration.

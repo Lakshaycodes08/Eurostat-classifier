@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/shell/internal/commands"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/commands"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // addCmd is the main add command that accepts canonical_id directly.

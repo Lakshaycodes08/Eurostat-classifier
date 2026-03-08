@@ -1,5 +1,7 @@
 # Swytchcode CLI – Refactor Proposals
 
+*For maintainers; not part of user-facing docs.*
+
 This document summarizes concrete refactor ideas based on the current codebase and the hardcoded inventory. It’s organized by area and is intended as a roadmap; none of these changes are required for correctness right now, but they would improve maintainability and configurability.
 
 ## 1. Configuration & environment
