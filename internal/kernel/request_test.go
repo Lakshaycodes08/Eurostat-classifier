@@ -9,8 +9,8 @@ import (
 
 func TestBuildRequest_StdinMapping(t *testing.T) {
 	baseURL := "http://localhost"
-	methodGET := &Method{HTTPMethod: "GET", Endpoint: "/v2/shell/methods"}
-	methodPOST := &Method{HTTPMethod: "POST", Endpoint: "/v2/shell/create"}
+	methodGET := &Method{HTTPMethod: "GET", Endpoint: "/v2/cli/methods"}
+	methodPOST := &Method{HTTPMethod: "POST", Endpoint: "/v2/cli/create"}
 
 	tests := []struct {
 		name     string
@@ -25,21 +25,21 @@ func TestBuildRequest_StdinMapping(t *testing.T) {
 			name:    "empty args - no query, no extra headers, no body",
 			method:  methodGET,
 			args:    map[string]interface{}{},
-			wantURL: "http://localhost/v2/shell/methods",
+			wantURL: "http://localhost/v2/cli/methods",
 			wantQuery: "",
 		},
 		{
 			name:    "project_name top-level - GET url has query",
 			method:  methodGET,
 			args:    map[string]interface{}{"project_name": "swytchcode"},
-			wantURL: "http://localhost/v2/shell/methods",
+			wantURL: "http://localhost/v2/cli/methods",
 			wantQuery: "project_name=swytchcode",
 		},
 		{
 			name:    "params.project_name - same as top-level",
 			method:  methodGET,
 			args:    map[string]interface{}{"params": map[string]interface{}{"project_name": "swytchcode"}},
-			wantURL: "http://localhost/v2/shell/methods",
+			wantURL: "http://localhost/v2/cli/methods",
 			wantQuery: "project_name=swytchcode",
 		},
 		{
@@ -62,9 +62,9 @@ func TestBuildRequest_StdinMapping(t *testing.T) {
 		},
 		{
 			name:    "path param - placeholder replaced, not in query",
-			method:  &Method{HTTPMethod: "GET", Endpoint: "/v2/shell/methods/{canonical_id}"},
+			method:  &Method{HTTPMethod: "GET", Endpoint: "/v2/cli/methods/{canonical_id}"},
 			args:    map[string]interface{}{"params": map[string]interface{}{"canonical_id": "shell.integration.list"}},
-			wantURL: "http://localhost/v2/shell/methods/shell.integration.list",
+			wantURL: "http://localhost/v2/cli/methods/shell.integration.list",
 			wantQuery: "",
 		},
 		{
@@ -117,7 +117,7 @@ func TestBuildRequest_StdinMapping(t *testing.T) {
 
 func TestExecuteDryRun_OutputShape(t *testing.T) {
 	// Build a request with query, headers, and body so dry-run reflects them
-	method := &Method{HTTPMethod: "POST", Endpoint: "/v2/shell/create"}
+	method := &Method{HTTPMethod: "POST", Endpoint: "/v2/cli/create"}
 	args := map[string]interface{}{
 		"project_name": "swytchcode",
 		"Authorization": "Bearer token123",

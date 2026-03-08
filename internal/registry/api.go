@@ -117,14 +117,6 @@ func nameFromCanonicalID(canonicalID string) string {
 	return canonicalID
 }
 
-// WorkflowDefinition represents a verified workflow definition.
-type WorkflowDefinition struct {
-	WorkflowID string                 `json:"workflow_id"`
-	Title      string                 `json:"title"`
-	Version    string                 `json:"version"`
-	Steps      []map[string]interface{} `json:"steps"`
-}
-
 // Method represents a method from the list.
 type Method struct {
 	MethodUUID  string `json:"method_uuid"`
@@ -135,15 +127,6 @@ type Method struct {
 // ListMethodsResponse is the response from GET /methods?project_uuid=...
 type ListMethodsResponse struct {
 	Methods []Method `json:"methods"`
-}
-
-// MethodDefinition represents a method definition.
-type MethodDefinition struct {
-	MethodUUID string                 `json:"method_uuid"`
-	LibraryUUID string                `json:"library_uuid"`
-	MethodName string                 `json:"method_name"`
-	Details    map[string]interface{} `json:"details"` // Can be null
-	Tags       []string               `json:"tags"`
 }
 
 // ErrorResponse represents an error response from the API.
@@ -289,32 +272,6 @@ func (c *Client) ListWorkflows(ctx context.Context, projectName string) (*ListWo
 	return result, nil
 }
 
-// GetWorkflow fetches a verified workflow definition by workflow_uuid.
-// Route: GET /workflows/:workflow_uuid
-func (c *Client) GetWorkflow(ctx context.Context, workflowUUID string) (*WorkflowDefinition, error) {
-	path := fmt.Sprintf("/workflows/%s", url.PathEscape(workflowUUID))
-	resp, err := c.Get(ctx, path)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("workflow %q not found", workflowUUID)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleError(resp)
-	}
-
-	var workflow WorkflowDefinition
-	if err := json.NewDecoder(resp.Body).Decode(&workflow); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-
-	return &workflow, nil
-}
-
 // ListMethods fetches methods for a project.
 // Route: GET /methods?project_name=...
 func (c *Client) ListMethods(ctx context.Context, projectName string) (*ListMethodsResponse, error) {
@@ -335,32 +292,6 @@ func (c *Client) ListMethods(ctx context.Context, projectName string) (*ListMeth
 	}
 
 	return &result, nil
-}
-
-// GetMethod fetches a method definition by method_uuid.
-// Route: GET /methods/:method_uuid
-func (c *Client) GetMethod(ctx context.Context, methodUUID string) (*MethodDefinition, error) {
-	path := fmt.Sprintf("/methods/%s", url.PathEscape(methodUUID))
-	resp, err := c.Get(ctx, path)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("method %q not found", methodUUID)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, c.handleError(resp)
-	}
-
-	var method MethodDefinition
-	if err := json.NewDecoder(resp.Body).Decode(&method); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-
-	return &method, nil
 }
 
 // handleError attempts to parse an error response from the API.

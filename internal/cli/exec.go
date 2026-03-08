@@ -4,12 +4,16 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/spf13/cobra"
+	"gitlab.com/swytchcode/shell/internal/auth"
 	"gitlab.com/swytchcode/shell/internal/kernel"
+	"gitlab.com/swytchcode/shell/internal/telemetry"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
 
@@ -65,10 +69,18 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		var exitCode int
+		apiURL := auth.ResolveAPIURL()
+		token, fromSession, _ := auth.ResolveToken()
+		if token == "" {
+			telemetry.MaybeHintNoAuth()
+		}
 
 		if len(args) == 0 {
-			// JSON stdin mode
+			// JSON stdin mode — canonical_id is embedded in the JSON payload, unknown here
+			start := time.Now()
 			exitCode = kernel.Execute(os.Stdin, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "")
+			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
+			telemetry.SendEvent(apiURL, token, fromSession, "exec", "", outcomeErr(exitCode), opts)
 		} else {
 			// CLI args mode: canonical_id provided as argument
 			canonicalID := args[0]
@@ -130,16 +142,20 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 			}
 
 			// Merge stdin into args when runtime sends JSON (e.g. {"project_name":"swytchcode"} or {"tool":"...","args":{...}}).
-			if stdinBytes := readStdinIfAvailable(); len(stdinBytes) > 0 {
-				var stdinObj map[string]interface{}
-				if json.Unmarshal(stdinBytes, &stdinObj) == nil {
-					if nested, ok := stdinObj["args"].(map[string]interface{}); ok && stdinObj["tool"] != nil {
-						for k, v := range nested {
-							argsMap[k] = v
-						}
-					} else {
-						for k, v := range stdinObj {
-							argsMap[k] = v
+			// Only read stdin if it's piped — skip when stdin is a TTY to avoid blocking.
+			fi, _ := os.Stdin.Stat()
+			if fi.Mode()&os.ModeCharDevice == 0 {
+				if stdinBytes := readStdinIfAvailable(); len(stdinBytes) > 0 {
+					var stdinObj map[string]interface{}
+					if json.Unmarshal(stdinBytes, &stdinObj) == nil {
+						if nested, ok := stdinObj["args"].(map[string]interface{}); ok && stdinObj["tool"] != nil {
+							for k, v := range nested {
+								argsMap[k] = v
+							}
+						} else {
+							for k, v := range stdinObj {
+								argsMap[k] = v
+							}
 						}
 					}
 				}
@@ -160,7 +176,10 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 
 			// Create a reader from the JSON bytes
 			reqReader := &jsonReader{data: reqJSON}
+			start := time.Now()
 			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "")
+			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
+			telemetry.SendEvent(apiURL, token, fromSession, "exec", canonicalID, outcomeErr(exitCode), opts)
 		}
 
 		os.Exit(exitCode)
@@ -183,6 +202,15 @@ func (r *jsonReader) Read(p []byte) (n int, err error) {
 		err = io.EOF
 	}
 	return n, err
+}
+
+// outcomeErr returns a non-nil error value when exitCode indicates failure,
+// so telemetry.SendEvent can record the correct outcome.
+func outcomeErr(exitCode int) error {
+	if exitCode != kernel.ExitCodeOK {
+		return fmt.Errorf("exit code %d", exitCode)
+	}
+	return nil
 }
 
 // splitKeyValue splits "key=value" into ["key", "value"]

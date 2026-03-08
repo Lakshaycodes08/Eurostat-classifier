@@ -1,7 +1,12 @@
 // constants.go defines shared constants for timeouts, MCP settings, and other configuration.
 package constants
 
-import "time"
+import (
+	"crypto/tls"
+	"net/http"
+	"os"
+	"time"
+)
 
 // HTTP client timeouts
 const (
@@ -18,6 +23,19 @@ const (
 	HTTPMaxIdleConnsPerHost = 10
 )
 
+// Auth session timing
+const (
+	// SessionTokenDurationSecs is the lifetime of a Firebase JWT issued at login.
+	SessionTokenDurationSecs int64 = 3600
+
+	// SessionRefreshBufferSecs is how many seconds before expiry to treat a token as expired.
+	// Firebase ID tokens last 3600s; refresh when less than 300s remain.
+	SessionRefreshBufferSecs int64 = 300
+
+	// AuthRequestTimeout is the timeout for authentication HTTP requests (login, refresh).
+	AuthRequestTimeout = 10 * time.Second
+)
+
 // MCP server configuration
 const (
 	// MCPDefaultPort is the default port for HTTP transport.
@@ -30,14 +48,41 @@ const (
 	MCPRequestTimeout = 5 * time.Minute
 )
 
+// Telemetry configuration
+const (
+	// TelemetryTimeout is the max duration for the telemetry POST request (spec: 2s).
+	TelemetryTimeout = 2 * time.Second
+
+	// TelemetryBatchSizeMax is the maximum events per batch request (spec: 100).
+	TelemetryBatchSizeMax = 100
+
+	// EnvVarTelemetryMCP is the env var that, when set to "1", marks execution as MCP-sourced.
+	EnvVarTelemetryMCP = "SWYTCHCODE_MCP"
+)
+
+// NewHTTPClient returns an *http.Client with the given timeout.
+// When SWYTCHCODE_INSECURE=1 is set, TLS certificate verification is skipped
+// (intended for local dev with self-signed certificates only).
+func NewHTTPClient(timeout time.Duration) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if os.Getenv("SWYTCHCODE_INSECURE") == "1" {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+	}
+	return &http.Client{Timeout: timeout, Transport: transport}
+}
+
+// EnvVarsCI lists environment variable names that indicate CI execution (for telemetry source detection).
+var EnvVarsCI = []string{
+	"CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "TRAVIS", "JENKINS_URL", "BUILDKITE",
+}
+
 // Application configuration (build-time constants)
 const (
 	// Version is the Swytchcode shell version.
-	Version = "1.0.0"
+	Version = "1.0.2"
 
 	// RegistryURL is the default registry base URL (build-time constant).
 	// Set this at build time; runtime environment variables are not used.
-	RegistryURL = "https://api-v2.swytchcode.com"
 	// RegistryURL = "https://dev-api-v2.swytchcode.world"
-	// RegistryURL = "http://localhost"
+	RegistryURL = "https://api-v2.swytchcode.com"
 )

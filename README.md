@@ -5,6 +5,15 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 **`tooling.json` defines what is trusted.**  
 **Wrekenfiles define what is possible.**
 
+### Docs
+
+- [Architecture](docs/architecture.md) – modules and data flow (CLI, kernel, registry, MCP, editors).
+- [Execution model](docs/execution-model.md) – how `swytchcode exec` works end-to-end.
+- [Config spec](docs/config-spec.md) – `tooling.json` and `manifest.json`.
+- [CLI reference](docs/cli-reference.md) – commands, inputs/outputs, exit codes.
+- [MCP & integrations](docs/mcp-and-integrations.md) – MCP server and editor integrations.
+- [Install & upgrade](docs/install-upgrade.md) – install scripts (including Windows) and upgrade behavior.
+
 ### Install
 
 **macOS / Linux:**
@@ -42,6 +51,12 @@ Optional: `$env:VERSION="v0.1.0"` for a specific release, `$env:INSTALL_DIR="C:\
 | `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec` |
 | `swytchcode mcp status` | Check if MCP server is running (daemon mode) |
 | `swytchcode mcp stop` | Stop MCP server (daemon mode) |
+| `swytchcode login` | Device-flow browser login; saves session to `~/.swytchcode/auth.json` |
+| `swytchcode logout` | Delete saved session |
+| `swytchcode whoami` | Show current session (email, customer UUID, expiry); prints "Not logged in" if no session |
+| `swytchcode check [project_or_library]` | Check for integration update proposals; exits 1 on breaking changes; requires `SWYTCHCODE_TOKEN` or login |
+| `swytchcode inspect <library>` | Show full proposal detail for a library (requires login) |
+| `swytchcode upgrade <library>` | Approve a pending integration update proposal (requires login) |
 
 ---
 
@@ -60,7 +75,7 @@ swytchcode --version
 
 **Output:**
 ```
-swytchcode version 0.0.1
+swytchcode version 1.0.2
 ```
 
 The version is a build-time constant defined in `internal/constants/constants.go`. To change the version, update `constants.Version` and rebuild.
@@ -266,7 +281,7 @@ swytchcode search stripe --json
 - `--json`: Output as JSON array instead of one project name per line
 
 **What it does:**
-- Calls `GET /v2/shell/integrations` endpoint
+- Calls `GET /v2/cli/integrations` endpoint
 - With no keyword: returns all project names from the registry
 - With keyword: returns project names that contain the keyword (case-insensitive)
 - Read-only operation — does not download or modify local state
@@ -506,6 +521,102 @@ swytchcode mcp stop
 - `"MCP server is not running (stale PID file removed)"` — PID file existed but process was not running
 - `"stop MCP server: %w"` — Failed to send stop signal
 
+---
+
+### Cloud commands (login / logout / whoami / check / inspect / upgrade)
+
+Auth requirements vary by command:
+
+| Command | Auth required | Accepts `SWYTCHCODE_TOKEN` |
+|---------|--------------|---------------------------|
+| `login` | No (this is how you authenticate) | — |
+| `logout` | No | — |
+| `whoami` | Optional — prints "Not logged in" if no session | No |
+| `check` | Optional — passes empty token if missing (server returns 401) | Yes |
+| `inspect` | Yes — user session only | No |
+| `upgrade` | Yes — user session only | No |
+
+Cloud commands contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode.com`).
+
+**Telemetry:** Usage events are sent only when you are logged in via `swytchcode login`. If `SWYTCHCODE_TOKEN` is set, telemetry is not sent. With no auth, a one-time hint may be shown. See `CLI_TELEMETRY.md` for the full contract.
+
+**Where to set SWYTCHCODE_TOKEN:** The CLI reads the token only from the process environment (it does not load config or `.env` files).
+
+- **Shell (current session):** `export SWYTCHCODE_TOKEN=your_token_here`
+- **Shell (persistent):** Add the same line to `~/.bashrc`, `~/.zshrc`, or your shell profile.
+- **Using a `.env` file:** Source it before running the CLI, e.g. `set -a && source .env && set +a` or `export $(grep -v '^#' .env | xargs)`, then run `swytchcode`. Alternatively: `env $(cat .env | xargs) swytchcode ...`
+- **MCP in an IDE (e.g. Cursor):** Set `SWYTCHCODE_TOKEN` in the environment of the process that runs the MCP server. In Cursor, use the MCP config’s `env` or `envFile` so the `swytchcode mcp serve` process receives the variable. If you start the server from a terminal, export the token (or source your `.env`) in that shell.
+- **CI/CD:** Define `SWYTCHCODE_TOKEN` as a secret or CI variable so the job environment has it.
+
+See `docs/cli-reference.md` for more detail.
+
+#### `swytchcode login`
+
+Opens a browser-based device-flow login. Saves the session to `~/.swytchcode/auth.json` on success.
+
+```bash
+swytchcode login
+```
+
+#### `swytchcode logout`
+
+Deletes the saved session file (`~/.swytchcode/auth.json`).
+
+```bash
+swytchcode logout
+```
+
+#### `swytchcode whoami`
+
+Prints the current session: email, customer UUID, and token expiry.
+
+```bash
+swytchcode whoami
+```
+
+Prints "Not logged in." if no session exists. Does not accept `SWYTCHCODE_TOKEN`.
+
+#### `swytchcode check [project_or_library]`
+
+Fetches integration update proposals and prints a summary.
+
+```bash
+swytchcode check                    # all proposals for the authed user
+swytchcode check weaviate           # filter by project name
+swytchcode check weaviate.lyrid     # filter by project.library
+```
+
+**Exit codes:**
+- `0` — No proposals (or no breaking ones)
+- `1` — Breaking-impact proposals found
+- `2` — CLI/auth error
+
+Requires `SWYTCHCODE_TOKEN` or `~/.swytchcode/auth.json`.
+
+#### `swytchcode inspect <library>`
+
+Shows full proposal detail for the named library (two-step: looks up proposal UUID, then fetches detail).
+
+```bash
+swytchcode inspect stripe
+swytchcode inspect stripe.stripe
+```
+
+Requires user login (`swytchcode login`).
+
+#### `swytchcode upgrade <library>`
+
+Approves a pending integration update proposal for the named library.
+
+```bash
+swytchcode upgrade stripe
+swytchcode upgrade stripe.stripe
+```
+
+Requires user login (`swytchcode login`).
+
+See `commands.md` for full verification detail on these commands.
+
 **Flags:**
 - `-d`: Run in daemon mode (properly daemonized background process). The server runs in a new session, completely detached from the terminal. Returns control immediately. Creates PID file at `.swytchcode/mcp.pid` for `status` and `stop` commands. Requires `--transport http`.
 - `--log-file <path>`: Path to log file (only used in daemon mode; if not provided, logs are suppressed)
@@ -548,7 +659,7 @@ swytchcode mcp stop
 
 **swytchcode_version**
 - Parameters: None
-- Returns: Version string (e.g., `"swytchcode version 0.0.1\n"`).
+- Returns: Version string (e.g., `"swytchcode version 1.0.2\n"`).
 
 **swytchcode_list**
 - Parameters: `filter` (string, optional) — Filter type: `"methods"`, `"workflows"`, `"integrations"`, or empty for all; `prefix` (string, optional) — Pattern to filter by canonical_id or project name (case-insensitive); `json` (boolean, optional) — Output as JSON object

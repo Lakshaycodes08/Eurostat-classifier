@@ -3,9 +3,11 @@ package registry
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"gitlab.com/swytchcode/shell/internal/constants"
 )
@@ -26,6 +28,9 @@ func NewClient(config *Config) *Client {
 		MaxIdleConns:        constants.HTTPMaxIdleConns,
 		MaxIdleConnsPerHost: constants.HTTPMaxIdleConnsPerHost,
 		IdleConnTimeout:     constants.HTTPIdleConnTimeout,
+	}
+	if os.Getenv("SWYTCHCODE_INSECURE") == "1" {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
 	}
 
 	return &Client{

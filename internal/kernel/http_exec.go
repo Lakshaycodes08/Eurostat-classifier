@@ -48,9 +48,7 @@ func ExecuteDryRun(req *http.Request, stdout io.Writer) int {
 
 // ExecuteHTTP executes the HTTP request and returns the response.
 func ExecuteHTTP(req *http.Request) (*http.Response, error) {
-	client := &http.Client{
-		Timeout: constants.HTTPClientTimeout,
-	}
+	client := constants.NewHTTPClient(constants.HTTPClientTimeout)
 
 	resp, err := client.Do(req)
 	if err != nil {
