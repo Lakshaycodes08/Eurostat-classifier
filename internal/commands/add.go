@@ -158,38 +158,10 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 		workflowsPath := filepath.Join(integrationsDir, "workflows.json")
 
 		toolType = ""
-		if data, err := os.ReadFile(methodsPath); err == nil {
-			var methodsResp map[string]interface{}
-			if json.Unmarshal(data, &methodsResp) == nil {
-				if methods, ok := methodsResp["methods"].([]interface{}); ok {
-					for _, m := range methods {
-						if mMap, ok := m.(map[string]interface{}); ok {
-							if id, ok := mMap["canonical_id"].(string); ok && id == canonicalID {
-								toolType = "method"
-								break
-							}
-						}
-					}
-				}
-			}
-		}
-
-		if toolType == "" {
-			if data, err := os.ReadFile(workflowsPath); err == nil {
-				var workflowsResp map[string]interface{}
-				if json.Unmarshal(data, &workflowsResp) == nil {
-					if workflows, ok := workflowsResp["workflows"].([]interface{}); ok {
-						for _, w := range workflows {
-							if wMap, ok := w.(map[string]interface{}); ok {
-								if id, ok := wMap["canonical_id"].(string); ok && id == canonicalID {
-									toolType = "workflow"
-									break
-								}
-							}
-						}
-					}
-				}
-			}
+		if findToolTypeInFile(methodsPath, "methods", canonicalID) {
+			toolType = "method"
+		} else if findToolTypeInFile(workflowsPath, "workflows", canonicalID) {
+			toolType = "workflow"
 		}
 
 		if toolType == "" {
@@ -376,6 +348,31 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 	}
 
 	return nil
+}
+
+// findToolTypeInFile reports whether canonicalID exists in the named key of a JSON file.
+// key is "methods" or "workflows".
+func findToolTypeInFile(path, key, canonicalID string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var resp map[string]interface{}
+	if json.Unmarshal(data, &resp) != nil {
+		return false
+	}
+	items, ok := resp[key].([]interface{})
+	if !ok {
+		return false
+	}
+	for _, item := range items {
+		if m, ok := item.(map[string]interface{}); ok {
+			if id, ok := m["canonical_id"].(string); ok && id == canonicalID {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ParseIntegrationSpec parses "project@library.version" and returns (project, library, version).

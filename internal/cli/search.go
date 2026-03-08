@@ -10,7 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"gitlab.com/swytchcode/shell/internal/registry"
-	"gitlab.com/swytchcode/shell/internal/util"
 )
 
 var (
@@ -23,17 +22,12 @@ var searchCmd = &cobra.Command{
 	Short: "Search remote registry for available integrations",
 	Long:  "Searches the remote registry for available integrations. With no keyword, lists all; with a keyword, returns matching project names. Read-only, never mutates local state.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		projectRoot, err := util.ProjectRoot()
-		if err != nil {
-			return fmt.Errorf("detect project root: %w", err)
-		}
-
 		keyword := ""
 		if len(args) > 0 {
 			keyword = args[0]
 		}
 
-		regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
+		regClient := registry.NewClient(registry.DefaultConfig())
 		ctx := context.Background()
 
 		integrationsResp, err := regClient.ListIntegrations(ctx)

@@ -8,7 +8,9 @@ import (
 	"runtime"
 
 	"github.com/spf13/cobra"
+	"gitlab.com/swytchcode/shell/internal/auth"
 	"gitlab.com/swytchcode/shell/internal/commands"
+	"gitlab.com/swytchcode/shell/internal/telemetry"
 )
 
 var loginOpen bool
@@ -22,16 +24,19 @@ flow completes and saves your session to ~/.swytchcode/auth.json.
 
 Use --open to have the CLI open the browser automatically.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		apiURL := os.Getenv("SWYTCHCODE_API_URL")
-		if apiURL == "" {
-			apiURL = "https://api-v2.swytchcode.com"
-		}
-
+		apiURL := auth.ResolveAPIURL()
 		cfg := commands.LoginConfig{APIURL: apiURL}
 		if loginOpen {
 			cfg.OnURL = openBrowser
 		}
-		return commands.RunLogin(cfg, os.Stdout)
+		if err := commands.RunLogin(cfg, os.Stdout); err != nil {
+			return err
+		}
+		// Telemetry only after successful login (we have a token now).
+		if session, loadErr := auth.Load(); loadErr == nil {
+			telemetry.SendEvent(apiURL, session.AccessToken, true, "login", "", nil, nil)
+		}
+		return nil
 	},
 }
 

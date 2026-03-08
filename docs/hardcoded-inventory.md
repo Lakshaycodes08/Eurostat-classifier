@@ -10,7 +10,7 @@ This file catalogs notable hardcoded values in the Swytchcode CLI codebase and w
   - `MCPBearerToken = "swytchcode-mcp-token"` – fixed bearer token for MCP HTTP transport (marked as temporary).
 
 - **`internal/registry/config.go`**
-  - `ConfigFromProjectRoot` returns a config with `BaseURL` set from `constants.RegistryURL` (no env override).
+  - `DefaultConfig` respects `SWYTCHCODE_API_URL` env var, falling back to `constants.RegistryURL`. This means `search`, `get`, `bootstrap`, and MCP tools all honour the env override.
 
 - **`internal/cli/check.go`, `internal/cli/login.go`, `internal/cli/inspect.go`, `internal/cli/upgrade.go`, `internal/auth/auth.go`**
   - All default `SWYTCHCODE_API_URL` to `https://api-v2.swytchcode.com` when the env var is empty.
@@ -73,8 +73,8 @@ This file catalogs notable hardcoded values in the Swytchcode CLI codebase and w
 - **`internal/mcp/transport.go`**
   - Authorization header for HTTP transport is always `Bearer ` + `constants.MCPBearerToken`.
 
-- **`internal/cli/check.go`, `internal/cli/inspect.go`, `internal/cli/upgrade.go` and `internal/telemetry/telemetry.go`**
-  - Telemetry uses `SWYTCHCODE_API_URL` (default `https://api-v2.swytchcode.com`) and includes `constants.Version` in events.
+- **`internal/telemetry/telemetry.go`**
+  - Telemetry uses `SWYTCHCODE_API_URL` (default `https://api-v2.swytchcode.com`) and includes `constants.Version` in events. Sending is centralised in `SendEvent()` — CLI commands no longer build `Event` structs directly.
 
 **Implication:** MCP HTTP transport uses a fixed bearer token; for production this should likely become configurable (env var or config file) and documented.
 

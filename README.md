@@ -538,6 +538,18 @@ Auth requirements vary by command:
 
 Cloud commands contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode.com`).
 
+**Telemetry:** Usage events are sent only when you are logged in via `swytchcode login`. If `SWYTCHCODE_TOKEN` is set, telemetry is not sent. With no auth, a one-time hint may be shown. See `CLI_TELEMETRY.md` for the full contract.
+
+**Where to set SWYTCHCODE_TOKEN:** The CLI reads the token only from the process environment (it does not load config or `.env` files).
+
+- **Shell (current session):** `export SWYTCHCODE_TOKEN=your_token_here`
+- **Shell (persistent):** Add the same line to `~/.bashrc`, `~/.zshrc`, or your shell profile.
+- **Using a `.env` file:** Source it before running the CLI, e.g. `set -a && source .env && set +a` or `export $(grep -v '^#' .env | xargs)`, then run `swytchcode`. Alternatively: `env $(cat .env | xargs) swytchcode ...`
+- **MCP in an IDE (e.g. Cursor):** Set `SWYTCHCODE_TOKEN` in the environment of the process that runs the MCP server. In Cursor, use the MCP config’s `env` or `envFile` so the `swytchcode mcp serve` process receives the variable. If you start the server from a terminal, export the token (or source your `.env`) in that shell.
+- **CI/CD:** Define `SWYTCHCODE_TOKEN` as a secret or CI variable so the job environment has it.
+
+See `docs/cli-reference.md` for more detail.
+
 #### `swytchcode login`
 
 Opens a browser-based device-flow login. Saves the session to `~/.swytchcode/auth.json` on success.

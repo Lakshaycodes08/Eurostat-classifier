@@ -2,6 +2,10 @@
 
 Swytchcode exposes its functionality over the Model Context Protocol (MCP) so editors and agents can call it in a standard way. This document explains how MCP tools map to CLI commands and how editor integrations are wired.
 
+## Authentication
+
+The MCP server uses the same auth as the CLI: `SWYTCHCODE_TOKEN` or `~/.swytchcode/auth.json`. Set `SWYTCHCODE_TOKEN` in the environment of the process that starts the MCP server (e.g. via your IDE's MCP server env configuration) so tools that call the API are authenticated. See the CLI reference ("Setting SWYTCHCODE_TOKEN") for shell, env file, and IDE setup.
+
 ## MCP server
 
 ### Starting the server

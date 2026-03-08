@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"gitlab.com/swytchcode/shell/internal/auth"
 	"gitlab.com/swytchcode/shell/internal/commands"
-	"gitlab.com/swytchcode/shell/internal/constants"
 	"gitlab.com/swytchcode/shell/internal/telemetry"
 )
 
@@ -31,10 +31,7 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		library := args[0]
 
-		apiURL := os.Getenv("SWYTCHCODE_API_URL")
-		if apiURL == "" {
-			apiURL = "https://api-v2.swytchcode.com"
-		}
+		apiURL := auth.ResolveAPIURL()
 
 		// upgrade requires a user session — no env-var service token fallback.
 		session, err := auth.Load()
@@ -55,21 +52,14 @@ Example:
 			return answer == "y" || answer == "yes"
 		}
 
+		start := time.Now()
 		err = commands.RunUpgrade(commands.UpgradeConfig{
 			APIURL:  apiURL,
 			Token:   session.AccessToken,
 			Library: library,
 		}, confirm, os.Stdout)
-		outcome := "success"
-		if err != nil {
-			outcome = "failure"
-		}
-		telemetry.Send(apiURL, session.AccessToken, telemetry.Event{
-			Command:     "upgrade",
-			LibraryName: library,
-			Outcome:     outcome,
-			CLIVersion:  constants.Version,
-		})
+		opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
+		telemetry.SendEvent(apiURL, session.AccessToken, true, "proposals_approve", library, err, opts)
 		return err
 	},
 }

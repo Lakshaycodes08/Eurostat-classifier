@@ -193,11 +193,21 @@ These commands talk to the backend at `SWYTCHCODE_API_URL` (default `https://api
 - `swytchcode inspect`
 - `swytchcode upgrade`
 
-See backend-specific docs for exact payloads and behavior. From the CLI’s perspective, they:
+See backend-specific docs for exact payloads and behavior. From the CLI's perspective, they:
 
 - Resolve project UUIDs and tokens via `internal/auth`.
 - Call backend endpoints for account/project/introspection and plan/usage info.
 - Exit with non-zero codes on auth/network/server errors, printing clear messages on stderr.
 
 `check`, `inspect`, and `upgrade` accept `--project <uuid>` to override `SWYTCHCODE_PROJECT_UUID`.
+
+### Setting SWYTCHCODE_TOKEN
+
+- **Shell**: `export SWYTCHCODE_TOKEN=...` (or add to `~/.bashrc` / `~/.zshrc`).
+- **Env file**: The CLI does not load a `.env` file automatically. To use a file: run `set -a && source .env && set +a` (or `export $(grep -v '^#' .env | xargs)`) in your shell before running `swytchcode`, or run `env $(cat .env | xargs) swytchcode ...`.
+- **MCP in the IDE**: When the MCP server is started by the IDE (e.g. Cursor), it uses whatever environment the IDE gives that process. In Cursor, configure the MCP server with an `env` block or `envFile` so that `SWYTCHCODE_TOKEN` (and optionally `SWYTCHCODE_API_URL`) are set for the `swytchcode mcp serve` process. If you start the MCP server from a terminal, export the token (or source your `.env`) in that shell so the server inherits it.
+
+### Telemetry
+
+Telemetry is **opt-in by identity**: events are only sent when you are logged in via `swytchcode login`. When `SWYTCHCODE_TOKEN` is set (service token), telemetry is **not** sent. When you have no auth, no events are sent and the CLI may print a one-time hint. See `CLI_TELEMETRY.md` in the repo for the full contract (event schema, endpoint, error classification).
 

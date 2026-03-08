@@ -490,17 +490,12 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 
 // handleSearch handles swytchcode_search tool (remote registry queries).
 func handleSearch(ctx context.Context, args map[string]interface{}, oc *OutputCapture) (string, error) {
-	projectRoot, err := util.ProjectRoot()
-	if err != nil {
-		return "", fmt.Errorf("detect project root: %w", err)
-	}
-
 	var keyword string
 	if k, ok := args["keyword"].(string); ok {
 		keyword = k
 	}
 
-	regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
+	regClient := registry.NewClient(registry.DefaultConfig())
 	integrationsResp, err := regClient.ListIntegrations(ctx)
 	if err != nil {
 		return "", fmt.Errorf("search: %w", err)

@@ -151,6 +151,15 @@ func (s *AuthSession) Refresh(apiURL string) error {
 	return nil
 }
 
+// ResolveAPIURL returns the backend API base URL from SWYTCHCODE_API_URL,
+// falling back to the build-time default.
+func ResolveAPIURL() string {
+	if u := os.Getenv("SWYTCHCODE_API_URL"); u != "" {
+		return u
+	}
+	return constants.RegistryURL
+}
+
 // ResolveToken returns a bearer token for API calls, trying in order:
 //  1. SWYTCHCODE_TOKEN env var (service token — agents, CI)
 //  2. ~/.swytchcode/auth.json (user session from `swytchcode login`)
@@ -169,11 +178,7 @@ func ResolveToken() (token string, fromSession bool, err error) {
 		if s.RefreshToken == "" {
 			return "", false, fmt.Errorf("session expired — run `swytchcode login`")
 		}
-		apiURL := os.Getenv("SWYTCHCODE_API_URL")
-		if apiURL == "" {
-			apiURL = "https://api-v2.swytchcode.com"
-		}
-		if err := s.Refresh(apiURL); err != nil {
+		if err := s.Refresh(ResolveAPIURL()); err != nil {
 			return "", false, err
 		}
 		if err := Save(s); err != nil {

@@ -21,7 +21,7 @@ func RunGet(ctx context.Context, projectName string, yes bool, stdout, stderr io
 		return fmt.Errorf("detect project root: %w", err)
 	}
 
-	regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
+	regClient := registry.NewClient(registry.DefaultConfig())
 
 	// Show spinner while fetching bundles
 	spinner := util.NewSpinner(fmt.Sprintf("Fetching %s...", projectName))

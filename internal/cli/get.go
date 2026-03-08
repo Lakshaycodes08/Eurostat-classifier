@@ -40,11 +40,7 @@ var getCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		interactive := util.IsInteractive() && !getNonInteractive
 
-		projectRoot, err := util.ProjectRoot()
-		if err != nil {
-			return fmt.Errorf("detect project root: %w", err)
-		}
-		regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
+		regClient := registry.NewClient(registry.DefaultConfig())
 		ctx := context.Background()
 
 		var library string

@@ -48,6 +48,18 @@ const (
 	MCPRequestTimeout = 5 * time.Minute
 )
 
+// Telemetry configuration
+const (
+	// TelemetryTimeout is the max duration for the telemetry POST request (spec: 2s).
+	TelemetryTimeout = 2 * time.Second
+
+	// TelemetryBatchSizeMax is the maximum events per batch request (spec: 100).
+	TelemetryBatchSizeMax = 100
+
+	// EnvVarTelemetryMCP is the env var that, when set to "1", marks execution as MCP-sourced.
+	EnvVarTelemetryMCP = "SWYTCHCODE_MCP"
+)
+
 // NewHTTPClient returns an *http.Client with the given timeout.
 // When SWYTCHCODE_INSECURE=1 is set, TLS certificate verification is skipped
 // (intended for local dev with self-signed certificates only).
@@ -57,6 +69,11 @@ func NewHTTPClient(timeout time.Duration) *http.Client {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
 	}
 	return &http.Client{Timeout: timeout, Transport: transport}
+}
+
+// EnvVarsCI lists environment variable names that indicate CI execution (for telemetry source detection).
+var EnvVarsCI = []string{
+	"CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "TRAVIS", "JENKINS_URL", "BUILDKITE",
 }
 
 // Application configuration (build-time constants)

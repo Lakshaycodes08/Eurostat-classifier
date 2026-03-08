@@ -52,7 +52,7 @@ func RunBootstrap(ctx context.Context, projectRoot string, stdout, stderr io.Wri
 		return fmt.Errorf("create integrations directory: %w", err)
 	}
 
-	regClient := registry.NewClient(registry.ConfigFromProjectRoot(projectRoot))
+	regClient := registry.NewClient(registry.DefaultConfig())
 
 	// Process each integration
 	var fetched []string

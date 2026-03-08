@@ -11,16 +11,16 @@ This document summarizes concrete refactor ideas based on the current codebase a
 **What was done:**
 
 - `constants.RegistryURL` updated to the production URL (`https://api-v2.swytchcode.com`).
-- All CLI commands (`check.go`, `login.go`, `inspect.go`, `upgrade.go`) and `auth.go` now use `SWYTCHCODE_API_URL` env var with a consistent fallback to `https://api-v2.swytchcode.com`. No more localhost defaults.
+- All CLI commands (`check.go`, `login.go`, `inspect.go`, `upgrade.go`) and `auth.go` now use `SWYTCHCODE_API_URL` env var via `auth.ResolveAPIURL()` (single helper, consistent fallback). No more localhost defaults.
 - Auth session timing magic numbers extracted to named constants (`SessionTokenDurationSecs`, `SessionRefreshBufferSecs`, `AuthRequestTimeout`).
 - Project UUID resolution centralized in `auth.ResolveProjectUUID()` (flag → `SWYTCHCODE_PROJECT_UUID` env var → error).
+- `internal/registry/config.go` respects `SWYTCHCODE_API_URL` via `DefaultConfig()`. `ConfigFromProjectRoot` removed — all registry-using commands (`search`, `get`, `bootstrap`, MCP) use `DefaultConfig()` directly.
+- Telemetry boilerplate centralized in `telemetry.SendEvent()` — CLI commands no longer build `Event` structs inline.
+- HTTP client creation standardised: `telemetry.go` and `kernel/http_exec.go` now use `constants.NewHTTPClient()`, so `SWYTCHCODE_INSECURE=1` is respected everywhere.
 
 **What remains:**
 
 - `constants.MCPBearerToken` is still hardcoded in `internal/mcp/transport.go`. A `SWYTCHCODE_MCP_BEARER` env override would allow dev/staging overrides without rebuilding.
-- `internal/registry/config.go` does not support a `SWYTCHCODE_REGISTRY_URL` env override; the registry URL is fixed at build time via `constants.RegistryURL`.
-
-A dedicated `internal/config` package (as originally proposed) is not strictly necessary now that the env var override pattern is consistently applied, but could still reduce code duplication if the number of commands grows.
 
 ## 2. Install scripts (especially Windows)
 

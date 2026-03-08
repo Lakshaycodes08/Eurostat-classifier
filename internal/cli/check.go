@@ -6,11 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"gitlab.com/swytchcode/shell/internal/auth"
 	"gitlab.com/swytchcode/shell/internal/commands"
-	"gitlab.com/swytchcode/shell/internal/constants"
 	"gitlab.com/swytchcode/shell/internal/telemetry"
 )
 
@@ -33,10 +33,7 @@ Optional environment variables:
 Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		apiURL := os.Getenv("SWYTCHCODE_API_URL")
-		if apiURL == "" {
-			apiURL = "https://api-v2.swytchcode.com"
-		}
+		apiURL := auth.ResolveAPIURL()
 
 		var library string
 		if len(args) == 1 {
@@ -45,22 +42,20 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 
 		// Soft-fail auth: if neither service token nor session is available,
 		// pass an empty token and let the server return 401 with a clean error.
-		token, _, _ := auth.ResolveToken()
+		token, fromSession, _ := auth.ResolveToken()
+		if token == "" {
+			telemetry.MaybeHintNoAuth()
+		}
 
-		outcome := "success"
+		start := time.Now()
 		hasBreaking, err := commands.RunCheck(commands.CheckConfig{
 			APIURL:  apiURL,
 			Token:   token,
 			Library: library,
 		}, os.Stdout)
+		opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
+		telemetry.SendEvent(apiURL, token, fromSession, "proposals_check", library, err, opts)
 		if err != nil {
-			outcome = "failure"
-			telemetry.Send(apiURL, token, telemetry.Event{
-				Command:     "check",
-				LibraryName: library,
-				Outcome:     outcome,
-				CLIVersion:  constants.Version,
-			})
 			var limitErr *commands.ExecLimitError
 			if errors.As(err, &limitErr) {
 				fmt.Fprintln(os.Stderr, "Error:", limitErr.Error())
@@ -70,12 +65,6 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			os.Exit(2)
 		}
-		telemetry.Send(apiURL, token, telemetry.Event{
-			Command:     "check",
-			LibraryName: library,
-			Outcome:     outcome,
-			CLIVersion:  constants.Version,
-		})
 		if hasBreaking {
 			os.Exit(1)
 		}

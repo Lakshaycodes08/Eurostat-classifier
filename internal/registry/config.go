@@ -22,12 +22,6 @@ func DefaultConfig() *Config {
 	return &Config{BaseURL: u}
 }
 
-// ConfigFromProjectRoot returns registry config using build-time constants.
-// The registry URL is set at build time and does not vary by project or environment.
-func ConfigFromProjectRoot(projectRoot string) *Config {
-	return DefaultConfig()
-}
-
 // APIBasePath returns the full API base path with version prefix.
 func (c *Config) APIBasePath() string {
 	return c.BaseURL + "/v2/cli"

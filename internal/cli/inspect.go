@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"gitlab.com/swytchcode/shell/internal/auth"
 	"gitlab.com/swytchcode/shell/internal/commands"
-	"gitlab.com/swytchcode/shell/internal/constants"
 	"gitlab.com/swytchcode/shell/internal/telemetry"
 )
 
@@ -28,10 +28,7 @@ Example:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		library := args[0]
 
-		apiURL := os.Getenv("SWYTCHCODE_API_URL")
-		if apiURL == "" {
-			apiURL = "https://api-v2.swytchcode.com"
-		}
+		apiURL := auth.ResolveAPIURL()
 
 		// inspect requires a user session for the app endpoint.
 		session, err := auth.Load()
@@ -42,6 +39,7 @@ Example:
 			return err
 		}
 
+		start := time.Now()
 		// Step 1: find the proposal UUID by library name.
 		proposals, err := commands.FetchProposals(commands.CheckConfig{
 			APIURL:  apiURL,
@@ -49,10 +47,8 @@ Example:
 			Library: library,
 		})
 		if err != nil {
-			telemetry.Send(apiURL, session.AccessToken, telemetry.Event{
-				Command: "inspect", LibraryName: library,
-				Outcome: "failure", CLIVersion: constants.Version,
-			})
+			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
+			telemetry.SendEvent(apiURL, session.AccessToken, true, "inspect", library, err, opts)
 			return err
 		}
 
@@ -65,20 +61,16 @@ Example:
 		}
 		if proposalUUID == "" {
 			fmt.Fprintf(os.Stdout, "No proposals found for %s\n", library)
-			telemetry.Send(apiURL, session.AccessToken, telemetry.Event{
-				Command: "inspect", LibraryName: library,
-				Outcome: "success", CLIVersion: constants.Version,
-			})
+			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
+			telemetry.SendEvent(apiURL, session.AccessToken, true, "inspect", library, nil, opts)
 			return nil
 		}
 
 		// Step 2: fetch full detail from the app endpoint.
 		detail, err := commands.FetchProposalDetail(apiURL, session.AccessToken, proposalUUID)
 		if err != nil {
-			telemetry.Send(apiURL, session.AccessToken, telemetry.Event{
-				Command: "inspect", LibraryName: library,
-				Outcome: "failure", CLIVersion: constants.Version,
-			})
+			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
+			telemetry.SendEvent(apiURL, session.AccessToken, true, "inspect", library, err, opts)
 			return err
 		}
 
@@ -101,10 +93,8 @@ Example:
 			fmt.Fprintf(os.Stdout, "Status:   %s\n", detail.Status)
 		}
 
-		telemetry.Send(apiURL, session.AccessToken, telemetry.Event{
-			Command: "inspect", LibraryName: library,
-			Outcome: "success", CLIVersion: constants.Version,
-		})
+		opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
+		telemetry.SendEvent(apiURL, session.AccessToken, true, "inspect", library, nil, opts)
 		return nil
 	},
 }
