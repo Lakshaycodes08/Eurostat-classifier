@@ -14,10 +14,9 @@ import (
 
 // UpgradeConfig holds configuration for an upgrade run.
 type UpgradeConfig struct {
-	APIURL      string // base URL of the backend API
-	Token       string // Firebase JWT (user login required — service token not accepted)
-	ProjectUUID string // project to check proposals for
-	Library     string // library name to upgrade
+	APIURL  string // base URL of the backend API
+	Token   string // Firebase JWT (user login required — service token not accepted)
+	Library string // project.library name to upgrade
 }
 
 // RunUpgrade finds the pending proposal for Library, confirms with the user,
@@ -26,9 +25,9 @@ type UpgradeConfig struct {
 // user confirmed (allows testing without stdin).
 func RunUpgrade(cfg UpgradeConfig, confirm func(prompt string) bool, w io.Writer) error {
 	proposals, err := FetchProposals(CheckConfig{
-		APIURL:      cfg.APIURL,
-		Token:       cfg.Token,
-		ProjectUUID: cfg.ProjectUUID,
+		APIURL:  cfg.APIURL,
+		Token:   cfg.Token,
+		Library: cfg.Library,
 	})
 	if err != nil {
 		return err

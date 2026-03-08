@@ -55,9 +55,9 @@ func (e *ExecLimitError) Error() string {
 
 // CheckConfig holds the configuration for a check run.
 type CheckConfig struct {
-	APIURL      string // base URL of the backend API
-	Token       string // bearer token (service token or Firebase JWT)
-	ProjectUUID string // project to query proposals for
+	APIURL  string // base URL of the backend API
+	Token   string // bearer token (service token or Firebase JWT)
+	Library string // project.library name to filter proposals (empty = all for the authed user)
 }
 
 // FetchProposals calls the backend and returns the raw proposals list.
@@ -69,7 +69,9 @@ func FetchProposals(cfg CheckConfig) ([]Proposal, error) {
 	}
 	endpoint.Path = "/v2/cli/proposals/check"
 	q := endpoint.Query()
-	q.Set("project_uuid", cfg.ProjectUUID)
+	if cfg.Library != "" {
+		q.Set("library", cfg.Library)
+	}
 	endpoint.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, endpoint.String(), nil)

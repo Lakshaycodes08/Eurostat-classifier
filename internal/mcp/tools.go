@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"gitlab.com/swytchcode/shell/internal/auth"
+	"gitlab.com/swytchcode/shell/internal/commands"
 	"gitlab.com/swytchcode/shell/internal/constants"
 	"gitlab.com/swytchcode/shell/internal/kernel"
-	"gitlab.com/swytchcode/shell/internal/commands"
 	"gitlab.com/swytchcode/shell/internal/registry"
 	"gitlab.com/swytchcode/shell/internal/util"
 )
@@ -65,6 +67,22 @@ type InfoArgs struct {
 	JSON        bool   `json:"json,omitempty" jsonschema:"Output as JSON array instead of human-readable format"`
 }
 
+// CheckArgs represents arguments for swytchcode_check.
+type CheckArgs struct {
+	Library string `json:"library,omitempty" jsonschema:"Optional project or project.library filter"`
+}
+
+// InspectArgs represents arguments for swytchcode_inspect.
+type InspectArgs struct {
+	Library string `json:"library" jsonschema:"Project or project.library name to inspect"`
+}
+
+// UpgradeArgs represents arguments for swytchcode_upgrade.
+type UpgradeArgs struct {
+	Library string `json:"library" jsonschema:"Project or project.library name to upgrade"`
+	Confirm bool   `json:"confirm" jsonschema:"Set to true to confirm the upgrade"`
+}
+
 // ExecArgs represents arguments for swytchcode_exec.
 type ExecArgs struct {
 	Tool      string                 `json:"tool" jsonschema:"Canonical ID of the tool to execute"`
@@ -76,16 +94,19 @@ type ExecArgs struct {
 }
 
 // RegisterTools registers all MCP tools with the server.
-// Registers 9 tools total:
-//   1. swytchcode_init
-//   2. swytchcode_bootstrap
-//   3. swytchcode_version
-//   4. swytchcode_list
-//   5. swytchcode_search
-//   6. swytchcode_get
-//   7. swytchcode_add
-//   8. swytchcode_exec
-//   9. swytchcode_info
+// Registers 12 tools total:
+//  1. swytchcode_init
+//  2. swytchcode_bootstrap
+//  3. swytchcode_version
+//  4. swytchcode_list
+//  5. swytchcode_search
+//  6. swytchcode_get
+//  7. swytchcode_add
+//  8. swytchcode_exec
+//  9. swytchcode_info
+//  10. swytchcode_check
+//  11. swytchcode_inspect
+//  12. swytchcode_upgrade
 func RegisterTools(server *mcp.Server, streamOutput bool) error {
 	// swytchcode_init
 	mcp.AddTool(server, &mcp.Tool{
@@ -288,6 +309,151 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 			Content: []mcp.Content{
 				&mcp.TextContent{Text: result},
 			},
+		}, ToolOutput{Output: result}, nil
+	})
+
+	// swytchcode_check
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_check",
+		Description: "Check for integration update proposals from the TinyFish agent. Exits with hasBreaking=true if any major (breaking) changes exist. Optionally filter by project or project.library name.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args CheckArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		apiURL := os.Getenv("SWYTCHCODE_API_URL")
+		if apiURL == "" {
+			apiURL = "https://api-v2.swytchcode.com"
+		}
+
+		token, _, _ := auth.ResolveToken()
+
+		oc := NewOutputCapture(streamOutput)
+		hasBreaking, err := commands.RunCheck(commands.CheckConfig{
+			APIURL:  apiURL,
+			Token:   token,
+			Library: args.Library,
+		}, oc.Stdout())
+		if err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		result := oc.GetCombinedOutput()
+		toolResult := &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: result},
+			},
+		}
+		if hasBreaking {
+			toolResult.IsError = true
+		}
+		return toolResult, ToolOutput{Output: result}, nil
+	})
+
+	// swytchcode_inspect
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_inspect",
+		Description: "Show full proposal detail for a specific library. Requires user login or SWYTCHCODE_TOKEN.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args InspectArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		if args.Library == "" {
+			return nil, ToolOutput{}, fmt.Errorf("library is required")
+		}
+
+		apiURL := os.Getenv("SWYTCHCODE_API_URL")
+		if apiURL == "" {
+			apiURL = "https://api-v2.swytchcode.com"
+		}
+
+		token, _, _ := auth.ResolveToken()
+		if token == "" {
+			return nil, ToolOutput{}, fmt.Errorf("not authenticated — run `swytchcode login` or set SWYTCHCODE_TOKEN")
+		}
+
+		oc := NewOutputCapture(streamOutput)
+
+		proposals, err := commands.FetchProposals(commands.CheckConfig{
+			APIURL:  apiURL,
+			Token:   token,
+			Library: args.Library,
+		})
+		if err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		var proposalUUID string
+		for _, p := range proposals {
+			if strings.EqualFold(p.LibraryName, args.Library) {
+				proposalUUID = p.ProposalUUID
+				break
+			}
+		}
+		if proposalUUID == "" {
+			fmt.Fprintf(oc.Stdout(), "No proposals found for %s\n", args.Library)
+			result := oc.GetCombinedOutput()
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{Text: result}},
+			}, ToolOutput{Output: result}, nil
+		}
+
+		detail, err := commands.FetchProposalDetail(apiURL, token, proposalUUID)
+		if err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		from := detail.CurrentVersion
+		if from == "" {
+			from = "unknown"
+		}
+		to := detail.ProposedVersion
+		if to == "" {
+			to = "unknown"
+		}
+		header := fmt.Sprintf("%s   %s -> %s   [%s]   confidence: %.2f",
+			args.Library, from, to, detail.Impact, detail.Confidence)
+		divider := strings.Repeat("─", len(header))
+		fmt.Fprintf(oc.Stdout(), "%s\n%s\n", header, divider)
+		if detail.Summary != "" {
+			fmt.Fprintf(oc.Stdout(), "Summary:  %s\n", detail.Summary)
+		}
+		if detail.ChangeSet != nil {
+			fmt.Fprintf(oc.Stdout(), "Status:   %s\n", detail.Status)
+		}
+
+		result := oc.GetCombinedOutput()
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: result}},
+		}, ToolOutput{Output: result}, nil
+	})
+
+	// swytchcode_upgrade
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_upgrade",
+		Description: "Approve a pending integration upgrade proposal. Requires user login (not a service token). Set confirm=true to approve.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args UpgradeArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		if args.Library == "" {
+			return nil, ToolOutput{}, fmt.Errorf("library is required")
+		}
+
+		apiURL := os.Getenv("SWYTCHCODE_API_URL")
+		if apiURL == "" {
+			apiURL = "https://api-v2.swytchcode.com"
+		}
+
+		token, _, _ := auth.ResolveToken()
+		if token == "" {
+			return nil, ToolOutput{}, fmt.Errorf("not authenticated — run `swytchcode login`")
+		}
+
+		oc := NewOutputCapture(streamOutput)
+		confirm := args.Confirm
+		err := commands.RunUpgrade(commands.UpgradeConfig{
+			APIURL:  apiURL,
+			Token:   token,
+			Library: args.Library,
+		}, func(_ string) bool { return confirm }, oc.Stdout())
+		if err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		result := oc.GetCombinedOutput()
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: result}},
 		}, ToolOutput{Output: result}, nil
 	})
 

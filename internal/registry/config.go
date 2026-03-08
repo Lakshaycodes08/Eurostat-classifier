@@ -1,16 +1,25 @@
 // config.go provides registry configuration using build-time constants.
 package registry
 
-import "gitlab.com/swytchcode/shell/internal/constants"
+import (
+	"os"
+
+	"gitlab.com/swytchcode/shell/internal/constants"
+)
 
 // Config holds the registry API configuration.
 type Config struct {
 	BaseURL string
 }
 
-// DefaultConfig returns the default registry configuration using build-time constants.
+// DefaultConfig returns the default registry configuration.
+// It respects the SWYTCHCODE_API_URL environment variable, falling back to the build-time constant.
 func DefaultConfig() *Config {
-	return &Config{BaseURL: constants.RegistryURL}
+	u := os.Getenv("SWYTCHCODE_API_URL")
+	if u == "" {
+		u = constants.RegistryURL
+	}
+	return &Config{BaseURL: u}
 }
 
 // ConfigFromProjectRoot returns registry config using build-time constants.

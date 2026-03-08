@@ -53,10 +53,10 @@ Optional: `$env:VERSION="v0.1.0"` for a specific release, `$env:INSTALL_DIR="C:\
 | `swytchcode mcp stop` | Stop MCP server (daemon mode) |
 | `swytchcode login` | Device-flow browser login; saves session to `~/.swytchcode/auth.json` |
 | `swytchcode logout` | Delete saved session |
-| `swytchcode whoami` | Show current session (email, customer UUID, expiry) |
-| `swytchcode check [--project <uuid>]` | Check for integration update proposals; exits 1 on breaking changes |
-| `swytchcode inspect <library> [--project <uuid>]` | Show full proposal detail for a library (requires login) |
-| `swytchcode upgrade <library> [--project <uuid>]` | Approve a pending integration update proposal (requires login) |
+| `swytchcode whoami` | Show current session (email, customer UUID, expiry); prints "Not logged in" if no session |
+| `swytchcode check [project_or_library]` | Check for integration update proposals; exits 1 on breaking changes; requires `SWYTCHCODE_TOKEN` or login |
+| `swytchcode inspect <library>` | Show full proposal detail for a library (requires login) |
+| `swytchcode upgrade <library>` | Approve a pending integration update proposal (requires login) |
 
 ---
 
@@ -525,7 +525,18 @@ swytchcode mcp stop
 
 ### Cloud commands (login / logout / whoami / check / inspect / upgrade)
 
-These commands require authentication via user session (`swytchcode login`) or a service token (`SWYTCHCODE_TOKEN`). They contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode.com`).
+Auth requirements vary by command:
+
+| Command | Auth required | Accepts `SWYTCHCODE_TOKEN` |
+|---------|--------------|---------------------------|
+| `login` | No (this is how you authenticate) | — |
+| `logout` | No | — |
+| `whoami` | Optional — prints "Not logged in" if no session | No |
+| `check` | Optional — passes empty token if missing (server returns 401) | Yes |
+| `inspect` | Yes — user session only | No |
+| `upgrade` | Yes — user session only | No |
+
+Cloud commands contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode.com`).
 
 #### `swytchcode login`
 
@@ -551,52 +562,46 @@ Prints the current session: email, customer UUID, and token expiry.
 swytchcode whoami
 ```
 
-#### `swytchcode check [--project <uuid>]`
+Prints "Not logged in." if no session exists. Does not accept `SWYTCHCODE_TOKEN`.
 
-Fetches integration update proposals for the project and prints a summary.
+#### `swytchcode check [project_or_library]`
+
+Fetches integration update proposals and prints a summary.
 
 ```bash
-swytchcode check
-swytchcode check --project <project-uuid>
+swytchcode check                    # all proposals for the authed user
+swytchcode check weaviate           # filter by project name
+swytchcode check weaviate.lyrid     # filter by project.library
 ```
-
-**Flags:**
-- `--project <uuid>`: Project UUID (overrides `SWYTCHCODE_PROJECT_UUID` env var)
 
 **Exit codes:**
 - `0` — No proposals (or no breaking ones)
 - `1` — Breaking-impact proposals found
 - `2` — CLI/auth error
 
-Requires `SWYTCHCODE_TOKEN` or `~/.swytchcode/auth.json`. Project UUID from `--project` flag or `SWYTCHCODE_PROJECT_UUID`.
+Requires `SWYTCHCODE_TOKEN` or `~/.swytchcode/auth.json`.
 
-#### `swytchcode inspect <library> [--project <uuid>]`
+#### `swytchcode inspect <library>`
 
 Shows full proposal detail for the named library (two-step: looks up proposal UUID, then fetches detail).
 
 ```bash
 swytchcode inspect stripe
-swytchcode inspect stripe --project <project-uuid>
+swytchcode inspect stripe.stripe
 ```
 
-**Flags:**
-- `--project <uuid>`: Project UUID (overrides `SWYTCHCODE_PROJECT_UUID` env var)
+Requires user login (`swytchcode login`).
 
-Requires user login (`swytchcode login`). Project UUID from `--project` flag or `SWYTCHCODE_PROJECT_UUID`.
-
-#### `swytchcode upgrade <library> [--project <uuid>]`
+#### `swytchcode upgrade <library>`
 
 Approves a pending integration update proposal for the named library.
 
 ```bash
 swytchcode upgrade stripe
-swytchcode upgrade stripe --project <project-uuid>
+swytchcode upgrade stripe.stripe
 ```
 
-**Flags:**
-- `--project <uuid>`: Project UUID (overrides `SWYTCHCODE_PROJECT_UUID` env var)
-
-Requires user login (`swytchcode login`). Project UUID from `--project` flag or `SWYTCHCODE_PROJECT_UUID`.
+Requires user login (`swytchcode login`).
 
 See `commands.md` for full verification detail on these commands.
 

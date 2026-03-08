@@ -151,21 +151,6 @@ func (s *AuthSession) Refresh(apiURL string) error {
 	return nil
 }
 
-// ResolveProjectUUID returns the project UUID to use for a command, in priority order:
-//  1. flagValue (non-empty string from --project flag)
-//  2. SWYTCHCODE_PROJECT_UUID environment variable
-//
-// Returns an error if neither source provides a value.
-func ResolveProjectUUID(flagValue string) (string, error) {
-	if flagValue != "" {
-		return flagValue, nil
-	}
-	if v := os.Getenv("SWYTCHCODE_PROJECT_UUID"); v != "" {
-		return v, nil
-	}
-	return "", fmt.Errorf("no project specified — use --project or set SWYTCHCODE_PROJECT_UUID")
-}
-
 // ResolveToken returns a bearer token for API calls, trying in order:
 //  1. SWYTCHCODE_TOKEN env var (service token — agents, CI)
 //  2. ~/.swytchcode/auth.json (user session from `swytchcode login`)

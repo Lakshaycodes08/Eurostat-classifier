@@ -14,33 +14,33 @@ import (
 	"gitlab.com/swytchcode/shell/internal/telemetry"
 )
 
-var checkProject string
-
 var checkCmd = &cobra.Command{
-	Use:   "check",
+	Use:   "check [project_or_library]",
 	Short: "Check for available integration updates",
 	Long: `Queries the Swytchcode backend for integration update proposals detected by the agent pipeline.
 
 Exits with code 1 if any major (breaking) proposals are found, 0 otherwise.
 
-Project UUID resolution order:
-  1. --project flag
-  2. SWYTCHCODE_PROJECT_UUID environment variable
+Optionally filter by project name or project.library:
+  swytchcode check                  # all proposals for the authed user
+  swytchcode check weaviate         # filter by project name
+  swytchcode check weaviate.lyrid   # filter by project.library
 
 Optional environment variables:
   SWYTCHCODE_API_URL   Backend base URL (default: https://api-v2.swytchcode.com)
   SWYTCHCODE_TOKEN     Service token for API authentication (agents/CI)
 
 Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		apiURL := os.Getenv("SWYTCHCODE_API_URL")
 		if apiURL == "" {
 			apiURL = "https://api-v2.swytchcode.com"
 		}
-		projectUUID, err := auth.ResolveProjectUUID(checkProject)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error:", err)
-			os.Exit(2)
+
+		var library string
+		if len(args) == 1 {
+			library = args[0]
 		}
 
 		// Soft-fail auth: if neither service token nor session is available,
@@ -49,15 +49,15 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 
 		outcome := "success"
 		hasBreaking, err := commands.RunCheck(commands.CheckConfig{
-			APIURL:      apiURL,
-			Token:       token,
-			ProjectUUID: projectUUID,
+			APIURL:  apiURL,
+			Token:   token,
+			Library: library,
 		}, os.Stdout)
 		if err != nil {
 			outcome = "failure"
 			telemetry.Send(apiURL, token, telemetry.Event{
 				Command:     "check",
-				ProjectUUID: projectUUID,
+				LibraryName: library,
 				Outcome:     outcome,
 				CLIVersion:  constants.Version,
 			})
@@ -72,7 +72,7 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 		}
 		telemetry.Send(apiURL, token, telemetry.Event{
 			Command:     "check",
-			ProjectUUID: projectUUID,
+			LibraryName: library,
 			Outcome:     outcome,
 			CLIVersion:  constants.Version,
 		})
@@ -81,8 +81,4 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 		}
 		return nil
 	},
-}
-
-func init() {
-	checkCmd.Flags().StringVar(&checkProject, "project", "", "Project UUID (overrides SWYTCHCODE_PROJECT_UUID)")
 }

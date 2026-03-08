@@ -28,6 +28,9 @@ To add a new integration, follow these steps in precise order
 4. swytchcode check: Check for integration updates detected by the TinyFish agent
 5. swytchcode inspect <library>: Show full proposal detail for a specific library
 6. swytchcode upgrade <library>: Approve a pending update proposal (requires user login)
+7. swytchcode login: Authenticate with the Swytchcode registry (required for inspect/upgrade)
+8. swytchcode whoami: Show currently authenticated user
+9. swytchcode logout: Remove stored authentication
 
 
 

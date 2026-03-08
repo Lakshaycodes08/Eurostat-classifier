@@ -130,16 +130,20 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 			}
 
 			// Merge stdin into args when runtime sends JSON (e.g. {"project_name":"swytchcode"} or {"tool":"...","args":{...}}).
-			if stdinBytes := readStdinIfAvailable(); len(stdinBytes) > 0 {
-				var stdinObj map[string]interface{}
-				if json.Unmarshal(stdinBytes, &stdinObj) == nil {
-					if nested, ok := stdinObj["args"].(map[string]interface{}); ok && stdinObj["tool"] != nil {
-						for k, v := range nested {
-							argsMap[k] = v
-						}
-					} else {
-						for k, v := range stdinObj {
-							argsMap[k] = v
+			// Only read stdin if it's piped — skip when stdin is a TTY to avoid blocking.
+			fi, _ := os.Stdin.Stat()
+			if fi.Mode()&os.ModeCharDevice == 0 {
+				if stdinBytes := readStdinIfAvailable(); len(stdinBytes) > 0 {
+					var stdinObj map[string]interface{}
+					if json.Unmarshal(stdinBytes, &stdinObj) == nil {
+						if nested, ok := stdinObj["args"].(map[string]interface{}); ok && stdinObj["tool"] != nil {
+							for k, v := range nested {
+								argsMap[k] = v
+							}
+						} else {
+							for k, v := range stdinObj {
+								argsMap[k] = v
+							}
 						}
 					}
 				}

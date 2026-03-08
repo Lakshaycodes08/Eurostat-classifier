@@ -16,8 +16,6 @@ import (
 	"gitlab.com/swytchcode/shell/internal/telemetry"
 )
 
-var upgradeProject string
-
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade <library>",
 	Short: "Approve a pending integration proposal",
@@ -27,7 +25,8 @@ Requires user login (run 'swytchcode login'). Service tokens are not accepted
 because the backend records which user approved the change.
 
 Example:
-  swytchcode upgrade stripe`,
+  swytchcode upgrade stripe
+  swytchcode upgrade stripe.stripe`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		library := args[0]
@@ -35,11 +34,6 @@ Example:
 		apiURL := os.Getenv("SWYTCHCODE_API_URL")
 		if apiURL == "" {
 			apiURL = "https://api-v2.swytchcode.com"
-		}
-		projectUUID, err := auth.ResolveProjectUUID(upgradeProject)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error:", err)
-			os.Exit(2)
 		}
 
 		// upgrade requires a user session — no env-var service token fallback.
@@ -62,10 +56,9 @@ Example:
 		}
 
 		err = commands.RunUpgrade(commands.UpgradeConfig{
-			APIURL:      apiURL,
-			Token:       session.AccessToken,
-			ProjectUUID: projectUUID,
-			Library:     library,
+			APIURL:  apiURL,
+			Token:   session.AccessToken,
+			Library: library,
 		}, confirm, os.Stdout)
 		outcome := "success"
 		if err != nil {
@@ -73,15 +66,10 @@ Example:
 		}
 		telemetry.Send(apiURL, session.AccessToken, telemetry.Event{
 			Command:     "upgrade",
-			ProjectUUID: projectUUID,
 			LibraryName: library,
 			Outcome:     outcome,
 			CLIVersion:  constants.Version,
 		})
 		return err
 	},
-}
-
-func init() {
-	upgradeCmd.Flags().StringVar(&upgradeProject, "project", "", "Project UUID (overrides SWYTCHCODE_PROJECT_UUID)")
 }

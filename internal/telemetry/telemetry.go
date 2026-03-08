@@ -16,7 +16,6 @@ import (
 type Event struct {
 	EventID     string `json:"event_id"`
 	Command     string `json:"command"`               // "check" | "inspect" | "upgrade" | "fetch"
-	ProjectUUID string `json:"project_uuid,omitempty"`
 	LibraryName string `json:"library_name,omitempty"`
 	Outcome     string `json:"outcome"`               // "success" | "failure" | "cancelled"
 	CLIVersion  string `json:"cli_version"`
