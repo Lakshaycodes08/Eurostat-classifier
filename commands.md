@@ -7,7 +7,7 @@ This file is an internal checklist for verifying the **real** Swytchcode CLI aga
 ## 1. Build
 
 ```bash
-cd /path/to/swytchcode/shell
+cd /path/to/cli
 go build -o swytchcode ./cmd/swytchcode/
 ```
 
@@ -44,7 +44,8 @@ user login only.
 ```bash
 # SWYTCHCODE_API_URL defaults to https://api-v2.swytchcode.com — only set to override (e.g. staging)
 export SWYTCHCODE_API_URL=https://api-v2.swytchcode.com
-export SWYTCHCODE_TOKEN=<value of INTERNAL_AGENT_TOKEN from backend .env>
+# Set SWYTCHCODE_TOKEN to your service token (e.g. from backend env or CI secret). The CLI does not read INTERNAL_AGENT_TOKEN.
+export SWYTCHCODE_TOKEN=<your-token>
 export SWYTCHCODE_PROJECT_UUID=<your project UUID>
 ```
 
@@ -129,7 +130,7 @@ exit code: 0
 
 ## 7. check — with a major proposal
 
-After TinyFish scan has run (or after seeding the DB manually — see `demo_todo.md` Step 4):
+After the backend has created proposals (e.g. TinyFish scan or manual DB seed):
 
 ```bash
 ./swytchcode check

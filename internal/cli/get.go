@@ -8,9 +8,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/shell/internal/commands"
-	"gitlab.com/swytchcode/shell/internal/registry"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/commands"
+	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 var (

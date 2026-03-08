@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/swytchcode/shell/internal/manifest"
-	"gitlab.com/swytchcode/shell/internal/registry"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/manifest"
+	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // RunBootstrap runs the bootstrap command: fetches all integrations declared in tooling.json.

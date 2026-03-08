@@ -7,8 +7,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/shell/internal/commands"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/commands"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // bootstrapCmd implements `swytchcode bootstrap`.

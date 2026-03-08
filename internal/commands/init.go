@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/swytchcode/shell/internal/constants"
-	"gitlab.com/swytchcode/shell/internal/editors"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/editors"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // RunInit runs the init command: creates .swytchcode/, tooling.json, and editor-specific config.

@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-	"gitlab.com/swytchcode/shell/internal/registry"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // ToolMatch represents a found tool (method or workflow) in an integration.

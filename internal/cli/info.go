@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/shell/internal/commands"
+	"gitlab.com/swytchcode/cli/internal/commands"
 )
 
 var (

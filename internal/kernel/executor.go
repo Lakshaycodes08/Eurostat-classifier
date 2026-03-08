@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // ExecRequest is the JSON input shape expected on stdin for swytchcode exec.

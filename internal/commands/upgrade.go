@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"gitlab.com/swytchcode/shell/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/constants"
 )
 
 // UpgradeConfig holds configuration for an upgrade run.

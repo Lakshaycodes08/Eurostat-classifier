@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"gitlab.com/swytchcode/shell/internal/auth"
-	"gitlab.com/swytchcode/shell/internal/commands"
-	"gitlab.com/swytchcode/shell/internal/constants"
-	"gitlab.com/swytchcode/shell/internal/kernel"
-	"gitlab.com/swytchcode/shell/internal/registry"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/auth"
+	"gitlab.com/swytchcode/cli/internal/commands"
+	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/kernel"
+	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // ToolOutput represents the output from MCP tools (matches CLI output).

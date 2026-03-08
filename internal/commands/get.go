@@ -9,9 +9,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/swytchcode/shell/internal/manifest"
-	"gitlab.com/swytchcode/shell/internal/registry"
-	"gitlab.com/swytchcode/shell/internal/util"
+	"gitlab.com/swytchcode/cli/internal/manifest"
+	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // RunGet runs the get command: fetch bundles for a project and write wrekenfile, methods, workflows, manifest.
