@@ -27,6 +27,11 @@ func MaybeHintNoAuth() {
 	})
 }
 
+// debugEnabled reports whether verbose telemetry logging is enabled.
+func debugEnabled() bool {
+	return os.Getenv(constants.EnvVarTelemetryDebug) != ""
+}
+
 // Event represents a single CLI execution event sent to POST /v2/cli/telemetry/batch.
 type Event struct {
 	EventID           string  `json:"event_id"`
@@ -113,10 +118,13 @@ func newEventID() string {
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
-// Send fires off a telemetry event asynchronously when fromSession is true and token is set.
-// When fromSession is false (e.g. SWYTCHCODE_TOKEN) or token is empty, no event is sent.
+// Send fires off a telemetry event asynchronously when a token is set.
+// When token is empty, no event is sent. fromSession is used only for auth refresh logic.
 func Send(apiURL, token string, fromSession bool, ev Event) {
-	if !fromSession || token == "" {
+	if token == "" {
+		if debugEnabled() {
+			fmt.Fprintln(os.Stderr, "[telemetry] skipped (tokenEmpty=true)")
+		}
 		return
 	}
 	if ev.EventID == "" {
@@ -128,17 +136,60 @@ func Send(apiURL, token string, fromSession bool, ev Event) {
 	if ev.CLIVersion == "" {
 		ev.CLIVersion = constants.Version
 	}
+	if debugEnabled() {
+		fmt.Fprintln(os.Stderr, "[telemetry] queue event",
+			"command=", ev.Command,
+			"outcome=", ev.Outcome,
+			"library=", ev.LibraryName,
+			"apiURL=", apiURL,
+		)
+	}
 	go func() {
-		_ = send(apiURL, token, fromSession, ev)
+		if err := send(apiURL, token, fromSession, ev); err != nil && debugEnabled() {
+			fmt.Fprintln(os.Stderr, "[telemetry] send error:", err.Error())
+		}
 	}()
 }
 
-// SendEvent builds and sends a command outcome event. Only sends when fromSession is true and token is set.
+// SendEvent builds and sends a command outcome event asynchronously. Only sends when token is set.
 // err may be nil (outcome = "success") or non-nil (outcome = "failure"). opts may be nil.
 func SendEvent(apiURL, token string, fromSession bool, command, library string, err error, opts *EventOpts) {
-	if !fromSession || token == "" {
+	if token == "" {
+		if debugEnabled() {
+			fmt.Fprintln(os.Stderr, "[telemetry] SendEvent skipped (tokenEmpty=true)")
+		}
 		return
 	}
+	ev := buildEvent(command, library, err, opts)
+	Send(apiURL, token, fromSession, ev)
+}
+
+// SendEventSync builds and sends a command outcome event synchronously.
+// Used for commands like exec where the process exits immediately after.
+// err may be nil (outcome = "success") or non-nil (outcome = "failure"). opts may be nil.
+func SendEventSync(apiURL, token string, fromSession bool, command, library string, err error, opts *EventOpts) {
+	if token == "" {
+		if debugEnabled() {
+			fmt.Fprintln(os.Stderr, "[telemetry] SendEventSync skipped (tokenEmpty=true)")
+		}
+		return
+	}
+	ev := buildEvent(command, library, err, opts)
+	if debugEnabled() {
+		fmt.Fprintln(os.Stderr, "[telemetry] sync send event",
+			"command=", ev.Command,
+			"outcome=", ev.Outcome,
+			"library=", ev.LibraryName,
+			"apiURL=", apiURL,
+		)
+	}
+	if err := send(apiURL, token, fromSession, ev); err != nil && debugEnabled() {
+		fmt.Fprintln(os.Stderr, "[telemetry] sync send error:", err.Error())
+	}
+}
+
+// buildEvent constructs an Event from the given inputs.
+func buildEvent(command, library string, err error, opts *EventOpts) Event {
 	outcome := "success"
 	if err != nil {
 		outcome = "failure"
@@ -167,7 +218,7 @@ func SendEvent(apiURL, token string, fromSession bool, command, library string, 
 	} else if outcome == "failure" {
 		ev.ErrorType = ClassifyError(err)
 	}
-	Send(apiURL, token, fromSession, ev)
+	return ev
 }
 
 func send(apiURL, token string, fromSession bool, ev Event) error {
@@ -178,6 +229,10 @@ func send(apiURL, token string, fromSession bool, ev Event) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), constants.TelemetryTimeout)
 	defer cancel()
+
+	if debugEnabled() {
+		fmt.Fprintln(os.Stderr, "[telemetry] POST", apiURL+"/v2/cli/telemetry/batch")
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		apiURL+"/v2/cli/telemetry/batch", bytes.NewReader(payload))
@@ -193,6 +248,10 @@ func send(apiURL, token string, fromSession bool, ev Event) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if debugEnabled() {
+		fmt.Fprintln(os.Stderr, "[telemetry] response status:", resp.StatusCode)
+	}
 
 	// On 401 and session auth, refresh and retry once
 	if resp.StatusCode == http.StatusUnauthorized && fromSession {

@@ -39,6 +39,18 @@ Clients call these tools; the server:
 
 **Execution still goes through the kernel** – only `swytchcode_exec` actually runs tools; the rest are discovery and configuration helpers.
 
+### Exec vs MCP HTTP server and integration base URLs
+
+- `swytchcode_exec` **always** calls the kernel, which in turn:
+  - Reads `tooling.json` to resolve the tool and integration.
+  - Reads `.swytchcode/integrations/manifest.json` to resolve the base URL for that integration based on `mode` (`sandbox_endpoint` vs `production_endpoint`).
+  - Builds the final URL as `baseURL + endpoint` (endpoint comes from the Wreken `METHODS` definition).
+- The **MCP HTTP transport** (when you run `swytchcode mcp serve --transport http --port 3000`) is only a transport for MCP clients. It is **not** the base URL for tools executed via `swytchcode_exec`.
+  - You can have MCP listening on `http://localhost:3000` while a tool targets `https://api.example.com` or any other host from `manifest.json`.
+- If an integration bundle has an empty or placeholder endpoint for the active `mode`, the CLI falls back to `http://localhost` as the base URL for that integration (see “Base URL Resolution” in the main README).
+  - In that case, a 404 like `Route PUT:/... not found` is coming from the **target API** at `http://localhost`, not from the MCP server.
+  - To fix it, update the integration’s entry in `.swytchcode/integrations/manifest.json` so `sandbox_endpoint` / `production_endpoint` point at the correct API host, or start the appropriate backend locally on the configured base URL.
+
 ### Daemon mode
 
 - `swytchcode mcp status` – Check if the MCP server daemon is running.

@@ -144,7 +144,8 @@ swytchcode get weaviate --yes --non-interactive
   - `methods.json` — Methods list for this integration version
   - `workflows.json` — Workflows list for this integration version
 - Updates `.swytchcode/integrations/manifest.json` with `project.library` entries (version, `sandbox_endpoint`, `production_endpoint`, methods count, workflows count)
-- Uses `sandbox_endpoint` and `production_endpoint` directly from bundle response (uses `http://localhost` if empty)
+- Uses `sandbox_endpoint` and `production_endpoint` directly from bundle response.
+  - If an endpoint is missing for the active `mode`, the CLI falls back to `http://localhost` for that integration **and expects you to be running the corresponding backend locally**. This is unrelated to the MCP HTTP server address.
 
 **Error messages:**
 - `"library name required when running non-interactively"` — Missing project name in non-interactive mode
@@ -538,7 +539,7 @@ Auth requirements vary by command:
 
 Cloud commands contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode.com`).
 
-**Telemetry:** Usage events are sent only when you are logged in via `swytchcode login`. If `SWYTCHCODE_TOKEN` is set, telemetry is not sent. With no auth, a one-time hint may be shown. See `CLI_TELEMETRY.md` for the full contract.
+**Telemetry:** Usage events are sent only when you are logged in via `swytchcode login`. If `SWYTCHCODE_TOKEN` is set, telemetry is not sent. With no auth, a one-time hint may be shown. See `CLI_TELEMETRY.md` for the full contract. Telemetry is **independent of exec success** — HTTP 4xx/5xx responses from the target API (including 404s from `http://localhost`) are still real API responses; debug them via tool info, `--dry-run`, and your project’s `tooling.json` / `manifest.json`, not by changing telemetry settings.
 
 **Where to set SWYTCHCODE_TOKEN:** The CLI reads the token only from the process environment (it does not load config or `.env` files).
 
@@ -821,6 +822,27 @@ All errors are written to stderr as JSON:
 ```
 
 Exit codes are stable and documented above. The kernel never prompts during execution and never calls the registry during `exec`.
+
+### Debugging 404s from localhost
+
+When a tool call returns a 404 with a URL starting with `http://localhost` (for example, a message like `Route PUT:/... not found` in the `data.error` field), the 404 is coming from the **target API** at that base URL, not from Swytchcode or the MCP server.
+
+To debug:
+
+1. Inspect the tool definition:
+   - `swytchcode info <canonical_id> --json`
+   - Confirm the HTTP method and endpoint path.
+2. Inspect the resolved request without executing it:
+   - `swytchcode exec <canonical_id> --dry-run --json`
+   - Check the `method`, `url`, `headers`, and `body` fields.
+3. Inspect your project configuration:
+   - `.swytchcode/tooling.json` → confirm `mode` and `tools[canonical_id].integration`.
+   - `.swytchcode/integrations/manifest.json` → confirm the integration’s `sandbox_endpoint` / `production_endpoint`.
+4. Fix either:
+   - Update the integration’s endpoints in `manifest.json` so they point at the correct API host (sandbox or production), **or**
+   - Start/adjust the local backend so it actually implements the route at the configured `http://localhost` base URL.
+
+MCP’s HTTP server (when enabled via `swytchcode mcp serve --transport http`) is only a transport for MCP clients and is **never** used as the base URL for tool execution.
 
 ---
 
