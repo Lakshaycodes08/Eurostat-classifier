@@ -80,7 +80,8 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 			start := time.Now()
 			exitCode = kernel.Execute(os.Stdin, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "")
 			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
-			telemetry.SendEvent(apiURL, token, fromSession, "exec", "", outcomeErr(exitCode), opts)
+			// Use synchronous telemetry for exec since the process exits immediately after.
+			telemetry.SendEventSync(apiURL, token, fromSession, "exec", "", outcomeErr(exitCode), opts)
 		} else {
 			// CLI args mode: canonical_id provided as argument
 			canonicalID := args[0]
@@ -179,7 +180,8 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 			start := time.Now()
 			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "")
 			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
-			telemetry.SendEvent(apiURL, token, fromSession, "exec", canonicalID, outcomeErr(exitCode), opts)
+			// Use synchronous telemetry for exec since the process exits immediately after.
+			telemetry.SendEventSync(apiURL, token, fromSession, "exec", canonicalID, outcomeErr(exitCode), opts)
 		}
 
 		os.Exit(exitCode)

@@ -58,6 +58,10 @@ const (
 
 	// EnvVarTelemetryMCP is the env var that, when set to "1", marks execution as MCP-sourced.
 	EnvVarTelemetryMCP = "SWYTCHCODE_MCP"
+
+	// EnvVarTelemetryDebug enables verbose telemetry logging when set (any non-empty value).
+	// When enabled, telemetry sends and skips are logged to stderr with a [telemetry] prefix.
+	EnvVarTelemetryDebug = "SWYTCHCODE_TELEMETRY_DEBUG"
 )
 
 // NewHTTPClient returns an *http.Client with the given timeout.
