@@ -6,7 +6,13 @@
 set -e
 
 BINARY_NAME="swytchcode"
-RELEASE_BASE="${BASE_URL:-https://gitlab.com/swytchcode/cli/-/releases}"
+#
+# Default download base is GitLab Pages (cli.swytchcode.com), which is updated by GitLab CI
+# for every tagged release and includes a /releases/latest directory that always matches
+# the website's advertised latest version.
+#
+# You can override via BASE_URL to point at GitLab Releases (or a mirror) if needed.
+RELEASE_BASE="${BASE_URL:-https://cli.swytchcode.com/releases}"
 VERSION="${VERSION:-latest}"
 
 # Detect OS and arch (darwin/linux + amd64/arm64)
@@ -61,9 +67,9 @@ main() {
   detect_platform
   artifact_name="${BINARY_NAME}_${os}_${arch}.tar.gz"
   if [ "$VERSION" = "latest" ]; then
-    download_base="${RELEASE_BASE}/permalink/latest/downloads"
+    download_base="${RELEASE_BASE}/latest"
   else
-    download_base="${RELEASE_BASE}/${VERSION}/downloads"
+    download_base="${RELEASE_BASE}/${VERSION}"
   fi
 
   tmpdir="$(mktemp -d)"

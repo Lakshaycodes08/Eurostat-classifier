@@ -80,13 +80,16 @@ var EnvVarsCI = []string{
 	"CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "TRAVIS", "JENKINS_URL", "BUILDKITE",
 }
 
-// Application configuration (build-time constants)
-const (
-	// Version is the Swytchcode shell version.
-	Version = "1.0.2"
-
-	// RegistryURL is the default registry base URL (build-time constant).
-	// Set this at build time; runtime environment variables are not used.
-	// RegistryURL = "https://dev-api-v2.swytchcode.world"
-	RegistryURL = "https://api-v2.swytchcode.com"
+// Application configuration
+//
+// Note: Version must be a variable (not a const) so it can be overridden at build time
+// via `-ldflags "-X gitlab.com/swytchcode/cli/internal/constants.Version=<version>"` (Goreleaser).
+var (
+	// Version is the Swytchcode CLI version (overridden by release builds).
+	Version = "1.0.5"
 )
+
+// RegistryURL is the default registry base URL (build-time constant).
+// Set this at build time; runtime environment variables are not used.
+// RegistryURL = "https://dev-api-v2.swytchcode.world"
+const RegistryURL = "https://api-v2.swytchcode.com"

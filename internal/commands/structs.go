@@ -54,15 +54,26 @@ func ResolveInputs(wreken map[string]interface{}, inputs interface{}) (interface
 			if typeStr == "" {
 				typeStr = getString(specMap, "type")
 			}
-			structName, isStruct := parseStructType(typeStr)
-			if !isStruct {
+			var schema map[string]interface{}
+			visited := make(map[string]bool)
+			if innerName, isArrayStruct := parseArrayStructType(typeStr); isArrayStruct {
+				nested, err := resolveStruct(wreken, innerName, visited)
+				if err != nil {
+					return nil, fmt.Errorf("input[%d].%s: %w", i, paramName, err)
+				}
+				schema = map[string]interface{}{
+					"type":  "array",
+					"items": buildJSONSchemaObject(nested),
+				}
+			} else if structName, isStruct := parseStructType(typeStr); isStruct {
+				var err error
+				schema, err = resolveStruct(wreken, structName, visited)
+				if err != nil {
+					return nil, fmt.Errorf("input[%d].%s: %w", i, paramName, err)
+				}
+			} else {
 				newItem[paramName] = paramSpec
 				continue
-			}
-			visited := make(map[string]bool)
-			schema, err := resolveStruct(wreken, structName, visited)
-			if err != nil {
-				return nil, fmt.Errorf("input[%d].%s: %w", i, paramName, err)
 			}
 			// Copy param spec and replace with resolved OBJECT + schema
 			copied := copyMap(specMap)
@@ -149,9 +160,19 @@ func getStatus(m map[string]interface{}) int {
 	return 0
 }
 
-// resolveReturnTypeToSchema turns a type string (STRUCT(name), []ANY, STRING, etc.) into a schema map.
+// resolveReturnTypeToSchema turns a type string (STRUCT(name), []STRUCT(name), []ANY, STRING, etc.) into a schema map.
 func resolveReturnTypeToSchema(wreken map[string]interface{}, typeStr string, visited map[string]bool) (map[string]interface{}, error) {
-	typeStr = strings.TrimSpace(typeStr)
+	typeStr = strings.TrimSpace(strings.Trim(typeStr, "\""))
+	if innerName, isArrayStruct := parseArrayStructType(typeStr); isArrayStruct {
+		nested, err := resolveStruct(wreken, innerName, visited)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]interface{}{
+			"type":  "array",
+			"items": buildJSONSchemaObject(nested),
+		}, nil
+	}
 	structName, isStruct := parseStructType(typeStr)
 	if isStruct {
 		return resolveStruct(wreken, structName, visited)
@@ -167,15 +188,39 @@ func resolveReturnTypeToSchema(wreken map[string]interface{}, typeStr string, vi
 	}
 }
 
-var structTypeRe = regexp.MustCompile(`^STRUCT\((.+)\)$`)
+var structTypeRe    = regexp.MustCompile(`^STRUCT\((.+)\)$`)
+var arrayStructRe  = regexp.MustCompile(`^\[\]STRUCT\((.+)\)$`)
 
 func parseStructType(s string) (name string, ok bool) {
-	s = strings.TrimSpace(s)
+	s = strings.TrimSpace(strings.Trim(s, "\""))
 	m := structTypeRe.FindStringSubmatch(s)
 	if len(m) != 2 {
 		return "", false
 	}
 	return strings.TrimSpace(m[1]), true
+}
+
+// parseArrayStructType recognizes []STRUCT(Name) or "[]STRUCT(Name)".
+func parseArrayStructType(s string) (structName string, ok bool) {
+	s = strings.TrimSpace(strings.Trim(s, "\""))
+	m := arrayStructRe.FindStringSubmatch(s)
+	if len(m) != 2 {
+		return "", false
+	}
+	return strings.TrimSpace(m[1]), true
+}
+
+// buildJSONSchemaObject turns a resolved struct schema (with "properties" and optionally "required")
+// into a JSON Schema object node: { "type": "object", "properties": ..., "required": ... }.
+func buildJSONSchemaObject(nested map[string]interface{}) map[string]interface{} {
+	out := map[string]interface{}{
+		"type":       "object",
+		"properties": nested["properties"],
+	}
+	if req, ok := nested["required"].([]string); ok && len(req) > 0 {
+		out["required"] = req
+	}
+	return out
 }
 
 // resolveStruct returns a schema object for the struct: { properties: { name: { type, required } }, required: [...] }.
@@ -211,7 +256,11 @@ func resolveStruct(wreken map[string]interface{}, structName string, visited map
 		if !ok {
 			continue
 		}
+		// Wrekenfiles may use "name" or "NAME" for struct field names.
 		fieldName := getString(fieldMap, "name")
+		if fieldName == "" {
+			fieldName = getString(fieldMap, "NAME")
+		}
 		if fieldName == "" {
 			continue
 		}
@@ -225,17 +274,29 @@ func resolveStruct(wreken map[string]interface{}, structName string, visited map
 			required = append(required, fieldName)
 		}
 
+		// Array of struct: []STRUCT(Name) or "[]STRUCT(Name)"
+		if innerName, isArrayStruct := parseArrayStructType(fieldType); isArrayStruct {
+			nested, err := resolveStruct(wreken, innerName, visited)
+			if err != nil {
+				return nil, fmt.Errorf("struct %q field %q: %w", structName, fieldName, err)
+			}
+			itemSchema := buildJSONSchemaObject(nested)
+			properties[fieldName] = map[string]interface{}{
+				"type":     "array",
+				"items":    itemSchema,
+				"required": req,
+			}
+			continue
+		}
+
 		innerStructName, isStruct := parseStructType(fieldType)
 		if isStruct {
 			nested, err := resolveStruct(wreken, innerStructName, visited)
 			if err != nil {
 				return nil, fmt.Errorf("struct %q field %q: %w", structName, fieldName, err)
 			}
-			properties[fieldName] = map[string]interface{}{
-				"type":     "object",
-				"schema":  nested,
-				"required": req,
-			}
+			// JSON Schema style: inline properties/required at every level (no "schema" wrapper).
+			properties[fieldName] = buildJSONSchemaObject(nested)
 			continue
 		}
 
@@ -284,6 +345,8 @@ func normalizeType(t string) string {
 	switch {
 	case strings.EqualFold(t, "STRING"):
 		return "string"
+	case strings.EqualFold(t, "INT"), strings.EqualFold(t, "INT32"), strings.EqualFold(t, "INT64"):
+		return "integer"
 	case strings.EqualFold(t, "BOOL"):
 		return "boolean"
 	case strings.EqualFold(t, "ANY"):

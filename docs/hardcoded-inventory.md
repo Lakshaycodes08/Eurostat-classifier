@@ -7,7 +7,7 @@ This file catalogs notable hardcoded values in the Swytchcode CLI codebase and w
 ## 1. Core configuration and API endpoints
 
 - **`internal/constants/constants.go`**
-  - `Version = "1.0.2"` – build-time constant overridden by Goreleaser via `-X` in `.goreleaser.yml`.
+  - `Version = "1.0.2"` – build-time **variable** overridden by Goreleaser via `-X` in `.goreleaser.yml` (must not be a Go `const`).
   - `RegistryURL = "https://api-v2.swytchcode.com"` – default registry base URL used by the registry client.
   - `MCPBearerToken = "swytchcode-mcp-token"` – fixed bearer token for MCP HTTP transport (marked as temporary).
 
