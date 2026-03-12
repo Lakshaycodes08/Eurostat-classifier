@@ -218,10 +218,16 @@ func buildEvent(command, library string, err error, opts *EventOpts) Event {
 	} else if outcome == "failure" {
 		ev.ErrorType = ClassifyError(err)
 	}
+	if ev.EventID == "" {
+		ev.EventID = newEventID()
+	}
 	return ev
 }
 
 func send(apiURL, token string, fromSession bool, ev Event) error {
+	if ev.EventID == "" && debugEnabled() {
+		fmt.Fprintln(os.Stderr, "[telemetry] missing event_id; check buildEvent")
+	}
 	payload, err := json.Marshal(map[string]any{"events": []Event{ev}})
 	if err != nil {
 		return err
