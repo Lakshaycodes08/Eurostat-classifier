@@ -18,9 +18,9 @@ Behavior (`install.sh`):
   - `swytchcode_darwin_arm64.tar.gz`
   - `swytchcode_linux_amd64.tar.gz`
   - `swytchcode_linux_arm64.tar.gz`
-- Resolves the release download base:
-  - Latest: `https://gitlab.com/swytchcode/cli/-/releases/permalink/latest/downloads`.
-  - Pinned: `https://gitlab.com/swytchcode/cli/-/releases/$VERSION/downloads`.
+- Resolves the release download base (GitLab Pages, published by GitLab CI):
+  - Latest: `https://cli.swytchcode.com/releases/latest`.
+  - Pinned: `https://cli.swytchcode.com/releases/$VERSION`.
 - Downloads:
   - The tarball for your OS/arch.
   - `checksums.txt` from the same release.
@@ -38,12 +38,12 @@ Behavior (`install.sh`):
 ### Pinned version
 
 ```bash
-VERSION=v0.1.5 curl -fsSL https://cli.swytchcode.com/install.sh | sh
+VERSION=v1.0.5 curl -fsSL https://cli.swytchcode.com/install.sh | sh
 ```
 
 The script uses `VERSION` to construct the download base:
 
-- `https://gitlab.com/swytchcode/cli/-/releases/v0.1.5/downloads`.
+- `https://cli.swytchcode.com/releases/v0.1.5`.
 
 ### Custom install directory
 
@@ -57,7 +57,7 @@ The script installs `swytchcode` into `$INSTALL_DIR` instead of system defaults.
 
 - `VERSION` – release tag (e.g. `v0.1.5`). Defaults to `latest`.
 - `INSTALL_DIR` – target directory for the binary.
-- `BASE_URL` – override for the GitLab Releases base URL (advanced use; defaults to the official `swytchcode/cli` project).
+- `BASE_URL` – override for the release base URL (advanced use; defaults to `https://cli.swytchcode.com/releases`).
 
 ## Install (Windows, PowerShell)
 
@@ -72,9 +72,9 @@ Behavior (`install.ps1`):
 - Determines architecture (currently treats 64-bit Windows as `amd64`).
 - Constructs the artifact name:
   - `swytchcode_windows_amd64.zip`
-- Resolves the release download base:
-  - Latest: `https://gitlab.com/swytchcode/cli/-/releases/permalink/latest/downloads`.
-  - Pinned: `https://gitlab.com/swytchcode/cli/-/releases/$env:VERSION/downloads`.
+- Resolves the release download base (GitLab Pages, published by GitLab CI):
+  - Latest: `https://cli.swytchcode.com/releases/latest`.
+  - Pinned: `https://cli.swytchcode.com/releases/$env:VERSION`.
 - Downloads:
   - Zip file: `swytchcode_windows_amd64.zip`.
   - `checksums.txt` from the same release.
@@ -91,7 +91,7 @@ Behavior (`install.ps1`):
 ### Pinned version
 
 ```powershell
-$env:VERSION = "v0.1.5"
+$env:VERSION = "v1.0.5"
 irm https://cli.swytchcode.com/install.ps1 | iex
 ```
 

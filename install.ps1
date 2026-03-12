@@ -4,15 +4,20 @@
 
 $ErrorActionPreference = "Stop"
 $BinaryName = "swytchcode"
-$ReleaseBase = if ($env:BASE_URL) { $env:BASE_URL } else { "https://gitlab.com/swytchcode/cli/-/releases" }
+# Default download base is GitLab Pages (cli.swytchcode.com), which is updated by GitLab CI
+# for every tagged release and includes a /releases/latest directory that always matches
+# the website's advertised latest version.
+#
+# You can override via BASE_URL to point at GitLab Releases (or a mirror) if needed.
+$ReleaseBase = if ($env:BASE_URL) { $env:BASE_URL } else { "https://cli.swytchcode.com/releases" }
 $Version = if ($env:VERSION) { $env:VERSION } else { "latest" }
 
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
 $artifactName = "${BinaryName}_windows_${arch}.zip"
 $downloadBase = if ($Version -eq "latest") {
-    "${ReleaseBase}/permalink/latest/downloads"
+    "${ReleaseBase}/latest"
 } else {
-    "${ReleaseBase}/${Version}/downloads"
+    "${ReleaseBase}/${Version}"
 }
 
 $tmpDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_.FullName }

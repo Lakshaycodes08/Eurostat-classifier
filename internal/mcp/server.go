@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"gitlab.com/swytchcode/cli/internal/constants"
 )
 
 // Server wraps the MCP server with configuration.
@@ -21,7 +22,7 @@ type Server struct {
 // NewServer creates a new MCP server.
 func NewServer(streamOutput bool, logFilePath string) (*Server, error) {
 	server := &Server{
-		mcpServer:   mcp.NewServer(&mcp.Implementation{Name: "swytchcode", Version: "1.0.0"}, nil),
+		mcpServer:   mcp.NewServer(&mcp.Implementation{Name: "swytchcode", Version: constants.Version}, nil),
 		streamOutput: streamOutput,
 	}
 

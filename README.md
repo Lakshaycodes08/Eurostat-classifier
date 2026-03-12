@@ -20,13 +20,13 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 ```bash
 curl -fsSL https://cli.swytchcode.com/install.sh | sh
 ```
-Optional: `VERSION=v0.1.0` for a specific release, `INSTALL_DIR=/path` to choose install location (default: `/usr/local/bin` if writable, else `~/.local/bin`).
+Optional: `VERSION=v1.0.5` for a specific release, `INSTALL_DIR=/path` to choose install location (default: `/usr/local/bin` if writable, else `~/.local/bin`).
 
 **Windows (PowerShell):**
 ```powershell
 irm https://cli.swytchcode.com/install.ps1 | iex
 ```
-Optional: `$env:VERSION="v0.1.0"` for a specific release, `$env:INSTALL_DIR="C:\path"` to choose install location (default: `%LOCALAPPDATA%\Programs\swytchcode\bin`, added to user PATH automatically).
+Optional: `$env:VERSION="v1.0.5"` for a specific release, `$env:INSTALL_DIR="C:\path"` to choose install location (default: `%LOCALAPPDATA%\Programs\swytchcode\bin`, added to user PATH automatically).
 
 **More:** [GitLab Pages](https://cli.swytchcode.com/) · [swytchcode.com](https://swytchcode.com)
 
@@ -78,7 +78,7 @@ swytchcode --version
 swytchcode version 1.0.2
 ```
 
-The version is a build-time constant defined in `internal/constants/constants.go`. To change the version, update `constants.Version` and rebuild.
+The version is defined in `internal/constants/constants.go` and is overridden in release builds by Goreleaser via `-ldflags -X` so `swytchcode --version` matches the Git tag. To change the default version for local builds, update `constants.Version` and rebuild.
 
 ---
 
