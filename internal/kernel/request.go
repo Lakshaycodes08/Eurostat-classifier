@@ -59,11 +59,12 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 	params := paramsFromArgs(args)
 
 	// Replace path parameters in endpoint (e.g., /api/cluster/{id} -> /api/cluster/123)
-	// Keys used in path must not be added to query (path takes precedence).
+	// Values are URL-encoded to prevent path injection. Keys used in path must not
+	// be added to query (path takes precedence).
 	for key, value := range params {
 		placeholder := "{" + key + "}"
 		if strings.Contains(path, placeholder) {
-			path = strings.ReplaceAll(path, placeholder, value)
+			path = strings.ReplaceAll(path, placeholder, url.PathEscape(value))
 			fullURL = base + path
 		}
 	}

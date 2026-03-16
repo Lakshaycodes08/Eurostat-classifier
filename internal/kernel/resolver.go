@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 // Tool represents a tool entry from tooling.json.
@@ -21,20 +20,7 @@ type Tool struct {
 }
 
 // ResolveTool resolves a canonical_id to a Tool from tooling.json.
-// For raw methods (isRaw=true), bypasses tooling.json and returns minimal Tool.
 func ResolveTool(projectRoot, canonicalID string, isRaw bool) (*Tool, error) {
-	if isRaw {
-		// Raw methods bypass tooling.json
-		// Parse "raw.project.library.operation" format
-		parts := strings.Split(canonicalID, ".")
-		if len(parts) < 3 {
-			return nil, fmt.Errorf("invalid raw method format: %q (expected raw.project.library.operation)", canonicalID)
-		}
-		// For raw, we'll need to search integrations to find version
-		// For now, return error - raw method resolution needs integration discovery
-		return nil, fmt.Errorf("raw method resolution not yet implemented")
-	}
-
 	// Load tooling.json
 	toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
 	data, err := os.ReadFile(toolingPath)

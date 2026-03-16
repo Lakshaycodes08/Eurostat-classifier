@@ -2,20 +2,38 @@
 package kernel
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"gitlab.com/swytchcode/cli/internal/registry"
 	"gopkg.in/yaml.v3"
 )
 
 // IntegrationBundle represents a loaded integration bundle.
 type IntegrationBundle struct {
-	Project   string
-	Library   string
-	Version   string
-	Wrekenfile map[string]interface{}
+	Project            string
+	Library            string
+	Version            string
+	SandboxEndpoint    string
+	ProductionEndpoint string
+	Wrekenfile         map[string]interface{}
+}
+
+// safeName rejects path components that could enable directory traversal.
+// Valid components contain only alphanumerics, hyphens, underscores, and dots,
+// and must not be empty or the special ".." value.
+func safeName(s string) error {
+	if s == "" || s == ".." {
+		return fmt.Errorf("invalid path component %q", s)
+	}
+	if strings.ContainsAny(s, "/\\") {
+		return fmt.Errorf("path component %q must not contain slashes", s)
+	}
+	return nil
 }
 
 // LoadIntegrationBundle loads an integration bundle from disk.
@@ -38,6 +56,13 @@ func LoadIntegrationBundle(projectRoot, integration string) (*IntegrationBundle,
 
 	project := libParts[0]
 	library := libParts[1]
+
+	// Validate path components to prevent directory traversal
+	for _, component := range []string{project, library, version} {
+		if err := safeName(component); err != nil {
+			return nil, fmt.Errorf("invalid integration %q: %w", integration, err)
+		}
+	}
 
 	// Load wrekenfile.yaml
 	wrekenPath := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version, "wrekenfile.yaml")
@@ -132,4 +157,74 @@ func ResolveMethod(bundle *IntegrationBundle, canonicalID string) (*Method, erro
 	}
 
 	return method, nil
+}
+
+// ---------------------------------------------------------------------------
+// Multi-library bundle support
+// ---------------------------------------------------------------------------
+
+// BundleMap maps library_uuid → kernel IntegrationBundle.
+// Used during workflow execution to route each step to its correct bundle.
+type BundleMap map[string]*IntegrationBundle
+
+// maxWrekenSize is the maximum allowed size of a decoded wrekenfile (10 MB).
+const maxWrekenSize = 10 * 1024 * 1024
+
+// ParseRegistryBundle converts a registry API bundle (base64 YAML content)
+// into a kernel IntegrationBundle ready for use with ResolveMethod.
+func ParseRegistryBundle(rb registry.IntegrationBundle) (*IntegrationBundle, error) {
+	yamlBytes, err := base64.StdEncoding.DecodeString(rb.Files.Wreken.Content)
+	if err != nil {
+		return nil, fmt.Errorf("decode wrekenfile for %q: %w", rb.Integration, err)
+	}
+	if len(yamlBytes) > maxWrekenSize {
+		return nil, fmt.Errorf("wrekenfile for %q is too large (%d bytes, max %d)", rb.Integration, len(yamlBytes), maxWrekenSize)
+	}
+
+	var wrekenfile map[string]interface{}
+	if err := yaml.Unmarshal(yamlBytes, &wrekenfile); err != nil {
+		return nil, fmt.Errorf("parse wrekenfile for %q: %w", rb.Integration, err)
+	}
+
+	// Derive project and library from integration string "project.library" (no @version here)
+	project := ""
+	library := rb.Integration
+	if i := strings.Index(rb.Integration, "."); i > 0 {
+		project = rb.Integration[:i]
+		library = rb.Integration[i+1:]
+	}
+
+	return &IntegrationBundle{
+		Project:            project,
+		Library:            library,
+		Version:            rb.Version,
+		SandboxEndpoint:    rb.SandboxEndpoint,
+		ProductionEndpoint: rb.ProductionEndpoint,
+		Wrekenfile:         wrekenfile,
+	}, nil
+}
+
+// FetchBundleMap fetches all bundles required for a workflow and returns a BundleMap
+// keyed by library_uuid. Calls the workflow-bundles endpoint so the backend resolves
+// which libraries are needed (multi-library aware).
+func FetchBundleMap(ctx context.Context, client *registry.Client, projectName, canonicalID string) (BundleMap, error) {
+	resp, err := client.GetWorkflowBundles(ctx, projectName, canonicalID)
+	if err != nil {
+		return nil, fmt.Errorf("fetch workflow bundles: %w", err)
+	}
+
+	bundleMap := make(BundleMap, len(resp.Bundles))
+	for _, rb := range resp.Bundles {
+		b, err := ParseRegistryBundle(rb)
+		if err != nil {
+			return nil, err
+		}
+		// Key by library_uuid; fall back to integration name if uuid missing
+		key := rb.LibraryUUID
+		if key == "" {
+			key = rb.Integration
+		}
+		bundleMap[key] = b
+	}
+	return bundleMap, nil
 }

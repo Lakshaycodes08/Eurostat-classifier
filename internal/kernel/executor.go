@@ -1,10 +1,15 @@
-// executor.go runs a single tool invocation: resolves the tool, validates input, and returns JSON output (or structured error).
+// executor.go runs a tool invocation: resolves the tool, validates input, and returns JSON output (or structured error).
+// For single methods: all data comes from local tooling.json + wrekenfiles (no registry calls).
+// For workflows: fetches workflow definition and bundles from registry, then executes steps via chain.go.
 package kernel
 
 import (
+	"context"
+	"encoding/json"
 	"io"
 	"strings"
 
+	"gitlab.com/swytchcode/cli/internal/registry"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
 
@@ -19,8 +24,11 @@ type ExecRequest struct {
 // Invariant: tooling.json pins what is trusted. The registry supplies how it works.
 // bootstrap reconciles the two. exec only executes.
 //
-// exec must NEVER call the registry. All data comes from local tooling.json and Wrekenfiles
-// only. This ensures CI determinism, offline execution, and security boundaries.
+// exec must NEVER call the registry for single-method execution. All data comes from local
+// tooling.json and Wrekenfiles only. This ensures CI determinism, offline execution, and
+// security boundaries.
+// Exception: workflow execution fetches definition + bundles from registry (intentional —
+// workflow definitions are not stored locally).
 //
 // Execution pipeline:
 //   1. Parse request (from stdin or CLI args)
@@ -35,6 +43,63 @@ type ExecRequest struct {
 //   10. Return JSON output
 //
 // It returns a process exit code from the fixed set defined in errors.go.
+// executeWorkflow fetches the workflow definition and bundles from the registry,
+// then runs all steps sequentially via chain.go.
+// Registry calls are intentional here — workflow definitions are not stored locally.
+func executeWorkflow(canonicalID, integration, mode string, args map[string]interface{}, out, errOut io.Writer) int {
+	// Derive project name: "weaviate.lyrid@v1" → "weaviate"; "project.workflow" → "project"
+	projectName := integration
+	if i := strings.Index(integration, "."); i > 0 {
+		projectName = integration[:i]
+	}
+
+	ctx := context.Background()
+	client := registry.NewClient(registry.DefaultConfig())
+
+	// Fetch workflow definition
+	wf, err := client.GetWorkflow(ctx, projectName, canonicalID)
+	if err != nil {
+		msg := "failed to fetch workflow: " + err.Error()
+		writeErrorJSON(errOut, msg)
+		LogExecFailure(ExitCodeSDKFailure, canonicalID, msg)
+		return ExitCodeSDKFailure
+	}
+
+	// Fetch all bundles needed for this workflow
+	bundleMap, err := FetchBundleMap(ctx, client, projectName, canonicalID)
+	if err != nil {
+		msg := "failed to fetch workflow bundles: " + err.Error()
+		writeErrorJSON(errOut, msg)
+		LogExecFailure(ExitCodeSDKFailure, canonicalID, msg)
+		return ExitCodeSDKFailure
+	}
+
+	// Run workflow steps sequentially
+	results, err := RunWorkflow(ctx, wf, bundleMap, args, mode, out, errOut)
+	if err != nil {
+		if wfErr, ok := err.(*WorkflowError); ok {
+			PrintWorkflowError(errOut, wfErr)
+		} else {
+			writeErrorJSON(errOut, err.Error())
+		}
+		LogExecFailure(ExitCodeSDKFailure, canonicalID, err.Error())
+		return ExitCodeSDKFailure
+	}
+
+	// Output final result: last step's output as JSON
+	var finalOutput map[string]interface{}
+	if len(results) > 0 {
+		finalOutput = results[len(results)-1].Output
+	} else {
+		finalOutput = map[string]interface{}{}
+	}
+	if err := json.NewEncoder(out).Encode(finalOutput); err != nil {
+		LogExecFailure(ExitCodeInternalError, canonicalID, "failed to encode output")
+		return ExitCodeInternalError
+	}
+	return ExitCodeOK
+}
+
 // Execute runs a single tool invocation. When jsonOutput is true, stdout is guaranteed to be a single JSON object (normalized or raw per rawOutput).
 func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool, dryRun bool, rawOutput bool, jsonOutput bool, projectRoot string) int {
 	var req ExecRequest
@@ -46,7 +111,7 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	}
 
 	if req.Tool == "" {
-		msg := "tool is required"
+		msg := `tool is required (e.g. "project.method_name") — run 'swytchcode init' to generate tooling.json`
 		writeErrorJSON(stderr, msg)
 		LogExecFailure(ExitCodeInvalidInput, "", msg)
 		return ExitCodeInvalidInput
@@ -86,7 +151,12 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 		return ExitCodeToolNotFound
 	}
 
-	// Step 2: Load integration bundle
+	// Workflow execution path (calls registry — intentional for workflows)
+	if tool.Type == "workflow" {
+		return executeWorkflow(req.Tool, tool.Integration, tool.Mode, req.Args, stdout, stderr)
+	}
+
+	// Step 2: Load integration bundle (single-method path — no registry calls)
 	bundle, err := LoadIntegrationBundle(projectRoot, tool.Integration)
 	if err != nil {
 		writeErrorJSON(stderr, err.Error())

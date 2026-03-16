@@ -33,6 +33,8 @@ From `internal/mcp/tools.go`, the server exposes tools that roughly mirror CLI c
 - `swytchcode_check` — Check for integration updates (TinyFish)
 - `swytchcode_inspect` — Show full upgrade proposal detail
 - `swytchcode_upgrade` — Approve a pending upgrade
+- `swytchcode_discover` — Semantic capability discovery by natural language intent
+- `swytchcode_plan` — Show workflow steps for a canonical workflow ID
 
 Clients call these tools; the server:
 

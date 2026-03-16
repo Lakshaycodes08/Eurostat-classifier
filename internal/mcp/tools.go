@@ -83,6 +83,21 @@ type UpgradeArgs struct {
 	Confirm bool   `json:"confirm" jsonschema:"Set to true to confirm the upgrade"`
 }
 
+// DiscoverArgs represents arguments for swytchcode_discover.
+type DiscoverArgs struct {
+	Intent  string `json:"intent" jsonschema:"Natural language description of the capability to find"`
+	Project string `json:"project,omitempty" jsonschema:"Optional project name to scope the search"`
+	Top     int    `json:"top,omitempty" jsonschema:"Number of results to return (default 5)"`
+	JSON    bool   `json:"json,omitempty" jsonschema:"Output as JSON"`
+}
+
+// PlanArgs represents arguments for swytchcode_plan.
+type PlanArgs struct {
+	CanonicalID string `json:"canonical_id" jsonschema:"Canonical workflow ID to show steps for"`
+	Project     string `json:"project,omitempty" jsonschema:"Project name (defaults to prefix of canonical_id)"`
+	JSON        bool   `json:"json,omitempty" jsonschema:"Output as JSON"`
+}
+
 // ExecArgs represents arguments for swytchcode_exec.
 type ExecArgs struct {
 	Tool      string                 `json:"tool" jsonschema:"Canonical ID of the tool to execute"`
@@ -94,7 +109,7 @@ type ExecArgs struct {
 }
 
 // RegisterTools registers all MCP tools with the server.
-// Registers 12 tools total:
+// Registers 14 tools total:
 //  1. swytchcode_init
 //  2. swytchcode_bootstrap
 //  3. swytchcode_version
@@ -107,6 +122,8 @@ type ExecArgs struct {
 //  10. swytchcode_check
 //  11. swytchcode_inspect
 //  12. swytchcode_upgrade
+//  13. swytchcode_discover
+//  14. swytchcode_plan
 func RegisterTools(server *mcp.Server, streamOutput bool) error {
 	// swytchcode_init
 	mcp.AddTool(server, &mcp.Tool{
@@ -448,6 +465,53 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 			Library: args.Library,
 		}, func(_ string) bool { return confirm }, oc.Stdout())
 		if err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		result := oc.GetCombinedOutput()
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: result}},
+		}, ToolOutput{Output: result}, nil
+	})
+
+	// swytchcode_discover
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_discover",
+		Description: "Discover API capabilities by natural language intent. Returns matching methods and a recommended workflow. Use before swytchcode_exec when you don't know the exact canonical ID.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args DiscoverArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		toolCtx, cancel := context.WithTimeout(ctx, constants.MCPRequestTimeout)
+		defer cancel()
+
+		topK := args.Top
+		if topK == 0 {
+			topK = 5
+		}
+
+		oc := NewOutputCapture(streamOutput)
+		if err := commands.RunDiscover(toolCtx, args.Intent, args.Project, topK, args.JSON, oc.Stdout(), oc.Stderr()); err != nil {
+			return nil, ToolOutput{}, err
+		}
+
+		result := oc.GetCombinedOutput()
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: result}},
+		}, ToolOutput{Output: result}, nil
+	})
+
+	// swytchcode_plan
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_plan",
+		Description: "Show the steps for a workflow by its canonical ID. Use after swytchcode_discover to inspect a recommended workflow before running it.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args PlanArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		toolCtx, cancel := context.WithTimeout(ctx, constants.MCPRequestTimeout)
+		defer cancel()
+
+		if args.CanonicalID == "" {
+			return nil, ToolOutput{}, fmt.Errorf("canonical_id is required")
+		}
+
+		oc := NewOutputCapture(streamOutput)
+		if err := commands.RunPlan(toolCtx, args.CanonicalID, args.Project, args.JSON, oc.Stdout(), oc.Stderr()); err != nil {
 			return nil, ToolOutput{}, err
 		}
 

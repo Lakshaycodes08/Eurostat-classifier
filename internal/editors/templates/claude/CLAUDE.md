@@ -11,7 +11,8 @@ Use swytchcode when the user wants to:
 
 Available MCP tools: swytchcode_init, swytchcode_bootstrap, swytchcode_version,
 swytchcode_list, swytchcode_search, swytchcode_get, swytchcode_add,
-swytchcode_exec, swytchcode_info, swytchcode_check, swytchcode_inspect, swytchcode_upgrade
+swytchcode_exec, swytchcode_info, swytchcode_check, swytchcode_inspect, swytchcode_upgrade,
+swytchcode_discover, swytchcode_plan
 
 CLI-only commands (NOT available as MCP tools — user runs these manually in terminal):
 swytchcode login / swytchcode whoami / swytchcode logout
@@ -42,6 +43,8 @@ To add a new integration, follow these steps in precise order
 4. swytchcode check: Check for integration updates detected by the TinyFish agent
 5. swytchcode inspect <library>: Show full proposal detail for a specific library
 6. swytchcode upgrade <library>: Approve a pending update proposal (requires user login)
+7. swytchcode discover "<intent>": Find API capabilities matching a natural language description (MCP: swytchcode_discover)
+8. swytchcode plan <canonical_id>: Show the steps of a workflow before executing it (MCP: swytchcode_plan)
 
 
 
