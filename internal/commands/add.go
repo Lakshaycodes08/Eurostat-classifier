@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/registry"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
@@ -214,7 +215,7 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 		for index, step := range workflow.Steps {
 			methodEntry, err := findMethodInWrekenfile(wrekenPath, step.CanonicalID)
 			if err != nil {
-				fmt.Fprintf(stderr, "Warning: method %q from workflow step not found in wrekenfile: %v\n", step.CanonicalID, err)
+				output.Warn(stderr, fmt.Sprintf("method %q from workflow step not found in wrekenfile: %v", step.CanonicalID, err))
 				continue
 			}
 
@@ -234,7 +235,7 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 			if inputsRaw, ok := methodEntry["INPUTS"]; ok {
 				inputs = inputsRaw
 				if resolved, err := ResolveInputs(wreken, inputsRaw); err != nil {
-					fmt.Fprintf(stderr, "Warning: resolve STRUCTs for step %q: %v (using raw inputs)\n", step.CanonicalID, err)
+					output.Warn(stderr, fmt.Sprintf("resolve STRUCTs for step %q: %v (using raw inputs)", step.CanonicalID, err))
 				} else if resolved != nil {
 					inputs = resolved
 				}
@@ -250,10 +251,10 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 				"index":       index,
 			}
 			if returnsRaw, ok := methodEntry["RETURNS"]; ok {
-				if output, err := ResolveReturns(wreken, returnsRaw); err != nil {
-					fmt.Fprintf(stderr, "Warning: resolve STRUCTs for step %q returns: %v (output omitted)\n", step.CanonicalID, err)
-				} else if output != nil {
-					stepDef["output"] = output
+				if resolved, err := ResolveReturns(wreken, returnsRaw); err != nil {
+					output.Warn(stderr, fmt.Sprintf("resolve STRUCTs for step %q returns: %v (output omitted)", step.CanonicalID, err))
+				} else if resolved != nil {
+					stepDef["output"] = resolved
 				}
 			}
 			stepsArray = append(stepsArray, stepDef)

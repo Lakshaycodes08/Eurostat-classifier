@@ -61,7 +61,7 @@ var initCmd = &cobra.Command{
 		}
 
 		// Use shared RunInit function (non-interactive mode)
-		return commands.RunInit(projectRoot, editorChoice, modeChoice, os.Stdout)
+		return commands.RunInit(projectRoot, editorChoice, modeChoice, os.Stdout, os.Stderr)
 	},
 }
 

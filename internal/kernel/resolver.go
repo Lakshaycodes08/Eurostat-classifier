@@ -56,12 +56,12 @@ func ResolveTool(projectRoot, canonicalID string, isRaw bool) (*Tool, error) {
 	// Find tool in tools map
 	tools, ok := tooling["tools"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("tool %q not found in tooling.json. Run: swytchcode add %s", canonicalID, canonicalID)
+		return nil, fmt.Errorf("tool %q not found in tooling.json — run 'swytchcode add <canonical_id>' to add it, or 'swytchcode search' to find it", canonicalID)
 	}
 
 	toolRaw, ok := tools[canonicalID]
 	if !ok {
-		return nil, fmt.Errorf("tool %q not found in tooling.json. Run: swytchcode add %s", canonicalID, canonicalID)
+		return nil, fmt.Errorf("tool %q not found in tooling.json — run 'swytchcode add <canonical_id>' to add it, or 'swytchcode search' to find it", canonicalID)
 	}
 
 	toolMap, ok := toolRaw.(map[string]interface{})

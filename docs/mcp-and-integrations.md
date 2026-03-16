@@ -30,6 +30,9 @@ From `internal/mcp/tools.go`, the server exposes tools that roughly mirror CLI c
 - `swytchcode_add`
 - `swytchcode_info`
 - `swytchcode_exec`
+- `swytchcode_check` — Check for integration updates (TinyFish)
+- `swytchcode_inspect` — Show full upgrade proposal detail
+- `swytchcode_upgrade` — Approve a pending upgrade
 
 Clients call these tools; the server:
 

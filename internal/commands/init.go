@@ -10,21 +10,25 @@ import (
 
 	"gitlab.com/swytchcode/cli/internal/constants"
 	"gitlab.com/swytchcode/cli/internal/editors"
+	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // RunInit runs the init command: creates .swytchcode/, tooling.json, and editor-specific config.
 // editor and mode are required (non-interactive mode).
-func RunInit(projectRoot, editor, mode string, stdout io.Writer) error {
-	// Validate mode
+func RunInit(projectRoot, editor, mode string, stdout, stderr io.Writer) error {
+	// Accumulate validation errors so both are shown at once
+	var validationErrs []string
 	if mode != "production" && mode != "sandbox" {
-		return fmt.Errorf("invalid mode %q (expected production or sandbox)", mode)
+		validationErrs = append(validationErrs, fmt.Sprintf("invalid mode %q (expected production or sandbox)", mode))
 	}
-
-	// Validate editor
 	validEditors := map[string]bool{"cursor": true, "claude": true, "none": true}
 	if editor != "" && !validEditors[editor] {
-		return fmt.Errorf("unknown editor %q (expected cursor|claude|none)", editor)
+		validationErrs = append(validationErrs, fmt.Sprintf("unknown editor %q (expected cursor|claude|none)", editor))
+	}
+	if len(validationErrs) > 0 {
+		output.ValidationErrors(stderr, validationErrs)
+		return fmt.Errorf("validation failed")
 	}
 
 	swytchDir := filepath.Join(projectRoot, ".swytchcode")

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"gitlab.com/swytchcode/cli/internal/manifest"
+	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/registry"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
@@ -120,10 +121,12 @@ func RunBootstrap(ctx context.Context, projectRoot string, stdout, stderr io.Wri
 		}
 	}
 	if len(failed) > 0 {
-		fmt.Fprintf(stderr, "\nFailed to fetch %d integration(s):\n", len(failed))
 		for _, name := range failed {
-			fmt.Fprintf(stderr, "  - %s\n", name)
+			output.Error(stderr, name)
 		}
+		fmt.Fprintln(stderr)
+		fmt.Fprintf(stderr, "Failed to fetch %d integration(s)\n", len(failed))
+		output.Hint(stderr, "re-run 'swytchcode bootstrap' to retry failed integrations")
 		return fmt.Errorf("bootstrap failed for %d integration(s)", len(failed))
 	}
 

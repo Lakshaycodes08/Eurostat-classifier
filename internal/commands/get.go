@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"gitlab.com/swytchcode/cli/internal/manifest"
+	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/registry"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
@@ -31,13 +32,14 @@ func RunGet(ctx context.Context, projectName string, yes bool, stdout, stderr io
 	bundlesResp, err := regClient.GetIntegrationBundles(ctx, projectName)
 	if err != nil {
 		spinner.Stop()
-		fmt.Fprintf(stderr, "✗ Failed to fetch integration bundles: %v\n", err)
+		output.Error(stderr, fmt.Sprintf("Failed to fetch integration bundles: %v", err))
+		output.Hint(stderr, "check your network connection or run 'swytchcode login'")
 		return fmt.Errorf("fetch integration bundles: %w", err)
 	}
 
 	if bundlesResp == nil || len(bundlesResp.Bundles) == 0 {
 		spinner.Stop()
-		fmt.Fprintf(stderr, "✗ No bundles found for project %q\n", projectName)
+		output.Error(stderr, fmt.Sprintf("No bundles found for project %q", projectName))
 		return fmt.Errorf("no bundles found for project %q", projectName)
 	}
 
@@ -60,14 +62,14 @@ func RunGet(ctx context.Context, projectName string, yes bool, stdout, stderr io
 	workflowsResp, err := regClient.ListWorkflows(ctx, projectName)
 	if err != nil {
 		spinner.Stop()
-		fmt.Fprintf(stderr, "✗ Failed to fetch workflows: %v\n", err)
+		output.Error(stderr, fmt.Sprintf("Failed to fetch workflows: %v", err))
 		return fmt.Errorf("fetch workflows for project %q: %w", projectName, err)
 	}
 	registry.FillEmptyWorkflowNames(workflowsResp)
 	methodsResp, err := regClient.ListMethods(ctx, projectName)
 	if err != nil {
 		spinner.Stop()
-		fmt.Fprintf(stderr, "✗ Failed to fetch methods: %v\n", err)
+		output.Error(stderr, fmt.Sprintf("Failed to fetch methods: %v", err))
 		return fmt.Errorf("fetch methods for project %q: %w", projectName, err)
 	}
 

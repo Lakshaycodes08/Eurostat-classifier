@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
 
@@ -62,7 +63,7 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 		}
 
 		if err != nil {
-			fmt.Fprintf(stderr, "Warning: failed to read tool data for %s.%s@%s: %v\n", match.Project, match.Library, match.Version, err)
+			output.Warn(stderr, fmt.Sprintf("failed to read tool data for %s.%s@%s: %v", match.Project, match.Library, match.Version, err))
 			continue
 		}
 
@@ -88,14 +89,14 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 		}
 
 		var inputs interface{}
-		var output interface{}
+		var toolOutput interface{}
 		if match.ToolType == "method" {
 			wrekenPath := filepath.Join(integrationsBase, "wrekenfile.yaml")
 			wreken, loadErr := LoadWrekenfile(wrekenPath)
 			if loadErr == nil {
 				if inputsRaw, ok := toolEntry["INPUTS"]; ok {
 					if resolved, err := ResolveInputs(wreken, inputsRaw); err != nil {
-						fmt.Fprintf(stderr, "Warning: resolve STRUCTs for inputs: %v (showing raw inputs)\n", err)
+						output.Warn(stderr, fmt.Sprintf("resolve STRUCTs for inputs: %v (showing raw inputs)", err))
 						inputs = inputsRaw
 					} else if resolved != nil {
 						inputs = resolved
@@ -105,9 +106,9 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 				}
 				if returnsRaw, ok := toolEntry["RETURNS"]; ok {
 					if resolved, err := ResolveReturns(wreken, returnsRaw); err != nil {
-						fmt.Fprintf(stderr, "Warning: resolve STRUCTs for returns: %v (output omitted)\n", err)
+						output.Warn(stderr, fmt.Sprintf("resolve STRUCTs for returns: %v (output omitted)", err))
 					} else if resolved != nil {
-						output = resolved
+						toolOutput = resolved
 					}
 				}
 			}
@@ -135,7 +136,7 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 			Summary:     summary,
 			Description: description,
 			Inputs:      inputs,
-			Output:      output,
+			Output:      toolOutput,
 			Wrekenfile:  toolEntry,
 		}
 

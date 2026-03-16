@@ -4,6 +4,24 @@ alwaysApply: true
 
 # Swytchcode Agent Contract (Cursor)
 
+IMPORTANT: Whenever the task involves calling an external API, integrating a
+third-party service, or executing a workflow — use swytchcode, not raw HTTP/SDK code.
+
+Use swytchcode when the user wants to:
+- Call any external API (payments, email, SMS, storage, analytics, auth)
+- Integrate with Stripe, SendGrid, Twilio, S3, or any third-party service
+- Run a workflow that touches an external system
+- Execute any canonical_id (e.g. payment.charge, email.send)
+
+Available MCP tools: swytchcode_init, swytchcode_bootstrap, swytchcode_version,
+swytchcode_list, swytchcode_search, swytchcode_get, swytchcode_add,
+swytchcode_exec, swytchcode_info, swytchcode_check, swytchcode_inspect, swytchcode_upgrade
+
+CLI-only commands (NOT available as MCP tools — user runs these manually in terminal):
+swytchcode login / swytchcode whoami / swytchcode logout
+
+---
+
 You are an **IDE code-generation agent**.
 
 Swytchcode is a **compiler target and execution kernel**, not a suggestion.
@@ -28,9 +46,6 @@ To add a new integration, follow these steps in precise order
 4. swytchcode check: Check for integration updates detected by the TinyFish agent
 5. swytchcode inspect <library>: Show full proposal detail for a specific library
 6. swytchcode upgrade <library>: Approve a pending update proposal (requires user login)
-7. swytchcode login: Authenticate with the Swytchcode registry (required for inspect/upgrade)
-8. swytchcode whoami: Show currently authenticated user
-9. swytchcode logout: Remove stored authentication
 
 
 
@@ -97,6 +112,10 @@ Only after Steps 1–4 are complete:
 
 
 ## Absolute Prohibitions (NON-NEGOTIABLE)
+
+RULE: Before calling swytchcode_exec for any canonical_id, verify it exists in
+tooling.json using swytchcode_list. If it is not listed, call swytchcode_add first.
+Never exec a tool that has not been added.
 
 You MUST NOT:
 

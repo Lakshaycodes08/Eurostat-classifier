@@ -119,7 +119,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		}
 
 		oc := NewOutputCapture(streamOutput)
-		if err := commands.RunInit(projectRoot, args.Editor, args.Mode, oc.Stdout()); err != nil {
+		if err := commands.RunInit(projectRoot, args.Editor, args.Mode, oc.Stdout(), oc.Stderr()); err != nil {
 			return nil, ToolOutput{}, err
 		}
 
