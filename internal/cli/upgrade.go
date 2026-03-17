@@ -16,6 +16,8 @@ import (
 	"gitlab.com/swytchcode/cli/internal/telemetry"
 )
 
+var upgradeApply bool
+
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade <library>",
 	Short: "Approve a pending integration proposal",
@@ -57,9 +59,15 @@ Example:
 			APIURL:  apiURL,
 			Token:   session.AccessToken,
 			Library: library,
+			Apply:   upgradeApply,
+			Stderr:  os.Stderr,
 		}, confirm, os.Stdout)
 		opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
 		telemetry.SendEvent(apiURL, session.AccessToken, true, "proposals_approve", library, err, opts)
 		return err
 	},
+}
+
+func init() {
+	upgradeCmd.Flags().BoolVar(&upgradeApply, "apply", false, "After approval, auto-run get and re-add all affected tools in tooling.json")
 }

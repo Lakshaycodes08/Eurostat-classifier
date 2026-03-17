@@ -4,19 +4,26 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // UpgradeConfig holds configuration for an upgrade run.
 type UpgradeConfig struct {
-	APIURL  string // base URL of the backend API
-	Token   string // Firebase JWT (user login required — service token not accepted)
-	Library string // project.library name to upgrade
+	APIURL      string    // base URL of the backend API
+	Token       string    // Firebase JWT (user login required — service token not accepted)
+	Library     string    // project.library name to upgrade
+	Apply       bool      // if true, auto-run get + re-add all affected tools after approval
+	ProjectRoot string    // path to project root (optional; detected automatically when empty)
+	Stderr      io.Writer // stderr for apply sub-commands (falls back to stdout writer when nil)
 }
 
 // RunUpgrade finds the pending proposal for Library, confirms with the user,
@@ -75,6 +82,70 @@ func RunUpgrade(cfg UpgradeConfig, confirm func(prompt string) bool, w io.Writer
 	}
 
 	fmt.Fprintf(w, "Upgrade submitted for %s — spec fetch and library reprocessing started\n", found.LibraryName)
+
+	if cfg.Apply {
+		stderr := cfg.Stderr
+		if stderr == nil {
+			stderr = w
+		}
+		if err := runApplyAfterUpgrade(context.Background(), cfg, found.LibraryName, w, stderr); err != nil {
+			fmt.Fprintf(w, "⚠ apply failed: %v\n", err)
+		}
+	}
+	return nil
+}
+
+// runApplyAfterUpgrade re-downloads the project bundle and re-adds all affected tools in tooling.json.
+func runApplyAfterUpgrade(ctx context.Context, cfg UpgradeConfig, libraryName string, w, stderr io.Writer) error {
+	projectRoot := cfg.ProjectRoot
+	if projectRoot == "" {
+		var err error
+		projectRoot, err = util.ProjectRoot()
+		if err != nil {
+			return fmt.Errorf("detect project root: %w", err)
+		}
+	}
+
+	projectName := strings.SplitN(libraryName, ".", 2)[0]
+	fmt.Fprintf(w, "Refreshing bundles for project %q...\n", projectName)
+	if err := RunGet(ctx, projectName, true, w, stderr); err != nil {
+		return fmt.Errorf("get %s: %w", projectName, err)
+	}
+
+	// Re-add all tools in tooling.json whose integration belongs to this library.
+	toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
+	data, err := os.ReadFile(toolingPath)
+	if err != nil {
+		return fmt.Errorf("read tooling.json: %w", err)
+	}
+	var tooling map[string]interface{}
+	if err := json.Unmarshal(data, &tooling); err != nil {
+		return fmt.Errorf("parse tooling.json: %w", err)
+	}
+	tools, _ := tooling["tools"].(map[string]interface{})
+
+	prefix := libraryName + "@"
+	var refreshed []string
+	for canonicalID, raw := range tools {
+		entry, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		integration, _ := entry["integration"].(string)
+		if strings.HasPrefix(integration, prefix) {
+			if err := RunAdd(ctx, canonicalID, "", false, w, stderr); err != nil {
+				fmt.Fprintf(w, "  ⚠ re-add %s: %v\n", canonicalID, err)
+			} else {
+				refreshed = append(refreshed, canonicalID)
+			}
+		}
+	}
+
+	if len(refreshed) > 0 {
+		fmt.Fprintf(w, "Re-added %d tool(s): %s\n", len(refreshed), strings.Join(refreshed, ", "))
+	} else {
+		fmt.Fprintf(w, "No tools for %s found in tooling.json to re-add.\n", libraryName)
+	}
 	return nil
 }
 

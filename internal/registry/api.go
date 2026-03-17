@@ -350,14 +350,17 @@ type WorkflowDetail struct {
 }
 
 // DiscoverCapabilities calls POST /discover with the given intent.
-// projectName is optional — pass empty string to search across all projects.
-func (c *Client) DiscoverCapabilities(ctx context.Context, intent, projectName string, topK int) (*DiscoverResponse, error) {
+// projectName and libraryName are optional — pass empty strings to search across all projects/libraries.
+func (c *Client) DiscoverCapabilities(ctx context.Context, intent, projectName, libraryName string, topK int) (*DiscoverResponse, error) {
 	payload := map[string]interface{}{
 		"intent": intent,
 		"top_k":  topK,
 	}
 	if projectName != "" {
 		payload["project_name"] = projectName
+	}
+	if libraryName != "" {
+		payload["library_name"] = libraryName
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -425,6 +428,127 @@ func (c *Client) GetWorkflow(ctx context.Context, projectName, canonicalID strin
 		CanonicalID: raw.CanonicalID,
 		Steps:       steps,
 	}, nil
+}
+
+// VersionMethodsResponse is the response from GET /integrations/{project}/{library}/{version}/methods.
+type VersionMethodsResponse struct {
+	Methods    []string `json:"methods"`
+	Deprecated []string `json:"deprecated"`
+}
+
+// GetVersionMethods fetches the list of canonical IDs available in a specific integration version.
+// Route: GET /integrations/{project}/{library}/{version}/methods
+// Returns nil error and nil response when the endpoint is not yet available (graceful degradation).
+func (c *Client) GetVersionMethods(ctx context.Context, project, library, version string) (*VersionMethodsResponse, error) {
+	path := fmt.Sprintf("/integrations/%s/%s/%s/methods",
+		url.PathEscape(project), url.PathEscape(library), url.PathEscape(version))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // endpoint or version not found; caller skips validation
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var result VersionMethodsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
+// CanonicalIDResolution is the response from GET /canonical-id/resolve.
+type CanonicalIDResolution struct {
+	Status          string `json:"status"`            // "active" | "renamed" | "removed"
+	NewID           string `json:"new_id,omitempty"`
+	DeprecatedSince string `json:"deprecated_since,omitempty"`
+}
+
+// ResolveCanonicalID checks whether a canonical ID has been renamed or removed.
+// Route: GET /canonical-id/resolve?id=<id>
+// Returns nil, nil when the endpoint is not yet implemented (graceful degradation).
+func (c *Client) ResolveCanonicalID(ctx context.Context, id string) (*CanonicalIDResolution, error) {
+	path := fmt.Sprintf("/canonical-id/resolve?id=%s", url.QueryEscape(id))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // endpoint not implemented yet
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var result CanonicalIDResolution
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
+// InputField describes a single input parameter on a method.
+type InputField struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Required bool   `json:"required"`
+}
+
+// InputChange describes a change to an existing input field.
+type InputChange struct {
+	Name    string `json:"name"`
+	OldType string `json:"old_type"`
+	NewType string `json:"new_type"`
+}
+
+// MethodChange describes signature-level changes to a single method.
+type MethodChange struct {
+	CanonicalID   string       `json:"canonical_id"`
+	AddedInputs   []InputField `json:"added_inputs"`
+	RemovedInputs []InputField `json:"removed_inputs"`
+	ChangedInputs []InputChange `json:"changed_inputs"`
+}
+
+// ProposalDiff is the response from GET /proposals/diff.
+type ProposalDiff struct {
+	Library         string         `json:"library"`
+	CurrentVersion  string         `json:"current_version"`
+	ProposedVersion string         `json:"proposed_version"`
+	Added           []string       `json:"added"`
+	Removed         []string       `json:"removed"`
+	Changed         []MethodChange `json:"changed"`
+}
+
+// GetProposalDiff fetches the method-level diff between the installed version and the pending proposal.
+// Route: GET /proposals/diff?library=<library>
+// Returns nil, nil when no proposal exists or the endpoint is not yet available.
+func (c *Client) GetProposalDiff(ctx context.Context, library string) (*ProposalDiff, error) {
+	path := fmt.Sprintf("/proposals/diff?library=%s", url.QueryEscape(library))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // no pending proposal for this library
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var result ProposalDiff
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
 }
 
 // handleError attempts to parse an error response from the API.

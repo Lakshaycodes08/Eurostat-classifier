@@ -59,6 +59,23 @@ func executeWorkflow(canonicalID, integration, mode string, args map[string]inte
 	// Fetch workflow definition
 	wf, err := client.GetWorkflow(ctx, projectName, canonicalID)
 	if err != nil {
+		// Check if the workflow was renamed before returning a generic error
+		if strings.Contains(err.Error(), "not found") {
+			if resolution, resolveErr := client.ResolveCanonicalID(ctx, canonicalID); resolveErr == nil && resolution != nil {
+				switch resolution.Status {
+				case "renamed":
+					msg := "workflow " + canonicalID + " has been renamed to " + resolution.NewID + " — run: swytchcode add " + resolution.NewID
+					writeErrorJSON(errOut, msg)
+					LogExecFailure(ExitCodeToolNotFound, canonicalID, msg)
+					return ExitCodeToolNotFound
+				case "removed":
+					msg := "workflow " + canonicalID + " has been removed from the backend"
+					writeErrorJSON(errOut, msg)
+					LogExecFailure(ExitCodeToolNotFound, canonicalID, msg)
+					return ExitCodeToolNotFound
+				}
+			}
+		}
 		msg := "failed to fetch workflow: " + err.Error()
 		writeErrorJSON(errOut, msg)
 		LogExecFailure(ExitCodeSDKFailure, canonicalID, msg)

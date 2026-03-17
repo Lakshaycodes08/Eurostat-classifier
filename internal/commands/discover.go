@@ -13,13 +13,13 @@ import (
 )
 
 // RunDiscover searches for API capabilities matching intent.
-// projectName is optional (empty = cross-project search).
+// projectName and libraryName are optional (empty = cross-project/library search).
 // topK is the max number of results to return.
-func RunDiscover(ctx context.Context, intent, projectName string, topK int, jsonOutput bool, stdout, stderr io.Writer) error {
+func RunDiscover(ctx context.Context, intent, projectName, libraryName string, topK int, jsonOutput bool, stdout, stderr io.Writer) error {
 	regClient := registry.NewClient(registry.DefaultConfig())
 	defer regClient.CloseIdleConnections()
 
-	result, err := regClient.DiscoverCapabilities(ctx, intent, projectName, topK)
+	result, err := regClient.DiscoverCapabilities(ctx, intent, projectName, libraryName, topK)
 	if err != nil {
 		output.Error(stderr, fmt.Sprintf("discovery failed: %v", err))
 		output.Hint(stderr, "ensure the API is reachable and try again")

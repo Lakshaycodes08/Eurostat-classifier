@@ -15,20 +15,34 @@ import (
 	"gitlab.com/swytchcode/cli/internal/util"
 )
 
+var noAutoInstall bool
+var addAll bool
+
 // addCmd is the main add command that accepts canonical_id directly.
 // Usage:
 //   - swytchcode add <canonical_id> (searches all integrations)
 //   - swytchcode add <integration_spec> <canonical_id> (explicit scoped)
+//   - swytchcode add --all <project> (add all methods/workflows for a project)
 var addCmd = &cobra.Command{
 	Use:   "add [integration_spec] <canonical_id>",
 	Short: "Add a tool (method or workflow) to tooling.json by canonical_id",
 	Args: func(cmd *cobra.Command, args []string) error {
+		all, _ := cmd.Flags().GetBool("all")
+		if all {
+			if len(args) != 1 {
+				return errors.New("usage: swytchcode add --all <project>")
+			}
+			return nil
+		}
 		if len(args) < 1 || len(args) > 2 {
 			return errors.New("usage: swytchcode add [integration_spec] <canonical_id>")
 		}
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if addAll {
+			return commands.RunAddAll(context.Background(), args[0], os.Stdout, os.Stderr)
+		}
 		projectRoot, err := util.ProjectRoot()
 		if err != nil {
 			return fmt.Errorf("detect project root: %w", err)
@@ -54,7 +68,7 @@ var addCmd = &cobra.Command{
 			}
 			if len(matches) == 1 {
 				// Single match: RunAdd with empty spec will use it
-				return commands.RunAdd(context.Background(), canonicalID, "", os.Stdout, os.Stderr)
+				return commands.RunAdd(context.Background(), canonicalID, "", noAutoInstall, os.Stdout, os.Stderr)
 			}
 			// Multiple matches
 			interactive := util.IsInteractive()
@@ -85,7 +99,7 @@ var addCmd = &cobra.Command{
 			integrationSpec = selected
 		}
 
-		return commands.RunAdd(context.Background(), canonicalID, integrationSpec, os.Stdout, os.Stderr)
+		return commands.RunAdd(context.Background(), canonicalID, integrationSpec, noAutoInstall, os.Stdout, os.Stderr)
 	},
 }
 
@@ -142,4 +156,6 @@ var addIntegrationCmd = &cobra.Command{
 
 func init() {
 	addCmd.AddCommand(addIntegrationCmd)
+	addCmd.Flags().BoolVar(&noAutoInstall, "no-auto-install", false, "Do not auto-download missing library dependencies for multi-library workflows")
+	addCmd.Flags().BoolVar(&addAll, "all", false, "Add all methods and workflows for a project (usage: swytchcode add --all <project>)")
 }

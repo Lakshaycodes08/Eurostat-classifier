@@ -40,7 +40,9 @@ func init() {
 	rootCmd.AddCommand(whoamiCmd)
 	rootCmd.AddCommand(inspectCmd)
 	rootCmd.AddCommand(upgradeCmd)
+	rootCmd.AddCommand(diffCmd)
 	rootCmd.AddCommand(discoverCmd)
 	rootCmd.AddCommand(planCmd)
+	rootCmd.AddCommand(syncCmd)
 }
 

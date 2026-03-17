@@ -86,7 +86,7 @@ var EnvVarsCI = []string{
 // via `-ldflags "-X gitlab.com/swytchcode/cli/internal/constants.Version=<version>"` (Goreleaser).
 var (
 	// Version is the Swytchcode CLI version (overridden by release builds).
-	Version = "1.0.5"
+	Version = "1.0.8"
 )
 
 // RegistryURL is the default registry base URL (build-time constant).

@@ -52,6 +52,9 @@ func (c *Client) Get(ctx context.Context, path string) (*http.Response, error) {
 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
+	if c.config.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -71,6 +74,9 @@ func (c *Client) Post(ctx context.Context, path string, body io.Reader) (*http.R
 
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
+	if c.config.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.config.Token)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

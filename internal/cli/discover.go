@@ -34,6 +34,7 @@ Optional environment variables:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		intent := args[0]
 		project, _ := cmd.Flags().GetString("project")
+		library, _ := cmd.Flags().GetString("library")
 		topK, _ := cmd.Flags().GetInt("top")
 		jsonOut, _ := cmd.Flags().GetBool("json")
 
@@ -42,7 +43,7 @@ Optional environment variables:
 
 		ctx := context.Background()
 		start := time.Now()
-		err := commands.RunDiscover(ctx, intent, project, topK, jsonOut, os.Stdout, os.Stderr)
+		err := commands.RunDiscover(ctx, intent, project, library, topK, jsonOut, os.Stdout, os.Stderr)
 		opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
 		telemetry.SendEvent(apiURL, token, fromSession, "discover", intent, err, opts)
 
@@ -56,6 +57,7 @@ Optional environment variables:
 
 func init() {
 	discoverCmd.Flags().StringP("project", "p", "", "Scope search to a specific project")
+	discoverCmd.Flags().StringP("library", "l", "", "Scope search to a specific library within a project")
 	discoverCmd.Flags().IntP("top", "n", 5, "Number of results to return")
 	discoverCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 }

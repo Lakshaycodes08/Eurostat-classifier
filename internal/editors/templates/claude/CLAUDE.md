@@ -12,10 +12,10 @@ Use swytchcode when the user wants to:
 Available MCP tools: swytchcode_init, swytchcode_bootstrap, swytchcode_version,
 swytchcode_list, swytchcode_search, swytchcode_get, swytchcode_add,
 swytchcode_exec, swytchcode_info, swytchcode_check, swytchcode_inspect, swytchcode_upgrade,
-swytchcode_discover, swytchcode_plan
+swytchcode_discover, swytchcode_plan, swytchcode_diff
 
 CLI-only commands (NOT available as MCP tools — user runs these manually in terminal):
-swytchcode login / swytchcode whoami / swytchcode logout
+swytchcode login / swytchcode whoami / swytchcode logout / swytchcode sync
 
 ---
 
@@ -32,7 +32,7 @@ Skipping steps is forbidden.
 To add a new integration, follow these steps in precise order
 1. swytchcode search: To search all available integrations remotely
 2. swytchcode get <integration>: Add integration like stripe
-3. swytchcode add <canonical_id> of workflow or method: Adds to tooling.json
+3. swytchcode add <canonical_id> of workflow or method: Adds to tooling.json (use --all <project> to add all tools from a project at once)
 4. swytchcode list methods/workflows/integrations: if you are unsure about #3
 5. swytchcode exec: use the runtime library for this or a child process to execute the cli, if runtime not available
 
@@ -42,9 +42,11 @@ To add a new integration, follow these steps in precise order
 3. swytchcode version: check swytchcode version
 4. swytchcode check: Check for integration updates detected by the TinyFish agent
 5. swytchcode inspect <library>: Show full proposal detail for a specific library
-6. swytchcode upgrade <library>: Approve a pending update proposal (requires user login)
-7. swytchcode discover "<intent>": Find API capabilities matching a natural language description (MCP: swytchcode_discover)
-8. swytchcode plan <canonical_id>: Show the steps of a workflow before executing it (MCP: swytchcode_plan)
+6. swytchcode upgrade <library> [--apply]: Approve a pending update proposal (requires user login). --apply auto-runs get + re-add after approval.
+7. swytchcode diff <library>: Show method-level signature changes in a pending upgrade proposal before approving (MCP: swytchcode_diff, requires auth)
+8. swytchcode discover "<intent>" [--library <name>]: Find API capabilities matching a natural language description (MCP: swytchcode_discover)
+9. swytchcode plan <canonical_id>: Show the steps of a workflow before executing it (MCP: swytchcode_plan)
+10. swytchcode sync [project_name]: Pull new/updated workflows and methods from backend without touching tooling.json. Run when new workflows were created remotely since last `get`.
 
 
 
@@ -204,14 +206,23 @@ swytchcode inspect <library>
 
 Shows confidence score and full summary for the named library's proposal.
 
+### Previewing a diff before approving
+
+```
+swytchcode diff <library>
+```
+
+Shows method-level changes: added/removed methods, new/removed/changed input fields, breaking flag. Requires auth. MCP: `swytchcode_diff`.
+
 ### Approving an upgrade
 
 ```
-swytchcode upgrade <library>
+swytchcode upgrade <library> [--apply]
 ```
 
 Requires user login (`swytchcode login`). Not available to service tokens.
 Triggers spec fetch and library reprocessing on the backend.
+`--apply`: after approval, automatically re-fetches integration bundle and re-adds all affected methods to `tooling.json`.
 
 ### When to use these in agent workflows
 
