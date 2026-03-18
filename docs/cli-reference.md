@@ -299,9 +299,43 @@ See backend-specific docs for exact payloads and behavior. From the CLI's perspe
 
 ### Setting SWYTCHCODE_TOKEN
 
-- **Shell**: `export SWYTCHCODE_TOKEN=...` (or add to `~/.bashrc` / `~/.zshrc`).
-- **Env file**: The CLI does not load a `.env` file automatically. To use a file: run `set -a && source .env && set +a` (or `export $(grep -v '^#' .env | xargs)`) in your shell before running `swytchcode`, or run `env $(cat .env | xargs) swytchcode ...`.
-- **MCP in the IDE**: When the MCP server is started by the IDE (e.g. Cursor), it uses whatever environment the IDE gives that process. In Cursor, configure the MCP server with an `env` block or `envFile` so that `SWYTCHCODE_TOKEN` (and optionally `SWYTCHCODE_API_URL`) are set for the `swytchcode mcp serve` process. If you start the MCP server from a terminal, export the token (or source your `.env`) in that shell so the server inherits it.
+The CLI reads the token only from the **process environment** — it does not load `.env` files.
+
+#### Mac / Linux
+
+| Goal | Command |
+|------|---------|
+| Current session only | `export SWYTCHCODE_TOKEN=your_token_here` |
+| Permanent (Zsh — default on macOS) | `echo 'export SWYTCHCODE_TOKEN=your_token_here' >> ~/.zshrc && source ~/.zshrc` |
+| Permanent (Bash) | `echo 'export SWYTCHCODE_TOKEN=your_token_here' >> ~/.bashrc && source ~/.bashrc` |
+| Per-directory (direnv) | Add `export SWYTCHCODE_TOKEN=your_token_here` to `.envrc`, then `direnv allow .` |
+| From a `.env` file (one-off) | `set -a && source .env && set +a` then run `swytchcode` |
+
+#### Windows
+
+| Goal | Command |
+|------|---------|
+| Current PowerShell session | `$env:SWYTCHCODE_TOKEN = "your_token_here"` |
+| Permanent (PowerShell, user-level) | `[System.Environment]::SetEnvironmentVariable("SWYTCHCODE_TOKEN","your_token_here","User")` |
+| Permanent (cmd / setx, user-level) | `setx SWYTCHCODE_TOKEN "your_token_here"` |
+| Via GUI | System Properties → Advanced → Environment Variables → User variables → New |
+
+> **Note:** After `setx` or the GUI method, open a **new** terminal window for the change to take effect.
+
+#### Node.js projects (any platform)
+
+If you call `swytchcode` via the `swytchcode-runtime` package and want to load from a `.env` file without exporting manually:
+
+- **Node 20.6+:** `node --env-file=.env src/index.js`
+- **dotenv package:** add `require('dotenv').config()` at the top of your entry-point file, then `npm install dotenv`
+
+#### MCP in the IDE
+
+Configure the MCP server's `env` block with `SWYTCHCODE_TOKEN` so the server process inherits it. If you start the MCP server from a terminal, export the token first.
+
+#### CI/CD
+
+Define `SWYTCHCODE_TOKEN` as a secret or CI variable so the job environment has it.
 
 ### Telemetry
 

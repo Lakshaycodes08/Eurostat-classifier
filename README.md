@@ -632,15 +632,18 @@ Cloud commands contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode
 
 **Telemetry:** Usage events are sent only when you are logged in via `swytchcode login`. If `SWYTCHCODE_TOKEN` is set, telemetry is not sent. With no auth, a one-time hint may be shown. See `CLI_TELEMETRY.md` for the full contract. Telemetry is **independent of exec success** — HTTP 4xx/5xx responses from the target API (including 404s from `http://localhost`) are still real API responses; debug them via tool info, `--dry-run`, and your project’s `tooling.json` / `manifest.json`, not by changing telemetry settings.
 
-**Where to set SWYTCHCODE_TOKEN:** The CLI reads the token only from the process environment (it does not load config or `.env` files).
+**Where to set SWYTCHCODE_TOKEN:** The CLI reads the token only from the process environment (it does not load `.env` files). Quick reference:
 
-- **Shell (current session):** `export SWYTCHCODE_TOKEN=your_token_here`
-- **Shell (persistent):** Add the same line to `~/.bashrc`, `~/.zshrc`, or your shell profile.
-- **Using a `.env` file:** Source it before running the CLI, e.g. `set -a && source .env && set +a` or `export $(grep -v '^#' .env | xargs)`, then run `swytchcode`. Alternatively: `env $(cat .env | xargs) swytchcode ...`
-- **MCP daemon (HTTP/SSE):** When the daemon is started by `swytchcode init` or manually via `swytchcode mcp serve --daemon --transport http`, it inherits the shell environment at the time it was started. Export `SWYTCHCODE_TOKEN` in your shell before running `swytchcode init` (or `mcp serve`) so the daemon process receives it. To restart with the new token: `swytchcode mcp stop && swytchcode mcp serve --daemon --transport http`.
-- **CI/CD:** Define `SWYTCHCODE_TOKEN` as a secret or CI variable so the job environment has it.
+- **Mac/Linux — current session:** `export SWYTCHCODE_TOKEN=your_token_here`
+- **Mac/Linux — permanent (Zsh):** `echo 'export SWYTCHCODE_TOKEN=your_token_here' >> ~/.zshrc && source ~/.zshrc`
+- **Mac/Linux — permanent (Bash):** `echo 'export SWYTCHCODE_TOKEN=your_token_here' >> ~/.bashrc && source ~/.bashrc`
+- **Windows — permanent (PowerShell):** `[System.Environment]::SetEnvironmentVariable("SWYTCHCODE_TOKEN","your_token_here","User")`
+- **Windows — permanent (cmd):** `setx SWYTCHCODE_TOKEN "your_token_here"` (open a new terminal after)
+- **Node.js projects:** `node --env-file=.env src/index.js` (Node 20.6+) or add `require('dotenv').config()` in your entry point
+- **MCP daemon:** Export the token before starting `swytchcode mcp serve` so the daemon inherits it.
+- **CI/CD:** Define as a secret/CI variable.
 
-See `docs/cli-reference.md` for more detail.
+See `docs/cli-reference.md` → "Setting SWYTCHCODE_TOKEN" for full detail.
 
 #### `swytchcode login`
 
