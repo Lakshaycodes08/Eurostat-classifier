@@ -10,6 +10,15 @@ import (
 	"strings"
 )
 
+// inputLocation returns the LOCATION value for an arg key from method.InputLocations (case-insensitive key match).
+// Returns empty string if not defined.
+func inputLocation(method *Method, key string) string {
+	if method.InputLocations == nil {
+		return ""
+	}
+	return method.InputLocations[strings.ToLower(key)]
+}
+
 // queryParamReservedKeys are top-level args that must not be sent as URL query parameters.
 var queryParamReservedKeys = map[string]bool{
 	"body": true, "params": true, "Authorization": true, "headers": true,
@@ -99,6 +108,10 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 		if queryParamReservedKeys[key] {
 			continue
 		}
+		// Skip if LOCATION is explicitly non-query (e.g. header or body)
+		if loc := inputLocation(method, key); loc != "" && loc != "query" {
+			continue
+		}
 		if query.Get(key) != "" {
 			continue // params already set this; prefer params
 		}
@@ -134,6 +147,13 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 	// Set headers from method definition (Wreken HEADERS)
 	for key, value := range method.Headers {
 		req.Header.Set(key, value)
+	}
+
+	// Route args declared as LOCATION: header
+	for key, val := range args {
+		if inputLocation(method, key) == "header" {
+			req.Header.Set(key, argValueToQueryString(val))
+		}
 	}
 
 	// Headers from args: Authorization (single) and optional args["headers"] map

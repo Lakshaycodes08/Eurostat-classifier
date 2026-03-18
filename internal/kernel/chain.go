@@ -17,7 +17,8 @@ type StepResult struct {
 	StepIndex     int
 	StepName      string
 	LibraryUUID   string
-	Output        map[string]interface{}
+	Output        map[string]interface{} // object fields for step chaining (empty for array/scalar responses)
+	RawOutput     interface{}            // actual parsed response value (array, object, scalar, or nil)
 	StatusCode    int
 	Error         error
 	RequestMethod string // HTTP method of the step request (e.g. "POST")
@@ -62,7 +63,7 @@ func RunWorkflow(
 			stepName = step.CanonicalID
 		}
 
-		fmt.Fprintf(out, "  [%d/%d] %s", i+1, len(workflow.Steps), stepName)
+		fmt.Fprintf(errOut, "  [%d/%d] %s", i+1, len(workflow.Steps), stepName)
 
 		// Resolve the bundle for this step
 		bundle := resolveStepBundle(step, bundleMap)
@@ -129,12 +130,13 @@ func RunWorkflow(
 		}
 
 		// Parse response body
-		stepOutput, statusCode, execErr := parseStepResponse(resp)
+		stepOutput, rawOutput, statusCode, execErr := parseStepResponse(resp)
 		result := StepResult{
 			StepIndex:     i,
 			StepName:      stepName,
 			LibraryUUID:   step.LibraryUUID,
 			Output:        stepOutput,
+			RawOutput:     rawOutput,
 			StatusCode:    statusCode,
 			Error:         execErr,
 			RequestMethod: httpReq.Method,
@@ -152,7 +154,7 @@ func RunWorkflow(
 			}
 		}
 
-		fmt.Fprintf(out, " ✓ (HTTP %d)\n", statusCode)
+		fmt.Fprintf(errOut, " ✓ (HTTP %d)\n", statusCode)
 		completedIndexes = append(completedIndexes, i)
 
 		// Merge this step's output into accumulated args for subsequent steps
@@ -181,32 +183,42 @@ func resolveStepBundle(step registry.WorkflowStep, bundleMap BundleMap) *Integra
 	return nil
 }
 
-// parseStepResponse reads the HTTP response and returns the parsed body, status code, and any error.
-func parseStepResponse(resp *http.Response) (map[string]interface{}, int, error) {
+// parseStepResponse reads the HTTP response and returns:
+//   - mergeMap: object fields for chaining into the next step's args (empty map for array/scalar responses)
+//   - rawOutput: the actual parsed JSON value (array, object, or nil) for display in workflow output
+//   - statusCode: the HTTP status code
+//   - err: non-nil when status >= 400
+func parseStepResponse(resp *http.Response) (mergeMap map[string]interface{}, rawOutput interface{}, statusCode int, err error) {
 	defer resp.Body.Close()
-	statusCode := resp.StatusCode
+	statusCode = resp.StatusCode
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, statusCode, fmt.Errorf("read response body: %w", err)
+	bodyBytes, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return nil, nil, statusCode, fmt.Errorf("read response body: %w", readErr)
 	}
 
-	var parsed map[string]interface{}
+	mergeMap = map[string]interface{}{}
 	if len(bodyBytes) > 0 {
-		if jsonErr := json.Unmarshal(bodyBytes, &parsed); jsonErr != nil {
-			// Non-JSON body — wrap as raw string
-			parsed = map[string]interface{}{"raw": string(bodyBytes)}
+		var parsed interface{}
+		if jsonErr := json.Unmarshal(bodyBytes, &parsed); jsonErr == nil {
+			rawOutput = parsed
+			// Only merge into next step args when the response is a JSON object
+			if m, ok := parsed.(map[string]interface{}); ok {
+				mergeMap = m
+			}
+			// Arrays and scalars are preserved in RawOutput but not merged into args
+		} else {
+			// Non-JSON body — wrap as raw string; don't leak into next step's query params
+			rawStr := string(bodyBytes)
+			rawOutput = rawStr
 		}
-	}
-	if parsed == nil {
-		parsed = map[string]interface{}{}
 	}
 
 	if statusCode >= 400 {
-		return parsed, statusCode, fmt.Errorf("HTTP %d: %s", statusCode, http.StatusText(statusCode))
+		return mergeMap, rawOutput, statusCode, fmt.Errorf("HTTP %d: %s", statusCode, http.StatusText(statusCode))
 	}
 
-	return parsed, statusCode, nil
+	return mergeMap, rawOutput, statusCode, nil
 }
 
 // PrintWorkflowError writes a human-readable failure summary to errOut.

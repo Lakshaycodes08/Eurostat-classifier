@@ -144,7 +144,8 @@ func TestExecuteDryRun_OutputShape(t *testing.T) {
 	if !ok {
 		t.Fatalf("dry-run headers not map: %T", out["headers"])
 	}
-	if h := headers["Authorization"]; h != "Bearer token123" {
+	// Authorization is redacted in dry-run output to prevent credential leakage
+	if h := headers["Authorization"]; h != "[REDACTED]" {
 		t.Errorf("dry-run headers Authorization = %v", h)
 	}
 	if h := headers["X-Request-Id"]; h != "abc" {

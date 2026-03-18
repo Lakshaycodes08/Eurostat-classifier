@@ -138,4 +138,5 @@ const (
 	WrekenEndpoint   = "ENDPOINT"
 	WrekenHTTPMethod = "METHOD"
 	WrekenHeaders    = "HEADERS"
+	WrekenLocation   = "LOCATION"
 )

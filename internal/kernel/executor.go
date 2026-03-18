@@ -52,7 +52,7 @@ func buildWorkflowOutput(results []StepResult) map[string]interface{} {
 			"step":        r.StepIndex + 1,
 			"name":        r.StepName,
 			"status_code": r.StatusCode,
-			"data":        r.Output,
+			"data":        r.RawOutput,
 		}
 		if r.RequestMethod != "" || r.RequestURL != "" {
 			entry["request"] = map[string]string{

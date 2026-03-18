@@ -87,13 +87,13 @@ func LoadIntegrationBundle(projectRoot, integration string) (*IntegrationBundle,
 
 // Method represents a method definition from Wreken METHODS section.
 type Method struct {
-	CanonicalID string
-	HTTPMethod  string
-	Endpoint    string
-	Headers     map[string]string
-	Inputs      interface{}
-	Returns     interface{}
-	// ... other fields from wrekenfile
+	CanonicalID    string
+	HTTPMethod     string
+	Endpoint       string
+	Headers        map[string]string
+	Inputs         interface{}
+	Returns        interface{}
+	InputLocations map[string]string // field name (lowercase) → "header" | "query" | "body"
 }
 
 // ResolveMethod resolves a canonical_id to a Method from the Wreken METHODS section.
@@ -147,9 +147,23 @@ func ResolveMethod(bundle *IntegrationBundle, canonicalID string) (*Method, erro
 		}
 	}
 
-	// Extract INPUTS
+	// Extract INPUTS and parse LOCATION for each field
 	if inputsRaw, ok := methodMap[constants.WrekenInputs]; ok {
 		method.Inputs = inputsRaw
+		if inputsList, ok := inputsRaw.([]interface{}); ok {
+			method.InputLocations = make(map[string]string)
+			for _, item := range inputsList {
+				if m, ok := item.(map[string]interface{}); ok {
+					for fieldName, spec := range m {
+						if specMap, ok := spec.(map[string]interface{}); ok {
+							if loc, ok := specMap[constants.WrekenLocation].(string); ok {
+								method.InputLocations[strings.ToLower(fieldName)] = strings.ToLower(loc)
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// Extract RETURNS
