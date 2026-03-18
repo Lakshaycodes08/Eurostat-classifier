@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"gitlab.com/swytchcode/cli/internal/constants"
 	"gitlab.com/swytchcode/cli/internal/manifest"
 	"gitlab.com/swytchcode/cli/internal/output"
 )
@@ -40,8 +41,8 @@ func GetBaseURL(projectRoot, integration, mode string) (string, error) {
 	}
 	// Optional: warn when using a plain http://localhost base URL, which usually implies
 	// a local backend. This is a best-effort hint only and does not affect execution.
-	if endpoint == "http://localhost" {
-		output.Warn(os.Stderr, fmt.Sprintf("integration %q is using base URL http://localhost – this expects a local backend and is unrelated to the MCP HTTP server address", projectLibrary))
+	if endpoint == constants.DefaultLocalEndpoint {
+		output.Warn(os.Stderr, fmt.Sprintf("integration %q is using base URL %s – this expects a local backend and is unrelated to the MCP HTTP server address", projectLibrary, constants.DefaultLocalEndpoint))
 	}
 	return endpoint, nil
 }

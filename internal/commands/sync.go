@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gitlab.com/swytchcode/cli/internal/constants"
 	"gitlab.com/swytchcode/cli/internal/manifest"
 	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/registry"
@@ -27,7 +28,7 @@ func RunSync(ctx context.Context, projectName string, stdout, stderr io.Writer) 
 		return fmt.Errorf("detect project root: %w", err)
 	}
 
-	integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations")
+	integrationsDir := util.IntegrationsDir(projectRoot)
 	if _, err := os.Stat(integrationsDir); err != nil {
 		return fmt.Errorf("no integrations found — run: swytchcode get <project>")
 	}
@@ -71,10 +72,10 @@ func syncProject(ctx context.Context, regClient *registry.Client, projectRoot, p
 	registry.FillEmptyWorkflowNames(remoteResp)
 
 	// Load local workflows from the first workflows.json found in this project's dir
-	projDir := filepath.Join(projectRoot, ".swytchcode", "integrations", projectName)
+	projDir := filepath.Join(util.IntegrationsDir(projectRoot), projectName)
 	var localWorkflows []registry.Workflow
 	_ = filepath.Walk(projDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() || info.Name() != "workflows.json" || localWorkflows != nil {
+		if err != nil || info.IsDir() || info.Name() != constants.WorkflowsJSONFile || localWorkflows != nil {
 			return nil
 		}
 		data, err := os.ReadFile(path)
@@ -125,27 +126,26 @@ func syncProject(ctx context.Context, regClient *registry.Client, projectRoot, p
 	}
 	spinner.StopWithMessage(fmt.Sprintf("  ✓ Downloaded %d bundle(s)\n", len(bundlesResp.Bundles)))
 
-	integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations")
 	workflowsData, marshalErr := json.MarshalIndent(remoteResp, "", "  ")
 
 	for _, bundle := range bundlesResp.Bundles {
 		if bundle.Integration == "" || bundle.Version == "" {
 			continue
 		}
-		versionedDir := filepath.Join(integrationsDir, projectName, bundle.Integration, bundle.Version)
+		versionedDir := util.IntegrationVersionDir(projectRoot, projectName, bundle.Integration, bundle.Version)
 		if err := util.EnsureDir(versionedDir, 0o755); err != nil {
 			continue
 		}
 
 		wrekenBytes := util.DecodeBase64OrRaw(bundle.Files.Wreken.Content)
 		if len(wrekenBytes) > 0 {
-			if err := os.WriteFile(filepath.Join(versionedDir, "wrekenfile.yaml"), wrekenBytes, 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(versionedDir, constants.WrekenfileYAMLFile), wrekenBytes, 0o644); err != nil {
 				output.Warn(stderr, fmt.Sprintf("  failed to write wrekenfile for %s: %v", bundle.Integration, err))
 			}
 		}
 
 		if marshalErr == nil {
-			if err := os.WriteFile(filepath.Join(versionedDir, "workflows.json"), workflowsData, 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(versionedDir, constants.WorkflowsJSONFile), workflowsData, 0o644); err != nil {
 				output.Warn(stderr, fmt.Sprintf("  failed to write workflows.json for %s: %v", bundle.Integration, err))
 			}
 		}
@@ -153,10 +153,10 @@ func syncProject(ctx context.Context, regClient *registry.Client, projectRoot, p
 		sandboxEndpoint := bundle.SandboxEndpoint
 		productionEndpoint := bundle.ProductionEndpoint
 		if sandboxEndpoint == "" {
-			sandboxEndpoint = "http://localhost"
+			sandboxEndpoint = constants.DefaultLocalEndpoint
 		}
 		if productionEndpoint == "" {
-			productionEndpoint = "http://localhost"
+			productionEndpoint = constants.DefaultLocalEndpoint
 		}
 		projectLibrary := fmt.Sprintf("%s.%s", projectName, bundle.Integration)
 		manifest.UpdateEntry(projectRoot, projectLibrary, bundle.Version, sandboxEndpoint, productionEndpoint, 0, len(remoteResp.Workflows), map[string]interface{}{})
@@ -168,7 +168,7 @@ func syncProject(ctx context.Context, regClient *registry.Client, projectRoot, p
 	}
 
 	// Warn about updated workflows already in tooling.json
-	toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
+	toolingPath := util.ToolingPath(projectRoot)
 	var toolingTools map[string]interface{}
 	if toolingData, err := os.ReadFile(toolingPath); err == nil {
 		var tooling map[string]interface{}
@@ -201,7 +201,6 @@ func checkStaleMethods(projectRoot, projectName string, tools map[string]interfa
 		return
 	}
 
-	integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations")
 	staleCount := 0
 
 	for canonicalID, raw := range tools {
@@ -239,7 +238,7 @@ func checkStaleMethods(projectRoot, projectName string, tools map[string]interfa
 			continue
 		}
 
-		wrekenPath := filepath.Join(integrationsDir, proj, lib, version, "wrekenfile.yaml")
+		wrekenPath := filepath.Join(util.IntegrationVersionDir(projectRoot, proj, lib, version), constants.WrekenfileYAMLFile)
 		methodEntry, err := findMethodInWrekenfile(wrekenPath, canonicalID)
 		if err != nil {
 			continue

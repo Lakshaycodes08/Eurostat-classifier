@@ -68,6 +68,18 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 			fullURL = base + path
 		}
 	}
+	// Also substitute path params from top-level args (e.g., merged from prior workflow step outputs).
+	// This allows chained steps to pass values like project_uuid into path parameters.
+	for key, val := range args {
+		placeholder := "{" + key + "}"
+		if strings.Contains(path, placeholder) {
+			str := argValueToQueryString(val)
+			if str != "" {
+				path = strings.ReplaceAll(path, placeholder, url.PathEscape(str))
+				fullURL = base + path
+			}
+		}
+	}
 
 	// Parse URL
 	parsedURL, err := url.Parse(fullURL)

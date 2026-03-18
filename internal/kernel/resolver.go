@@ -5,8 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+
+	"gitlab.com/swytchcode/cli/internal/util"
 )
+
+// LocalWorkflowStep is a workflow step read from the local tooling.json.
+type LocalWorkflowStep struct {
+	CanonicalID string
+	Integration string // "project.library@version" format
+	Name        string
+}
 
 // Tool represents a tool entry from tooling.json.
 type Tool struct {
@@ -15,14 +23,15 @@ type Tool struct {
 	Integration string // "project.library@version" format
 	Summary     string
 	Desc        string
-	Inputs      interface{} // Input schema
-	Mode        string       // "production" or "sandbox" from tooling.json
+	Inputs      interface{}         // Input schema
+	Mode        string              // "production" or "sandbox" from tooling.json
+	Steps       []LocalWorkflowStep // populated for workflow tools
 }
 
 // ResolveTool resolves a canonical_id to a Tool from tooling.json.
 func ResolveTool(projectRoot, canonicalID string, isRaw bool) (*Tool, error) {
 	// Load tooling.json
-	toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
+	toolingPath := util.ToolingPath(projectRoot)
 	data, err := os.ReadFile(toolingPath)
 	if err != nil {
 		return nil, fmt.Errorf("tooling.json not found; run 'swytchcode init' first")
@@ -81,6 +90,29 @@ func ResolveTool(projectRoot, canonicalID string, isRaw bool) (*Tool, error) {
 
 	if inputsRaw, ok := toolMap["inputs"]; ok {
 		tool.Inputs = inputsRaw
+	}
+
+	// Read workflow steps if present
+	if stepsRaw, ok := toolMap["steps"].([]interface{}); ok {
+		for _, sRaw := range stepsRaw {
+			sMap, ok := sRaw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			step := LocalWorkflowStep{}
+			if v, ok := sMap["canonical_id"].(string); ok {
+				step.CanonicalID = v
+			}
+			if v, ok := sMap["integration"].(string); ok {
+				step.Integration = v
+			}
+			if v, ok := sMap["name"].(string); ok {
+				step.Name = v
+			}
+			if step.CanonicalID != "" && step.Integration != "" {
+				tool.Steps = append(tool.Steps, step)
+			}
+		}
 	}
 
 	return tool, nil

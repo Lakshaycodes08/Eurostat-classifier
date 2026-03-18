@@ -116,7 +116,21 @@ These changes can remain in `install.ps1` without changing the contract with use
 
 This reduces duplication and makes it easier to reason about behavior when refactoring.
 
-## 5. Summary of priority changes
+## 5. Constants and path helpers refactor ✅ Completed
+
+**What was done:**
+
+- All hardcoded directory/file name string literals, Wrekenfile section key strings, and `"http://localhost"` fallback URLs extracted to named constants in `internal/constants/constants.go`:
+  - File/dir names: `SwytchDirName`, `IntegrationsDirName`, `ToolingJSONFile`, `WrekenfileYAMLFile`, `MethodsJSONFile`, `WorkflowsJSONFile`, `ManifestJSONFile`, `MCPPIDFile`
+  - Fallback: `DefaultLocalEndpoint`
+  - Wrekenfile keys: `WrekenMethods`, `WrekenWorkflows`, `WrekenStructs`, `WrekenInputs`, `WrekenReturns`, `WrekenSummary`, `WrekenDesc`, `WrekenHTTP`, `WrekenEndpoint`, `WrekenHTTPMethod`, `WrekenHeaders`
+- Path helper functions added to `internal/util/fs.go`: `SwytchDir`, `ToolingPath`, `IntegrationsDir`, `IntegrationVersionDir`, `ManifestPath`, `MCPPIDPath`
+- All occurrences replaced across: `commands/get.go`, `commands/add.go`, `commands/init.go`, `commands/bootstrap.go`, `commands/sync.go`, `commands/structs.go`, `commands/info.go`, `commands/list.go`, `commands/upgrade.go`, `cli/add.go`, `kernel/resolver.go`, `kernel/bundle.go`, `kernel/manifest.go`, `manifest/manifest.go`, `mcp/pid.go`, `mcp/tools.go`, `auth/auth.go`
+- Three hardcoded `"https://api-v2.swytchcode.com"` strings in `mcp/tools.go` replaced with `constants.RegistryURL`
+
+**Verification:** `go build ./...` passes with no errors. No bare `.swytchcode`, `tooling.json`, `wrekenfile.yaml`, `methods.json`, `workflows.json`, `manifest.json`, `mcp.pid`, or `http://localhost` string literals remain in source (outside of `constants.go` and test files).
+
+## 6. Summary of priority changes
 
 If you want to keep changes focused, the highest-impact refactors are:
 

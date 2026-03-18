@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gitlab.com/swytchcode/cli/internal/constants"
 	"gitlab.com/swytchcode/cli/internal/manifest"
 	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/registry"
@@ -19,7 +20,7 @@ import (
 // RunBootstrap runs the bootstrap command: fetches all integrations declared in tooling.json.
 func RunBootstrap(ctx context.Context, projectRoot string, stdout, stderr io.Writer) error {
 	// Load tooling.json
-	toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
+	toolingPath := util.ToolingPath(projectRoot)
 	data, err := os.ReadFile(toolingPath)
 	if err != nil {
 		return fmt.Errorf("tooling.json not found; run 'swytchcode init' first: %w", err)
@@ -48,8 +49,7 @@ func RunBootstrap(ctx context.Context, projectRoot string, stdout, stderr io.Wri
 	}
 
 	// Ensure integrations directory exists
-	integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations")
-	if err := util.EnsureDir(integrationsDir, 0o755); err != nil {
+	if err := util.EnsureDir(util.IntegrationsDir(projectRoot), 0o755); err != nil {
 		return fmt.Errorf("create integrations directory: %w", err)
 	}
 
@@ -83,10 +83,10 @@ func RunBootstrap(ctx context.Context, projectRoot string, stdout, stderr io.Wri
 		}
 
 		// Check if integration already exists
-		integrationPath := filepath.Join(integrationsDir, projectName, libraryName, version)
+		integrationPath := util.IntegrationVersionDir(projectRoot, projectName, libraryName, version)
 		if _, err := os.Stat(integrationPath); err == nil {
 			// Check if wrekenfile exists
-			wrekenPath := filepath.Join(integrationPath, "wrekenfile.yaml")
+			wrekenPath := filepath.Join(integrationPath, constants.WrekenfileYAMLFile)
 			if _, err := os.Stat(wrekenPath); err == nil {
 				skipped = append(skipped, projectLibrary)
 				continue
@@ -160,14 +160,13 @@ func fetchIntegration(ctx context.Context, regClient *registry.Client, projectRo
 	}
 
 	// Ensure directories exist
-	integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations")
-	versionedDir := filepath.Join(integrationsDir, projectName, libraryName, version)
+	versionedDir := util.IntegrationVersionDir(projectRoot, projectName, libraryName, version)
 	if err := util.EnsureDir(versionedDir, 0o755); err != nil {
 		return fmt.Errorf("create versioned directory: %w", err)
 	}
 
 	// Write wrekenfile
-	wrekenPath := filepath.Join(versionedDir, "wrekenfile.yaml")
+	wrekenPath := filepath.Join(versionedDir, constants.WrekenfileYAMLFile)
 	wrekenBytes := util.DecodeBase64OrRaw(targetBundle.Files.Wreken.Content)
 	if len(wrekenBytes) == 0 {
 		return fmt.Errorf("empty Wrekenfile content")
@@ -189,7 +188,7 @@ func fetchIntegration(ctx context.Context, regClient *registry.Client, projectRo
 
 	// Write methods.json
 	if methodsResp != nil {
-		methodsPath := filepath.Join(versionedDir, "methods.json")
+		methodsPath := filepath.Join(versionedDir, constants.MethodsJSONFile)
 		data, err := json.MarshalIndent(methodsResp, "", "  ")
 		if err != nil {
 			return fmt.Errorf("marshal methods: %w", err)
@@ -201,7 +200,7 @@ func fetchIntegration(ctx context.Context, regClient *registry.Client, projectRo
 
 	// Write workflows.json
 	if workflowsResp != nil {
-		workflowsPath := filepath.Join(versionedDir, "workflows.json")
+		workflowsPath := filepath.Join(versionedDir, constants.WorkflowsJSONFile)
 		data, err := json.MarshalIndent(workflowsResp, "", "  ")
 		if err != nil {
 			return fmt.Errorf("marshal workflows: %w", err)
@@ -225,10 +224,10 @@ func fetchIntegration(ctx context.Context, regClient *registry.Client, projectRo
 	sandboxEndpoint := targetBundle.SandboxEndpoint
 	productionEndpoint := targetBundle.ProductionEndpoint
 	if sandboxEndpoint == "" {
-		sandboxEndpoint = "http://localhost"
+		sandboxEndpoint = constants.DefaultLocalEndpoint
 	}
 	if productionEndpoint == "" {
-		productionEndpoint = "http://localhost"
+		productionEndpoint = constants.DefaultLocalEndpoint
 	}
 
 	auth := make(map[string]interface{})

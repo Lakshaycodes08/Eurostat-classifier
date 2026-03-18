@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -124,7 +123,7 @@ var addIntegrationCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("detect project root: %w", err)
 		}
-		toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
+		toolingPath := util.ToolingPath(projectRoot)
 		var tooling map[string]interface{}
 		if data, err := os.ReadFile(toolingPath); err == nil {
 			if err := json.Unmarshal(data, &tooling); err != nil {

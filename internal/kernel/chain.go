@@ -14,12 +14,14 @@ import (
 
 // StepResult holds the outcome of a single workflow step execution.
 type StepResult struct {
-	StepIndex   int
-	StepName    string
-	LibraryUUID string
-	Output      map[string]interface{}
-	StatusCode  int
-	Error       error
+	StepIndex     int
+	StepName      string
+	LibraryUUID   string
+	Output        map[string]interface{}
+	StatusCode    int
+	Error         error
+	RequestMethod string // HTTP method of the step request (e.g. "POST")
+	RequestURL    string // Full URL of the step request
 }
 
 // WorkflowError is returned when a step fails, carrying partial progress.
@@ -129,12 +131,14 @@ func RunWorkflow(
 		// Parse response body
 		stepOutput, statusCode, execErr := parseStepResponse(resp)
 		result := StepResult{
-			StepIndex:   i,
-			StepName:    stepName,
-			LibraryUUID: step.LibraryUUID,
-			Output:      stepOutput,
-			StatusCode:  statusCode,
-			Error:       execErr,
+			StepIndex:     i,
+			StepName:      stepName,
+			LibraryUUID:   step.LibraryUUID,
+			Output:        stepOutput,
+			StatusCode:    statusCode,
+			Error:         execErr,
+			RequestMethod: httpReq.Method,
+			RequestURL:    httpReq.URL.String(),
 		}
 		results = append(results, result)
 

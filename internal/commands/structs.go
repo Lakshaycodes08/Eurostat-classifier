@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+	"gitlab.com/swytchcode/cli/internal/constants"
 )
 
 // LoadWrekenfile reads and parses a wrekenfile.yaml into a map.
@@ -232,7 +233,7 @@ func resolveStruct(wreken map[string]interface{}, structName string, visited map
 	visited[structName] = true
 	defer func() { delete(visited, structName) }()
 
-	structsSection, ok := wreken["STRUCTS"]
+	structsSection, ok := wreken[constants.WrekenStructs]
 	if !ok {
 		return nil, fmt.Errorf("struct %q: STRUCTS section not found in wrekenfile", structName)
 	}

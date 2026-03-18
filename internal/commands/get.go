@@ -9,11 +9,41 @@ import (
 	"os"
 	"path/filepath"
 
+	"gopkg.in/yaml.v3"
+	"gitlab.com/swytchcode/cli/internal/constants"
 	"gitlab.com/swytchcode/cli/internal/manifest"
 	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/registry"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
+
+// filterMethodsByWreken returns a new ListMethodsResponse containing only methods whose
+// CanonicalID appears in the METHODS section of the given wrekenfile bytes.
+// This ensures each library's methods.json only contains its own methods, not the full project list.
+func filterMethodsByWreken(wrekenBytes []byte, all *registry.ListMethodsResponse) *registry.ListMethodsResponse {
+	if all == nil {
+		return nil
+	}
+	var wreken map[string]interface{}
+	if err := yaml.Unmarshal(wrekenBytes, &wreken); err != nil {
+		return all // can't parse — return unfiltered
+	}
+	methodsSection, ok := wreken[constants.WrekenMethods].(map[string]interface{})
+	if !ok {
+		return all // no METHODS section — return unfiltered
+	}
+	allowed := make(map[string]bool, len(methodsSection))
+	for id := range methodsSection {
+		allowed[id] = true
+	}
+	filtered := make([]registry.Method, 0, len(all.Methods))
+	for _, m := range all.Methods {
+		if allowed[m.CanonicalID] {
+			filtered = append(filtered, m)
+		}
+	}
+	return &registry.ListMethodsResponse{Methods: filtered}
+}
 
 // RunGet runs the get command: fetch bundles for a project and write wrekenfile, methods, workflows, manifest.
 func RunGet(ctx context.Context, projectName string, yes bool, stdout, stderr io.Writer) error {
@@ -46,12 +76,10 @@ func RunGet(ctx context.Context, projectName string, yes bool, stdout, stderr io
 	spinner.StopWithMessage(fmt.Sprintf("✓ Found %d bundle(s)\n", len(bundlesResp.Bundles)))
 
 	// Create base .swytchcode directory and integrations subdirectory
-	swytchDir := filepath.Join(projectRoot, ".swytchcode")
-	if err := util.EnsureDir(swytchDir, 0o755); err != nil {
+	if err := util.EnsureDir(util.SwytchDir(projectRoot), 0o755); err != nil {
 		return fmt.Errorf("create .swytchcode directory: %w", err)
 	}
-	integrationsDir := filepath.Join(swytchDir, "integrations")
-	if err := util.EnsureDir(integrationsDir, 0o755); err != nil {
+	if err := util.EnsureDir(util.IntegrationsDir(projectRoot), 0o755); err != nil {
 		return fmt.Errorf("create integrations directory: %w", err)
 	}
 
@@ -100,15 +128,15 @@ func RunGet(ctx context.Context, projectName string, yes bool, stdout, stderr io
 		}
 
 		// Create versioned directory: .swytchcode/integrations/{project}/{library}/{version}/
-		versionedDir := filepath.Join(integrationsDir, projectName, bundle.Integration, bundle.Version)
+		versionedDir := util.IntegrationVersionDir(projectRoot, projectName, bundle.Integration, bundle.Version)
 		if err := util.EnsureDir(versionedDir, 0o755); err != nil {
 			bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to create directory: %v\n", err))
 			return fmt.Errorf("create versioned directory: %w", err)
 		}
 
-		wrekenPath := filepath.Join(versionedDir, "wrekenfile.yaml")
-		methodsPath := filepath.Join(versionedDir, "methods.json")
-		workflowsPath := filepath.Join(versionedDir, "workflows.json")
+		wrekenPath := filepath.Join(versionedDir, constants.WrekenfileYAMLFile)
+		methodsPath := filepath.Join(versionedDir, constants.MethodsJSONFile)
+		workflowsPath := filepath.Join(versionedDir, constants.WorkflowsJSONFile)
 
 		// Check if directory already exists
 		if _, err := os.Stat(versionedDir); err == nil {
@@ -138,9 +166,9 @@ func RunGet(ctx context.Context, projectName string, yes bool, stdout, stderr io
 			return fmt.Errorf("write Wrekenfile %q: %w", wrekenPath, err)
 		}
 
-		// Write methods.json
+		// Write methods.json — filtered to only this library's methods (by wrekenfile METHODS keys)
 		if methodsResp != nil {
-			data, err := json.MarshalIndent(methodsResp, "", "  ")
+			data, err := json.MarshalIndent(filterMethodsByWreken(wrekenBytes, methodsResp), "", "  ")
 			if err != nil {
 				bundleSpinner.StopWithMessage(fmt.Sprintf("✗ Failed to marshal methods: %v\n", err))
 				return fmt.Errorf("marshal methods response: %w", err)
@@ -167,14 +195,14 @@ func RunGet(ctx context.Context, projectName string, yes bool, stdout, stderr io
 		// Update manifest.json
 		projectLibrary := fmt.Sprintf("%s.%s", projectName, bundle.Integration)
 
-		// Use endpoints directly from bundle (use http://localhost if empty)
+		// Use endpoints directly from bundle (fall back to DefaultLocalEndpoint if empty)
 		sandboxEndpoint := bundle.SandboxEndpoint
 		productionEndpoint := bundle.ProductionEndpoint
 		if sandboxEndpoint == "" {
-			sandboxEndpoint = "http://localhost"
+			sandboxEndpoint = constants.DefaultLocalEndpoint
 		}
 		if productionEndpoint == "" {
-			productionEndpoint = "http://localhost"
+			productionEndpoint = constants.DefaultLocalEndpoint
 		}
 
 		auth := make(map[string]interface{})

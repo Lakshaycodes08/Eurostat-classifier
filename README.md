@@ -20,19 +20,62 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 ```bash
 curl -fsSL https://cli.swytchcode.com/install.sh | sh
 ```
-Optional: `VERSION=v1.0.5` for a specific release, `INSTALL_DIR=/path` to choose install location (default: `/usr/local/bin` if writable, else `~/.local/bin`).
+Optional: `VERSION=v1.0.8` for a specific release, `INSTALL_DIR=/path` to choose install location (default: `/usr/local/bin` if writable, else `~/.local/bin`).
 
 **Windows (PowerShell):**
 ```powershell
 irm https://cli.swytchcode.com/install.ps1 | iex
 ```
-Optional: `$env:VERSION="v1.0.5"` for a specific release, `$env:INSTALL_DIR="C:\path"` to choose install location (default: `%LOCALAPPDATA%\Programs\swytchcode\bin`, added to user PATH automatically).
+Optional: `$env:VERSION="v1.0.8"` for a specific release, `$env:INSTALL_DIR="C:\path"` to choose install location (default: `%LOCALAPPDATA%\Programs\swytchcode\bin`, added to user PATH automatically).
 
 **More:** [GitLab Pages](https://cli.swytchcode.com/) · [swytchcode.com](https://swytchcode.com)
 
 ---
 
+## Quick start (2 minutes)
+
+This is the fastest end-to-end flow:
+
+```bash
+# 1) Initialize Swytchcode in this repo
+swytchcode init --editor=cursor --mode=sandbox
+
+# 2) Fetch an integration (one-time per integration/version)
+swytchcode get ngage
+
+# 3) Add a tool (declare intent / trust boundary)
+swytchcode add customers.external_account.create
+
+# 4) Execute the tool (replace placeholders with real values)
+echo '{
+  "tool": "customers.external_account.create",
+  "args": {
+    "customerID": "your-customer-id",
+    "Idempotency-Key": "your-idempotency-key",
+    "body": {
+      "variant": {
+        "value": {
+          "accountNumber": "000000000000",
+          "accountType": "checking",
+          "bankName": "Example Bank",
+          "routingNumber": "000000000"
+        }
+      }
+    }
+  }
+}' | swytchcode exec --json
+```
+
+**Mental model:**
+
+- **`init`**: create `.swytchcode/` and `tooling.json` in your project
+- **`get`**: download integrations (what’s possible)
+- **`add`**: enable specific trusted tools in `tooling.json` (what’s allowed)
+- **`exec`**: execute deterministically via the kernel
+
 ## Commands at a glance
+
+**Typical flow:** `init` → `get` → `add` → `exec`
 
 | Command | Purpose |
 |--------|---------|
@@ -45,7 +88,8 @@ Optional: `$env:VERSION="v1.0.5"` for a specific release, `$env:INSTALL_DIR="C:\
 | `swytchcode list workflows [pattern]` | List all workflows from .swytchcode/integrations (optional pattern filters by canonical_id or project) |
 | `swytchcode list integrations` | List locally fetched integrations |
 | `swytchcode search [keyword]` | Search remote registry; no keyword = all integrations, with keyword = matching names |
-| `swytchcode add [spec] <canonical_id>` | Add a tool to `tooling.json` |
+| `swytchcode sync [project_name]` | Re-fetch workflow/method list from backend; updates local files without modifying tooling.json |
+| `swytchcode add [spec] <canonical_id>` | Add a tool to `tooling.json`; auto-downloads missing library deps for multi-library workflows |
 | `swytchcode info <canonical_id>` | Show information about a tool by canonical ID |
 | `swytchcode exec [canonical_id]` | Execute a tool (CLI or JSON stdin); supports `--json`, `--raw`, `--dry-run` |
 | `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec` |
@@ -56,7 +100,8 @@ Optional: `$env:VERSION="v1.0.5"` for a specific release, `$env:INSTALL_DIR="C:\
 | `swytchcode whoami` | Show current session (email, customer UUID, expiry); prints "Not logged in" if no session |
 | `swytchcode check [project_or_library]` | Check for integration update proposals; exits 1 on breaking changes; requires `SWYTCHCODE_TOKEN` or login |
 | `swytchcode inspect <library>` | Show full proposal detail for a library (requires login) |
-| `swytchcode upgrade <library>` | Approve a pending integration update proposal (requires login) |
+| `swytchcode upgrade <library> [--apply]` | Approve a pending integration update proposal (requires login); `--apply` also re-downloads and refreshes tools |
+| `swytchcode diff <library>` | Show method-level changes in a pending upgrade proposal (requires login or `SWYTCHCODE_TOKEN`) |
 
 ---
 
@@ -105,8 +150,11 @@ swytchcode init --editor=cursor --mode=production --non-interactive
 - Creates `tooling.json` with empty `integrations` and `tools` maps
 - Sets `mode` and `version` in `tooling.json`
 - Installs editor rule templates in the repo (if editor ≠ `none`):
-  - **cursor** → `.cursor/rules/swytchcode.mdc`
-  - **claude** → `CLAUDE.md` (repo root)
+  - **cursor** → `.cursor/rules/swytchcode.mdc` and updates `~/.cursor/mcp.json` with SSE URL entry
+  - **claude** → `CLAUDE.md` (repo root) and updates `~/.claude/settings.json` with SSE URL entry
+- Starts the MCP HTTP daemon in the background (`swytchcode mcp serve --daemon --transport http`) so editor tools are available **immediately** — no restart required
+
+> **No restart needed:** Because init registers an SSE URL (`http://localhost:5476/sse`) rather than a stdio process, the editor can connect to the already-running daemon at any time. Tools are live as soon as init finishes.
 
 **Error messages:**
 - `"init requires --editor when running non-interactively"` — Missing `--editor` flag in non-interactive mode
@@ -297,6 +345,42 @@ swytchcode search stripe --json
 
 ---
 
+### `swytchcode sync [project_name]`
+
+Pull the latest workflow and method list from the backend for installed projects and update local files. Does **not** modify `tooling.json` — the user still decides which tools to activate with `swytchcode add`.
+
+**Usage:**
+```bash
+# Sync all installed projects
+swytchcode sync
+
+# Sync a single project
+swytchcode sync stripe
+```
+
+**What it does:**
+- For each installed project (or just the named one): calls the backend for the current workflow list
+- Compares against the local `workflows.json`; identifies new and updated workflows
+- If any changes found: re-fetches the full integration bundle (wrekenfiles + manifest), overwrites local files
+- Prints which new workflows are now available; warns if an updated workflow is already in `tooling.json` (run `swytchcode add <canonical_id>` to refresh it in tooling)
+- Does **not** touch `tooling.json`
+
+**Output example:**
+```
+Syncing project: stripe
+  ✓ 2 new workflow(s) available: stripe.charge_and_notify, stripe.refund_flow
+  ⚠ stripe.checkout updated (already in tooling.json — run: swytchcode add stripe.checkout to refresh)
+
+Syncing project: weaviate
+  ✓ Already up to date
+```
+
+**Error messages:**
+- `"no integrations found — run: swytchcode get <project>"` — No projects installed yet
+- `"fetch workflows from backend: %w"` — Network or auth error when calling the backend
+
+---
+
 ### `swytchcode add [integration_spec] <canonical_id>`
 
 Add a tool (method or workflow) to `tooling.json` by canonical ID. Searches `methods.json` and `workflows.json` files across all fetched integrations.
@@ -324,9 +408,15 @@ For **methods**:
 For **workflows**:
 - Searches `workflows.json` files in `.swytchcode/integrations/`
 - Reads workflow definition (with `name`, `canonical_id`, and `steps` array)
+- **Multi-library dep resolution**: if the workflow has steps whose methods live in libraries not yet downloaded, the CLI auto-fetches all required bundles in a single request (`GET /v2/cli/integrations/{project}/workflow/{canonical_id}/bundles`) and saves them before proceeding. Use `--no-auto-install` to skip this and exit with an error instead.
 - Adds a **single** workflow entry to `tooling.json` with `type: "workflow"`, `name`, `integration`, and `steps` as an **array of step definitions** (not top-level method entries). Each step object includes `canonical_id`, `name`, `summary`, `desc`, `inputs`, `integration`, and `index` so the workflow is self-contained.
+- For multi-library workflows, each step’s `integration` field reflects its actual library (e.g. `stripe.stripe@v2.1`), not the workflow’s own library.
 - Step methods are **not** added as separate top-level tools; they exist only inside the workflow’s `steps` array.
 - Automatically adds integration to `integrations` section if not already present
+
+**Flags:**
+- `--no-auto-install` — Skip auto-downloading missing library deps for multi-library workflows; exits with error instead. Use in CI for explicit dependency control.
+- `--all` — Add all methods and workflows for a project in one command (usage: `swytchcode add --all <project>`). Already-present tools are skipped. Prints a summary: `Added N, skipped M already present, K failed`.
 
 **Error messages:**
 - `"canonical ID %q not found in any fetched integrations.\nRun: swytchcode get <project>"` — Tool not found in any integration
@@ -335,6 +425,7 @@ For **workflows**:
 - `"Integration %s not installed. Run: swytchcode get %s"` — Integration not fetched yet
 - `"method %q not found in wrekenfile"` — Method not found in wrekenfile
 - `"workflow %q not found in workflows.json"` — Workflow not found in workflows.json
+- `"workflow has steps requiring libraries not yet downloaded..."` — `--no-auto-install` set but deps missing
 - `"Warning: method %q from workflow step not found in wrekenfile: %v"` — Method referenced in workflow steps not found in wrekenfile (that step is skipped; workflow is still added)
 
 ---
@@ -475,11 +566,11 @@ swytchcode mcp serve -d
 # Daemon mode with log file
 swytchcode mcp serve -d --log-file /path/to/mcp.log
 
-# HTTP transport
-swytchcode mcp serve --transport http --port 3000
+# HTTP transport (SSE — fully implemented)
+swytchcode mcp serve --transport http --port 5476
 
 # HTTP transport in daemon mode
-swytchcode mcp serve --transport http --port 3000 -d
+swytchcode mcp serve --transport http --port 5476 -d
 ```
 
 ### `swytchcode mcp status`
@@ -546,7 +637,7 @@ Cloud commands contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode
 - **Shell (current session):** `export SWYTCHCODE_TOKEN=your_token_here`
 - **Shell (persistent):** Add the same line to `~/.bashrc`, `~/.zshrc`, or your shell profile.
 - **Using a `.env` file:** Source it before running the CLI, e.g. `set -a && source .env && set +a` or `export $(grep -v '^#' .env | xargs)`, then run `swytchcode`. Alternatively: `env $(cat .env | xargs) swytchcode ...`
-- **MCP in an IDE (e.g. Cursor):** Set `SWYTCHCODE_TOKEN` in the environment of the process that runs the MCP server. In Cursor, use the MCP config’s `env` or `envFile` so the `swytchcode mcp serve` process receives the variable. If you start the server from a terminal, export the token (or source your `.env`) in that shell.
+- **MCP daemon (HTTP/SSE):** When the daemon is started by `swytchcode init` or manually via `swytchcode mcp serve --daemon --transport http`, it inherits the shell environment at the time it was started. Export `SWYTCHCODE_TOKEN` in your shell before running `swytchcode init` (or `mcp serve`) so the daemon process receives it. To restart with the new token: `swytchcode mcp stop && swytchcode mcp serve --daemon --transport http`.
 - **CI/CD:** Define `SWYTCHCODE_TOKEN` as a secret or CI variable so the job environment has it.
 
 See `docs/cli-reference.md` for more detail.
@@ -612,9 +703,24 @@ Approves a pending integration update proposal for the named library.
 ```bash
 swytchcode upgrade stripe
 swytchcode upgrade stripe.stripe
+swytchcode upgrade stripe --apply   # also refreshes local bundle + tooling.json
 ```
 
+**Flags:**
+- `--apply` — After approval, run `get` and re-add all affected tools.
+
 Requires user login (`swytchcode login`).
+
+#### `swytchcode diff <library>`
+
+Show method-level changes in a pending upgrade proposal before approving.
+
+```bash
+swytchcode diff stripe
+swytchcode diff weaviate.lyrid
+```
+
+Prints `ADDED`, `REMOVED`, and `CHANGED` methods with field-level input diffs. Requires login or `SWYTCHCODE_TOKEN`.
 
 See `commands.md` for full verification detail on these commands.
 
@@ -622,7 +728,7 @@ See `commands.md` for full verification detail on these commands.
 - `-d`: Run in daemon mode (properly daemonized background process). The server runs in a new session, completely detached from the terminal. Returns control immediately. Creates PID file at `.swytchcode/mcp.pid` for `status` and `stop` commands. Requires `--transport http`.
 - `--log-file <path>`: Path to log file (only used in daemon mode; if not provided, logs are suppressed)
 - `--transport <type>`: Transport type (`stdio` or `http`), default: `stdio`
-- `--port <number>`: Port for HTTP transport, default: `3000`
+- `--port <number>`: Port for HTTP transport, default: `5476`
 
 **What it does:**
 - Starts an MCP server exposing nine tools:
@@ -646,7 +752,7 @@ See `commands.md` for full verification detail on these commands.
   - Requires `--transport http` (stdio transport cannot be used in daemon mode)
   - **Cross-platform**: Works on Windows, Linux, and macOS
 - Supports stdio transport (default) for direct process communication (non-daemon mode only)
-- Supports HTTP transport with bearer token authentication
+- Supports HTTP/SSE transport: listens on `127.0.0.1:<port>/sse` (SSE event stream) and `/message` (JSON-RPC POST). The server binds to localhost only — not reachable externally. No auth token required for local use.
 
 **MCP Tools:**
 
@@ -794,10 +900,10 @@ After `swytchcode init`, the following structure is created:
 
 When you run `swytchcode init --editor=<cursor|claude>`, the CLI installs rule templates so the editor uses Swytchcode for API execution and does not read `.swytchcode/` or Wrekenfiles directly.
 
-| Editor | Files installed |
-|--------|------------------|
-| **cursor** | `.cursor/rules/swytchcode.mdc` |
-| **claude** | `CLAUDE.md` (repo root) |
+| Editor | Files installed | Global config updated |
+|--------|------------------|----------------------|
+| **cursor** | `.cursor/rules/swytchcode.mdc` | `~/.cursor/mcp.json` (SSE URL entry) |
+| **claude** | `CLAUDE.md` (repo root) | `~/.claude/settings.json` (SSE URL entry) |
 
 Templates are embedded in the binary; source lives in `editors/` (see `editors/README.md`). Rules require using MCP tools `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec` and generating runtime code that calls `swytchcode exec <canonical_id>`.
 
@@ -859,5 +965,5 @@ npx @modelcontextprotocol/inspector ./swytchcode mcp serve
 Using the http
 
 ```sh
-npx @modelcontextprotocol/inspector ./swytchcode mcp serve --transport http --port 3000
+npx @modelcontextprotocol/inspector ./swytchcode mcp serve --transport http --port 5476
 ```

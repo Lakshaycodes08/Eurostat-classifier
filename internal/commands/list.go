@@ -8,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // ListEntry is a tool (method or workflow) with its integration for identification.
@@ -90,7 +93,7 @@ func RunList(projectRoot, filter, prefix string, jsonOutput bool, stdout io.Writ
 // Methods and workflows are discovered from methods.json and workflows.json in each integration.
 // prefix is used as a filter pattern: match canonical_id or project name (case-insensitive substring/project match).
 func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, workflows []ListEntry, integrations []string, err error) {
-	integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations")
+	integrationsDir := util.IntegrationsDir(projectRoot)
 	if _, statErr := os.Stat(integrationsDir); statErr != nil {
 		if filter == "methods" || filter == "workflows" {
 			return nil, nil, nil, fmt.Errorf("integrations directory not found at %s: run 'swytchcode get <project>' first", integrationsDir)
@@ -124,7 +127,7 @@ func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, wor
 				}
 				version := versionEntry.Name()
 				versionPath := filepath.Join(libraryPath, version)
-				wrekenPath := filepath.Join(versionPath, "wrekenfile.yaml")
+				wrekenPath := filepath.Join(versionPath, constants.WrekenfileYAMLFile)
 				if _, err := os.Stat(wrekenPath); err != nil {
 					continue
 				}
@@ -133,7 +136,7 @@ func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, wor
 
 				// Methods from methods.json
 				if filter == "" || filter == "methods" {
-					methodsPath := filepath.Join(versionPath, "methods.json")
+					methodsPath := filepath.Join(versionPath, constants.MethodsJSONFile)
 					if data, readErr := os.ReadFile(methodsPath); readErr == nil {
 						var out map[string]interface{}
 						if json.Unmarshal(data, &out) == nil {
@@ -159,7 +162,7 @@ func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, wor
 
 				// Workflows from workflows.json
 				if filter == "" || filter == "workflows" {
-					workflowsPath := filepath.Join(versionPath, "workflows.json")
+					workflowsPath := filepath.Join(versionPath, constants.WorkflowsJSONFile)
 					if data, readErr := os.ReadFile(workflowsPath); readErr == nil {
 						var out map[string]interface{}
 						if json.Unmarshal(data, &out) == nil {

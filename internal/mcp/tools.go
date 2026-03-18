@@ -359,7 +359,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args CheckArgs) (*mcp.CallToolResult, ToolOutput, error) {
 		apiURL := os.Getenv("SWYTCHCODE_API_URL")
 		if apiURL == "" {
-			apiURL = "https://api-v2.swytchcode.com"
+			apiURL = constants.RegistryURL
 		}
 
 		token, _, _ := auth.ResolveToken()
@@ -397,7 +397,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 
 		apiURL := os.Getenv("SWYTCHCODE_API_URL")
 		if apiURL == "" {
-			apiURL = "https://api-v2.swytchcode.com"
+			apiURL = constants.RegistryURL
 		}
 
 		token, _, _ := auth.ResolveToken()
@@ -472,7 +472,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 
 		apiURL := os.Getenv("SWYTCHCODE_API_URL")
 		if apiURL == "" {
-			apiURL = "https://api-v2.swytchcode.com"
+			apiURL = constants.RegistryURL
 		}
 
 		token, _, _ := auth.ResolveToken()
@@ -731,9 +731,12 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
+	// Resolve auth token for registry calls (e.g. workflow execution)
+	mcpToken, _, _ := auth.ResolveToken()
+
 	// Create a reader from JSON
 	reqReader := &jsonReader{data: reqJSON}
-	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), allowRaw, dryRun, rawOutput, jsonOutput, "")
+	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), allowRaw, dryRun, rawOutput, jsonOutput, "", mcpToken)
 
 	if exitCode != kernel.ExitCodeOK {
 		log.Printf("[swytchcode_exec] failed tool=%s exit_code=%d (stderr captured)", tool, exitCode)

@@ -38,7 +38,7 @@ Behavior (`install.sh`):
 ### Pinned version
 
 ```bash
-VERSION=v1.0.5 curl -fsSL https://cli.swytchcode.com/install.sh | sh
+VERSION=v1.0.8 curl -fsSL https://cli.swytchcode.com/install.sh | sh
 ```
 
 The script uses `VERSION` to construct the download base:
@@ -91,7 +91,7 @@ Behavior (`install.ps1`):
 ### Pinned version
 
 ```powershell
-$env:VERSION = "v1.0.5"
+$env:VERSION = "v1.0.8"
 irm https://cli.swytchcode.com/install.ps1 | iex
 ```
 

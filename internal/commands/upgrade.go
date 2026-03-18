@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"gitlab.com/swytchcode/cli/internal/constants"
@@ -113,7 +112,7 @@ func runApplyAfterUpgrade(ctx context.Context, cfg UpgradeConfig, libraryName st
 	}
 
 	// Re-add all tools in tooling.json whose integration belongs to this library.
-	toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
+	toolingPath := util.ToolingPath(projectRoot)
 	data, err := os.ReadFile(toolingPath)
 	if err != nil {
 		return fmt.Errorf("read tooling.json: %w", err)

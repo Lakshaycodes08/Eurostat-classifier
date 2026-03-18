@@ -6,10 +6,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"gitlab.com/swytchcode/cli/internal/constants"
 	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/cli/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -65,7 +66,7 @@ func LoadIntegrationBundle(projectRoot, integration string) (*IntegrationBundle,
 	}
 
 	// Load wrekenfile.yaml
-	wrekenPath := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version, "wrekenfile.yaml")
+	wrekenPath := util.Join(util.IntegrationVersionDir(projectRoot, project, library, version), constants.WrekenfileYAMLFile)
 	data, err := os.ReadFile(wrekenPath)
 	if err != nil {
 		return nil, fmt.Errorf("integration %s not installed. Run: swytchcode get %s", integration, project)
@@ -98,7 +99,7 @@ type Method struct {
 // ResolveMethod resolves a canonical_id to a Method from the Wreken METHODS section.
 func ResolveMethod(bundle *IntegrationBundle, canonicalID string) (*Method, error) {
 	// Look for METHODS section
-	methodsRaw, ok := bundle.Wrekenfile["METHODS"]
+	methodsRaw, ok := bundle.Wrekenfile[constants.WrekenMethods]
 	if !ok {
 		return nil, fmt.Errorf("METHODS section not found in wrekenfile")
 	}
@@ -124,16 +125,16 @@ func ResolveMethod(bundle *IntegrationBundle, canonicalID string) (*Method, erro
 	}
 
 	// Extract HTTP method and endpoint
-	if httpRaw, ok := methodMap["HTTP"]; ok {
+	if httpRaw, ok := methodMap[constants.WrekenHTTP]; ok {
 		if httpMap, ok := httpRaw.(map[string]interface{}); ok {
-			if methodRaw, ok := httpMap["METHOD"].(string); ok {
+			if methodRaw, ok := httpMap[constants.WrekenHTTPMethod].(string); ok {
 				method.HTTPMethod = methodRaw
 			}
-			if endpointRaw, ok := httpMap["ENDPOINT"].(string); ok {
+			if endpointRaw, ok := httpMap[constants.WrekenEndpoint].(string); ok {
 				method.Endpoint = endpointRaw
 			}
 			// Extract headers
-			if headersRaw, ok := httpMap["HEADERS"]; ok {
+			if headersRaw, ok := httpMap[constants.WrekenHeaders]; ok {
 				if headersMap, ok := headersRaw.(map[string]interface{}); ok {
 					method.Headers = make(map[string]string)
 					for k, v := range headersMap {
@@ -147,12 +148,12 @@ func ResolveMethod(bundle *IntegrationBundle, canonicalID string) (*Method, erro
 	}
 
 	// Extract INPUTS
-	if inputsRaw, ok := methodMap["INPUTS"]; ok {
+	if inputsRaw, ok := methodMap[constants.WrekenInputs]; ok {
 		method.Inputs = inputsRaw
 	}
 
 	// Extract RETURNS
-	if returnsRaw, ok := methodMap["RETURNS"]; ok {
+	if returnsRaw, ok := methodMap[constants.WrekenReturns]; ok {
 		method.Returns = returnsRaw
 	}
 

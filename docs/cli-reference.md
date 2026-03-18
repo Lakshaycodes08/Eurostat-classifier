@@ -20,10 +20,14 @@ This document summarizes the Swytchcode CLI surface, with a focus on inputs, out
 | `swytchcode exec [canonical_id]` | **Single execution path** – run a tool via the kernel. |
 | `swytchcode mcp serve` | Start MCP server (stdio/HTTP). |
 | `swytchcode mcp status` / `swytchcode mcp stop` | Daemon status / stop. |
+| `swytchcode sync [project]` | Re-fetch workflow/method list from backend; updates local files without touching `tooling.json`. Warns on stale method hashes. |
+| `swytchcode discover <intent>` | Semantic search: find methods and workflows by natural-language description. |
+| `swytchcode plan <canonical_id>` | Preview ordered steps of a workflow before running it. |
 | `swytchcode check` | Check for integration update proposals from the backend. |
 | `swytchcode login` / `logout` / `whoami` | Manage CLI auth sessions. |
 | `swytchcode inspect <library> [--project <uuid>]` | Show full proposal detail for a library (requires login). |
-| `swytchcode upgrade <library> [--project <uuid>]` | Approve a pending integration update proposal (requires login). |
+| `swytchcode upgrade <library> [--apply]` | Approve a pending integration update proposal (requires login). `--apply` also refreshes local bundle and tooling.json. |
+| `swytchcode diff <library>` | Show method-level signature diff for a pending upgrade proposal (requires login or token). |
 
 ## swytchcode exec
 
@@ -88,9 +92,10 @@ swytchcode init --editor=cursor --mode=production --non-interactive
   - `version`
   - `mode` (`production` or `sandbox`)
   - empty `integrations` and `tools` maps.
-- Installs editor rules:
-  - Cursor: `.cursor/rules/swytchcode.mdc`
-  - Claude: `CLAUDE.md`
+- Installs editor rules and registers the MCP server:
+  - **Cursor**: writes `.cursor/rules/swytchcode.mdc`; merges `{"url":"http://localhost:5476/sse"}` into `~/.cursor/mcp.json`
+  - **Claude**: writes `CLAUDE.md`; merges `{"type":"sse","url":"http://localhost:5476/sse"}` into `~/.claude/settings.json`
+- Starts the MCP HTTP daemon in the background (if not already running) so editor tools are available immediately — **no editor restart required**.
 
 ## get
 
@@ -148,13 +153,19 @@ swytchcode search weaviate
 ```bash
 swytchcode add <canonical_id>
 swytchcode add <project@library.version> <canonical_id>
+swytchcode add --all <project>
 ```
 
 - Reads integration bundles and Wrekenfiles from `.swytchcode/integrations`.
 - Resolves the requested method/workflow and its STRUCTs into concrete input/output schemas.
 - Adds an entry in `tooling.json.tools` for that canonical ID.
+- Stores a `method_hash` (SHA-256 of the wrekenfile entry) to enable stale detection in `sync`.
 
 If the canonical ID exists in multiple integrations, `add` may require an explicit `project@library.version` to disambiguate.
+
+**Flags:**
+- `--all <project>` — Add all methods and workflows for the project. Skips already-present IDs. Prints a summary.
+- `--no-auto-install` — Do not auto-download missing library deps for multi-library workflows.
 
 ## info
 
@@ -168,11 +179,95 @@ swytchcode info <canonical_id>
   - Resolved input and output schemas (STRUCTs expanded).
 - Uses both `tooling.json` and integration artifacts (`wrekenfile.yaml`, `methods.json`, `workflows.json`) to compute the result.
 
+## sync
+
+```bash
+swytchcode sync
+swytchcode sync <project>
+```
+
+- Re-fetches the workflow list from the backend for each installed project (or the named one).
+- Compares against local `workflows.json`; if changes are found, re-downloads the full bundle.
+- Prints new workflows and warns about updated workflows already in `tooling.json`.
+- Does **not** modify `tooling.json`.
+- After bundle refresh, re-hashes all method entries against stored `method_hash` values in `tooling.json`. Warns if any differ: `⚠ method X has changed — run: swytchcode add X to refresh tooling.json`.
+
+**Error messages:**
+- `"no integrations found — run: swytchcode get <project>"` — No projects installed.
+- `"fetch workflows from backend: ..."` — Network or auth error.
+
+## discover
+
+```bash
+swytchcode discover "<intent>"
+swytchcode discover "<intent>" --project <name>
+swytchcode discover "<intent>" --library <name>
+swytchcode discover "<intent>" --top 10 --json
+```
+
+- Sends a semantic search query to the backend (`POST /v2/cli/discover`).
+- Returns ranked methods and workflows matching the plain-English intent.
+
+**Flags:**
+- `--project <name>` — Scope to a specific project.
+- `--library <name>` / `-l` — Scope to a specific library within a project.
+- `--top <n>` — Number of results (default: 5, max: 50).
+- `--json` — Output raw JSON.
+
+**Output:** Each result shows canonical ID, type, integration, confidence score, and a ready-to-use `swytchcode exec` snippet.
+
+## plan
+
+```bash
+swytchcode plan <canonical_id>
+swytchcode plan <canonical_id> --json
+```
+
+- Fetches the workflow definition from the registry and prints the ordered step list.
+- Shows step name, canonical ID, and integration for each step.
+- Does not execute anything.
+
+**Flags:**
+- `--json` — Output raw JSON.
+
+**Requirements:** Requires login or `SWYTCHCODE_TOKEN`.
+
+## diff
+
+```bash
+swytchcode diff <library>
+swytchcode diff stripe.payments
+```
+
+- Fetches the pending upgrade proposal diff from the backend (`GET /v2/cli/proposals/diff?library=<library>`).
+- Prints a formatted diff of what would change if the proposal were approved.
+
+**Output format:**
+```
+stripe  v1 → v2
+
+ADDED    stripe.create_payment_link
+REMOVED  stripe.legacy_charge  [breaking]
+CHANGED  stripe.charge_customer
+  + inputs.idempotency_key              (string, optional)
+  - inputs.source                       (string) [breaking]
+  ~ inputs.amount                       type: int → float
+
+Summary: 1 added, 1 removed, 1 changed
+
+To apply: swytchcode upgrade stripe
+```
+
+**Requirements:** Requires login or `SWYTCHCODE_TOKEN`. Depends on backend endpoint `GET /v2/cli/proposals/diff` (see `BACKEND_API_CONTRACTS.md`).
+
 ## MCP commands
 
 - `swytchcode mcp serve`
-  - Starts the MCP server (stdio by default, HTTP when configured).
+  - Starts the MCP server (stdio by default, HTTP/SSE when `--transport http` is specified).
+  - Default HTTP port: **5476** (override with `--port`).
+  - HTTP/SSE transport: listens on `127.0.0.1:<port>/sse` and `/message` — localhost only, no auth required.
   - Exposes tools that mirror CLI operations (init, get, bootstrap, list, info, exec, etc.).
+  - `swytchcode init --editor=<cursor|claude>` automatically registers the SSE URL in the editor's global MCP config and starts the daemon.
 
 - `swytchcode mcp status`
   - Reports whether the MCP daemon is running.
@@ -192,6 +287,7 @@ These commands talk to the backend at `SWYTCHCODE_API_URL` (default `https://api
 - `swytchcode check`
 - `swytchcode inspect`
 - `swytchcode upgrade`
+- `swytchcode diff`
 
 See backend-specific docs for exact payloads and behavior. From the CLI's perspective, they:
 

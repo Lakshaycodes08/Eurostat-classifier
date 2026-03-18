@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+	"gitlab.com/swytchcode/cli/internal/constants"
 	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
@@ -50,15 +51,15 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 	// For each match, get tool details from wrekenfile (methods) or workflows.json (workflows)
 	var toolInfos []ToolInfo
 	for _, match := range matches {
-		integrationsBase := filepath.Join(projectRoot, ".swytchcode", "integrations", match.Project, match.Library, match.Version)
+		integrationsBase := util.IntegrationVersionDir(projectRoot, match.Project, match.Library, match.Version)
 		var toolEntry map[string]interface{}
 		var err error
 
 		if match.ToolType == "workflow" {
-			workflowsPath := filepath.Join(integrationsBase, "workflows.json")
+			workflowsPath := filepath.Join(integrationsBase, constants.WorkflowsJSONFile)
 			toolEntry, err = findWorkflowEntryInWorkflowsJSON(workflowsPath, canonicalID)
 		} else {
-			wrekenPath := filepath.Join(integrationsBase, "wrekenfile.yaml")
+			wrekenPath := filepath.Join(integrationsBase, constants.WrekenfileYAMLFile)
 			toolEntry, err = findToolInWrekenfile(wrekenPath, canonicalID, match.ToolType)
 		}
 
@@ -69,7 +70,7 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 
 		// Extract common fields (wrekenfile uses SUMMARY/DESC/INPUTS; workflows.json uses summary/desc/steps)
 		summary := ""
-		for _, key := range []string{"SUMMARY", "summary"} {
+		for _, key := range []string{constants.WrekenSummary, "summary"} {
 			if summaryRaw, ok := toolEntry[key]; ok {
 				if summaryStr, ok := summaryRaw.(string); ok {
 					summary = summaryStr
@@ -79,7 +80,7 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 		}
 
 		description := ""
-		for _, key := range []string{"DESC", "desc", "description"} {
+		for _, key := range []string{constants.WrekenDesc, "desc", "description"} {
 			if descRaw, ok := toolEntry[key]; ok {
 				if descStr, ok := descRaw.(string); ok {
 					description = descStr
@@ -91,10 +92,10 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 		var inputs interface{}
 		var toolOutput interface{}
 		if match.ToolType == "method" {
-			wrekenPath := filepath.Join(integrationsBase, "wrekenfile.yaml")
+			wrekenPath := filepath.Join(integrationsBase, constants.WrekenfileYAMLFile)
 			wreken, loadErr := LoadWrekenfile(wrekenPath)
 			if loadErr == nil {
-				if inputsRaw, ok := toolEntry["INPUTS"]; ok {
+				if inputsRaw, ok := toolEntry[constants.WrekenInputs]; ok {
 					if resolved, err := ResolveInputs(wreken, inputsRaw); err != nil {
 						output.Warn(stderr, fmt.Sprintf("resolve STRUCTs for inputs: %v (showing raw inputs)", err))
 						inputs = inputsRaw
@@ -104,7 +105,7 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 						inputs = inputsRaw
 					}
 				}
-				if returnsRaw, ok := toolEntry["RETURNS"]; ok {
+				if returnsRaw, ok := toolEntry[constants.WrekenReturns]; ok {
 					if resolved, err := ResolveReturns(wreken, returnsRaw); err != nil {
 						output.Warn(stderr, fmt.Sprintf("resolve STRUCTs for returns: %v (output omitted)", err))
 					} else if resolved != nil {
@@ -112,11 +113,11 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 					}
 				}
 			}
-			if inputs == nil && toolEntry["INPUTS"] != nil {
-				inputs = toolEntry["INPUTS"]
+			if inputs == nil && toolEntry[constants.WrekenInputs] != nil {
+				inputs = toolEntry[constants.WrekenInputs]
 			}
 		} else {
-			if inputsRaw, ok := toolEntry["INPUTS"]; ok {
+			if inputsRaw, ok := toolEntry[constants.WrekenInputs]; ok {
 				inputs = inputsRaw
 			} else if stepsRaw, ok := toolEntry["steps"]; ok {
 				inputs = stepsRaw
@@ -160,9 +161,9 @@ func findToolInWrekenfile(wrekenPath, canonicalID, toolType string) (map[string]
 
 	var sectionName string
 	if toolType == "method" {
-		sectionName = "METHODS"
+		sectionName = constants.WrekenMethods
 	} else if toolType == "workflow" {
-		sectionName = "WORKFLOWS"
+		sectionName = constants.WrekenWorkflows
 	} else {
 		return nil, fmt.Errorf("unknown tool type: %q", toolType)
 	}

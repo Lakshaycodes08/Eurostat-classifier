@@ -32,7 +32,7 @@ func SessionPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("could not determine home directory: %w", err)
 	}
-	return filepath.Join(home, ".swytchcode", "auth.json"), nil
+	return filepath.Join(home, constants.SwytchDirName, "auth.json"), nil
 }
 
 // Load reads and parses the session file. Returns an error if the file is missing
