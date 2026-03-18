@@ -20,6 +20,7 @@ type StepResult struct {
 	Output        map[string]interface{} // object fields for step chaining (empty for array/scalar responses)
 	RawOutput     interface{}            // actual parsed response value (array, object, scalar, or nil)
 	StatusCode    int
+	Failed        bool  // true when step HTTP status >= 400
 	Error         error
 	RequestMethod string // HTTP method of the step request (e.g. "POST")
 	RequestURL    string // Full URL of the step request
@@ -130,7 +131,8 @@ func RunWorkflow(
 		}
 
 		// Parse response body
-		stepOutput, rawOutput, statusCode, execErr := parseStepResponse(resp)
+		stepOutput, rawOutput, statusCode, _ := parseStepResponse(resp)
+		failed := statusCode >= 400
 		result := StepResult{
 			StepIndex:     i,
 			StepName:      stepName,
@@ -138,14 +140,15 @@ func RunWorkflow(
 			Output:        stepOutput,
 			RawOutput:     rawOutput,
 			StatusCode:    statusCode,
-			Error:         execErr,
+			Failed:        failed,
 			RequestMethod: httpReq.Method,
 			RequestURL:    httpReq.URL.String(),
 		}
 		results = append(results, result)
 
-		if execErr != nil {
+		if failed {
 			fmt.Fprintf(errOut, " ✗ HTTP %d\n", statusCode)
+			execErr := fmt.Errorf("HTTP %d: %s", statusCode, http.StatusText(statusCode))
 			return results, &WorkflowError{
 				FailedStep:     i,
 				StepName:       stepName,
@@ -212,10 +215,6 @@ func parseStepResponse(resp *http.Response) (mergeMap map[string]interface{}, ra
 			rawStr := string(bodyBytes)
 			rawOutput = rawStr
 		}
-	}
-
-	if statusCode >= 400 {
-		return mergeMap, rawOutput, statusCode, fmt.Errorf("HTTP %d: %s", statusCode, http.StatusText(statusCode))
 	}
 
 	return mergeMap, rawOutput, statusCode, nil

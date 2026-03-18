@@ -45,11 +45,12 @@ func RunDiscover(ctx context.Context, intent, projectName, libraryName string, t
 			label = fmt.Sprintf("%s.%s", cap.Library, cap.Type)
 		}
 		summary := strings.TrimSpace(cap.Summary)
-		if len(summary) > 60 {
-			summary = summary[:57] + "..."
+		if len(summary) > 80 {
+			summary = summary[:77] + "..."
 		}
-		fmt.Fprintf(stdout, "  %d. %-40s %s  [%s]\n", i+1, label, summary, cap.Type)
-		fmt.Fprintf(stdout, "     exec: swytchcode exec %s\n\n", label)
+		fmt.Fprintf(stdout, "  %d. %s\n", i+1, label)
+		fmt.Fprintf(stdout, "     %s\n", buildLibLabel(cap.Library, cap.Version, cap.LibraryUUIDs))
+		fmt.Fprintf(stdout, "     [%s] %s\n\n", cap.Type, summary)
 	}
 
 	if result.RecommendedWorkflow != nil {
@@ -59,14 +60,31 @@ func RunDiscover(ctx context.Context, intent, projectName, libraryName string, t
 			label = wf.Library
 		}
 		summary := strings.TrimSpace(wf.Summary)
-		if len(summary) > 60 {
-			summary = summary[:57] + "..."
+		if len(summary) > 80 {
+			summary = summary[:77] + "..."
 		}
 		fmt.Fprintf(stdout, "Recommended workflow:\n")
-		fmt.Fprintf(stdout, "  %-40s %s\n", label, summary)
-		fmt.Fprintf(stdout, "  exec: swytchcode exec %s\n", label)
+		fmt.Fprintf(stdout, "  %s\n", label)
+		fmt.Fprintf(stdout, "  %s\n", buildLibLabel(wf.Library, wf.Version, wf.LibraryUUIDs))
+		fmt.Fprintf(stdout, "  [%s] %s\n", wf.Type, summary)
 		fmt.Fprintf(stdout, "  plan: swytchcode plan %s\n", label)
 	}
 
 	return nil
+}
+
+// buildLibLabel returns the library display string for a capability result.
+// Multi-library workflows show "primary + N more"; single-library shows "name@version".
+func buildLibLabel(library, version string, libraryUUIDs []string) string {
+	extra := len(libraryUUIDs) - 1
+	if extra > 0 {
+		if library == "" {
+			return fmt.Sprintf("%d libraries", len(libraryUUIDs))
+		}
+		return fmt.Sprintf("%s + %d more", library, extra)
+	}
+	if version != "" {
+		return library + "@" + version
+	}
+	return library
 }

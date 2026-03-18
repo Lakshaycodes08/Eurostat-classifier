@@ -45,7 +45,7 @@ type ExecRequest struct {
 // It returns a process exit code from the fixed set defined in errors.go.
 // buildWorkflowOutput converts all step results into the enriched output shape:
 // {"steps": [{"step": N, "name": "...", "request": {"method": "...", "url": "..."}, "status_code": N, "data": {...}}, ...]}
-func buildWorkflowOutput(results []StepResult) map[string]interface{} {
+func buildWorkflowOutput(results []StepResult, wfErr error) map[string]interface{} {
 	steps := make([]map[string]interface{}, 0, len(results))
 	for _, r := range results {
 		entry := map[string]interface{}{
@@ -53,6 +53,9 @@ func buildWorkflowOutput(results []StepResult) map[string]interface{} {
 			"name":        r.StepName,
 			"status_code": r.StatusCode,
 			"data":        r.RawOutput,
+		}
+		if r.Failed {
+			entry["failed"] = true
 		}
 		if r.RequestMethod != "" || r.RequestURL != "" {
 			entry["request"] = map[string]string{
@@ -62,7 +65,11 @@ func buildWorkflowOutput(results []StepResult) map[string]interface{} {
 		}
 		steps = append(steps, entry)
 	}
-	return map[string]interface{}{"steps": steps}
+	output := map[string]interface{}{"success": wfErr == nil, "steps": steps}
+	if wfErr != nil {
+		output["error"] = wfErr.Error()
+	}
+	return output
 }
 
 // executeLocalWorkflow runs a workflow using the locally stored definition and bundles.
@@ -110,20 +117,13 @@ func executeLocalWorkflow(canonicalID string, steps []LocalWorkflowStep, mode st
 		bundleMap[s.Integration] = bundle
 	}
 
-	results, err := RunWorkflow(ctx, wf, bundleMap, args, mode, out, errOut)
-	if err != nil {
-		if wfErr, ok := err.(*WorkflowError); ok {
-			PrintWorkflowError(errOut, wfErr)
-		} else {
-			writeErrorJSON(errOut, err.Error())
-		}
-		LogExecFailure(ExitCodeSDKFailure, canonicalID, err.Error())
-		return ExitCodeSDKFailure
-	}
-
-	if err := json.NewEncoder(out).Encode(buildWorkflowOutput(results)); err != nil {
+	results, runErr := RunWorkflow(ctx, wf, bundleMap, args, mode, out, errOut)
+	if encErr := json.NewEncoder(out).Encode(buildWorkflowOutput(results, runErr)); encErr != nil {
 		LogExecFailure(ExitCodeInternalError, canonicalID, "failed to encode output")
 		return ExitCodeInternalError
+	}
+	if runErr != nil {
+		LogExecFailure(ExitCodeOK, canonicalID, runErr.Error())
 	}
 	return ExitCodeOK
 }
@@ -177,20 +177,13 @@ func executeWorkflow(canonicalID, integration, mode string, args map[string]inte
 	}
 
 	// Run workflow steps sequentially
-	results, err := RunWorkflow(ctx, wf, bundleMap, args, mode, out, errOut)
-	if err != nil {
-		if wfErr, ok := err.(*WorkflowError); ok {
-			PrintWorkflowError(errOut, wfErr)
-		} else {
-			writeErrorJSON(errOut, err.Error())
-		}
-		LogExecFailure(ExitCodeSDKFailure, canonicalID, err.Error())
-		return ExitCodeSDKFailure
-	}
-
-	if err := json.NewEncoder(out).Encode(buildWorkflowOutput(results)); err != nil {
+	results, runErr := RunWorkflow(ctx, wf, bundleMap, args, mode, out, errOut)
+	if encErr := json.NewEncoder(out).Encode(buildWorkflowOutput(results, runErr)); encErr != nil {
 		LogExecFailure(ExitCodeInternalError, canonicalID, "failed to encode output")
 		return ExitCodeInternalError
+	}
+	if runErr != nil {
+		LogExecFailure(ExitCodeOK, canonicalID, runErr.Error())
 	}
 	return ExitCodeOK
 }
@@ -316,15 +309,10 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	}
 
 	// Step 9: Output response (include request URL so caller can verify base URL)
-	var code int
-	var errMsg string
 	if rawOutput {
-		code, errMsg = OutputRawResponse(resp, httpReq, stdout, stderr)
-	} else {
-		code, errMsg = OutputJSONResponse(resp, httpReq, stdout, stderr)
+		code, _ := OutputRawResponse(resp, httpReq, stdout, stderr)
+		return code
 	}
-	if code != ExitCodeOK {
-		LogExecFailure(code, req.Tool, errMsg)
-	}
+	code, _ := OutputJSONResponse(resp, httpReq, stdout, stderr)
 	return code
 }

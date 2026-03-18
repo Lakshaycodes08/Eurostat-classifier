@@ -100,14 +100,11 @@ func OutputRawResponse(resp *http.Response, req *http.Request, stdout io.Writer,
 		return ExitCodeInternalError, msg
 	}
 
-	if resp.StatusCode >= 400 {
-		return ExitCodeSDKFailure, fmt.Sprintf("HTTP status %d %s", resp.StatusCode, resp.Status)
-	}
-
 	return ExitCodeOK, ""
 }
 
 // OutputJSONResponse outputs normalized JSON response. Returns (exitCode, errMsg); errMsg is non-empty only when exitCode != ExitCodeOK.
+// API-level errors (HTTP 4xx/5xx) exit 0 — status_code in the JSON conveys success/failure.
 func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) (int, string) {
 	defer resp.Body.Close()
 
@@ -141,10 +138,6 @@ func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer
 		msg := "failed to encode response"
 		writeErrorJSON(stderr, msg)
 		return ExitCodeInternalError, msg
-	}
-
-	if resp.StatusCode >= 400 {
-		return ExitCodeSDKFailure, fmt.Sprintf("HTTP status %d %s", resp.StatusCode, resp.Status)
 	}
 
 	return ExitCodeOK, ""

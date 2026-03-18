@@ -73,12 +73,32 @@ Errors are written to stderr as:
 
 ### Exit codes (from `internal/kernel/errors.go`)
 
-- `0` – Success.
+- `0` – Success **or API-level error** (4xx/5xx from the target API). Check `status_code` in the JSON output to distinguish success from API failure.
 - `1` – Invalid input (bad JSON, missing `tool`, validation error, invalid flags).
 - `2` – Tool not found (missing in `tooling.json` or bundle).
 - `3` – Auth error (reserved for auth-related exec failures).
-- `4` – SDK failure (network/HTTP errors when calling the target API).
+- `4` – SDK failure (network/HTTP errors when calling the target API — DNS, timeout, connection refused).
 - `5` – Internal error (unexpected conditions, project root detection errors, etc).
+
+**API errors vs CLI errors:** The CLI exits 0 whenever it successfully received an HTTP response from the target API, regardless of the HTTP status code. The status code and error body are always available in the JSON output on stdout. Exit codes 1–5 indicate CLI-level problems (bad input, missing tool, network failure) where no API response was received.
+
+**Checking for API errors in code:**
+```js
+const result = JSON.parse(stdout);
+if (result.status_code >= 400) {
+  // API-level error — result.data has the error body
+  throw new Error(`API error ${result.status_code}: ${JSON.stringify(result.data)}`);
+}
+```
+
+**Workflow output:** A workflow always exits 0. Check `result.success` to detect step failures:
+```js
+const result = JSON.parse(stdout);
+if (!result.success) {
+  // result.error has the failure message; result.steps includes the failed step's data
+  const failedStep = result.steps.find(s => s.failed);
+}
+```
 
 ## init
 

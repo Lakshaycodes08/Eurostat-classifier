@@ -103,6 +103,9 @@ func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, wor
 
 	// Walk project/library/version and collect methods, workflows, and integration names
 	integrationSet := make(map[string]bool)
+	// workflowIntegrations deduplicates workflows by canonical_id across libraries.
+	// Value is the ordered list of integrations the workflow was found in.
+	workflowIntegrations := make(map[string][]string)
 
 	projectEntries, _ := os.ReadDir(integrationsDir)
 	for _, projectEntry := range projectEntries {
@@ -179,7 +182,7 @@ func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, wor
 									if !matchesPattern(canonicalID, integration, projectName, prefix) {
 										continue
 									}
-									workflows = append(workflows, ListEntry{CanonicalID: canonicalID, Integration: integration})
+									workflowIntegrations[canonicalID] = append(workflowIntegrations[canonicalID], integration)
 								}
 							}
 						}
@@ -187,6 +190,15 @@ func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, wor
 				}
 			}
 		}
+	}
+
+	// Convert deduplicated workflow map to []ListEntry
+	for canonicalID, integs := range workflowIntegrations {
+		integration := integs[0]
+		if len(integs) > 1 {
+			integration = fmt.Sprintf("%s +%d more", integs[0], len(integs)-1)
+		}
+		workflows = append(workflows, ListEntry{CanonicalID: canonicalID, Integration: integration})
 	}
 
 	// Build integrations list (optionally filtered by prefix as project name)

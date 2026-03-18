@@ -331,7 +331,9 @@ type DiscoveryCapability struct {
 	Summary     string   `json:"summary"`
 	Library     string   `json:"library"`
 	LibGroup    string   `json:"lib_group"`
-	LibraryUUID string   `json:"library_uuid"`
+	Version     string   `json:"lib_version"`
+	LibraryUUID  string   `json:"library_uuid"`
+	LibraryUUIDs []string `json:"library_uuids"`
 	Distance    float64  `json:"distance"`
 	Tags        []string `json:"tags"`
 }

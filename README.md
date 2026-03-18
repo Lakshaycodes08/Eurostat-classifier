@@ -515,7 +515,7 @@ swytchcode exec api.cluster.get --param id=123 --json
 - **--raw**: Raw HTTP response JSON: `request`, `status_code`, `status`, `headers`, `body` (string)
 - **--dry-run**: JSON showing `method`, `url`, `headers`, and `body` that would be sent
 
-**Example output:**
+**Example output (single method):**
 ```json
 {
   "request": {
@@ -527,12 +527,34 @@ swytchcode exec api.cluster.get --param id=123 --json
 }
 ```
 
+**Checking for API errors:** The CLI always exits `0` when it received an HTTP response, even for 4xx/5xx. Check `status_code` in the output:
+```js
+const result = JSON.parse(stdout);
+if (result.status_code >= 400) {
+  // result.data contains the API error body
+  throw new Error(`API error ${result.status_code}: ${JSON.stringify(result.data)}`);
+}
+```
+
+**Workflow output:**
+```json
+{
+  "success": false,
+  "error": "workflow failed at step 2 (create-order): HTTP 400: Bad Request",
+  "steps": [
+    { "step": 1, "name": "create-session", "status_code": 200, "data": {...} },
+    { "step": 2, "name": "create-order", "status_code": 400, "data": {...}, "failed": true }
+  ]
+}
+```
+Check `result.success` and find the failed step via `result.steps.find(s => s.failed)`.
+
 **Exit codes:**
-- `0` — Success
-- `1` — Invalid input
-- `2` — Tool not found
-- `3` — Auth missing/invalid (not currently used)
-- `4` — SDK execution failure
+- `0` — Success **or API-level error** (4xx/5xx received from target API — check `status_code` in output)
+- `1` — Invalid input (bad JSON, missing tool, validation failure)
+- `2` — Tool not found in `tooling.json` or bundle
+- `3` — Auth missing/invalid (reserved)
+- `4` — Network/transport failure (DNS, timeout, connection refused — no response received)
 - `5` — Internal error
 
 **Error messages (JSON on stderr):**
