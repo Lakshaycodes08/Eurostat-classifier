@@ -25,11 +25,11 @@ const (
 
 // Auth session timing
 const (
-	// SessionTokenDurationSecs is the lifetime of a Firebase JWT issued at login.
-	SessionTokenDurationSecs int64 = 3600
+	// SessionTokenDurationSecs is the lifetime of a CLI session token issued at login.
+	SessionTokenDurationSecs int64 = 10800
 
 	// SessionRefreshBufferSecs is how many seconds before expiry to treat a token as expired.
-	// Firebase ID tokens last 3600s; refresh when less than 300s remain.
+	// Sessions last 10800s (3h); refresh when less than 300s remain.
 	SessionRefreshBufferSecs int64 = 300
 
 	// AuthRequestTimeout is the timeout for authentication HTTP requests (login, refresh).
@@ -39,7 +39,7 @@ const (
 // MCP server configuration
 const (
 	// MCPDefaultPort is the default port for HTTP transport.
-	MCPDefaultPort = 3000
+	MCPDefaultPort = 5476
 
 	// MCPBearerToken is the bearer token for HTTP transport authentication (temporary constant).
 	MCPBearerToken = "swytchcode-mcp-token"
@@ -86,10 +86,57 @@ var EnvVarsCI = []string{
 // via `-ldflags "-X gitlab.com/swytchcode/cli/internal/constants.Version=<version>"` (Goreleaser).
 var (
 	// Version is the Swytchcode CLI version (overridden by release builds).
-	Version = "1.0.5"
+	Version = "1.0.8"
 )
 
 // RegistryURL is the default registry base URL (build-time constant).
 // Set this at build time; runtime environment variables are not used.
 // RegistryURL = "https://dev-api-v2.swytchcode.world"
 const RegistryURL = "https://api-v2.swytchcode.com"
+
+// Project directory and file names
+const (
+	// SwytchDirName is the name of the per-project swytchcode directory.
+	SwytchDirName = ".swytchcode"
+
+	// IntegrationsDirName is the subdirectory within SwytchDirName that stores integration bundles.
+	IntegrationsDirName = "integrations"
+
+	// ToolingJSONFile is the filename for the project tooling configuration.
+	ToolingJSONFile = "tooling.json"
+
+	// WrekenfileYAMLFile is the filename for the Wrekenfile integration spec.
+	WrekenfileYAMLFile = "wrekenfile.yaml"
+
+	// MethodsJSONFile is the filename for the cached method list.
+	MethodsJSONFile = "methods.json"
+
+	// WorkflowsJSONFile is the filename for the cached workflow list.
+	WorkflowsJSONFile = "workflows.json"
+
+	// ManifestJSONFile is the filename for the integration manifest.
+	ManifestJSONFile = "manifest.json"
+
+	// MCPPIDFile is the filename for the MCP daemon PID file.
+	MCPPIDFile = "mcp.pid"
+)
+
+// DefaultLocalEndpoint is the fallback base URL when a bundle has no endpoint configured.
+// It indicates that the target API must be running locally.
+const DefaultLocalEndpoint = "http://localhost"
+
+// Wrekenfile section and field keys
+const (
+	WrekenMethods    = "METHODS"
+	WrekenWorkflows  = "WORKFLOWS"
+	WrekenStructs    = "STRUCTS"
+	WrekenInputs     = "INPUTS"
+	WrekenReturns    = "RETURNS"
+	WrekenSummary    = "SUMMARY"
+	WrekenDesc       = "DESC"
+	WrekenHTTP       = "HTTP"
+	WrekenEndpoint   = "ENDPOINT"
+	WrekenHTTPMethod = "METHOD"
+	WrekenHeaders    = "HEADERS"
+	WrekenLocation   = "LOCATION"
+)

@@ -70,15 +70,19 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 	Run: func(cmd *cobra.Command, args []string) {
 		var exitCode int
 		apiURL := auth.ResolveAPIURL()
-		token, fromSession, _ := auth.ResolveToken()
+		token, fromSession, authErr := auth.ResolveToken()
 		if token == "" {
+			if authErr != nil {
+				util.WriteJSON(os.Stderr, map[string]string{"error": authErr.Error()})
+				os.Exit(kernel.ExitCodeAuthError)
+			}
 			telemetry.MaybeHintNoAuth()
 		}
 
 		if len(args) == 0 {
 			// JSON stdin mode — canonical_id is embedded in the JSON payload, unknown here
 			start := time.Now()
-			exitCode = kernel.Execute(os.Stdin, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "")
+			exitCode = kernel.Execute(os.Stdin, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "", token)
 			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
 			// Use synchronous telemetry for exec since the process exits immediately after.
 			telemetry.SendEventSync(apiURL, token, fromSession, "exec", "", outcomeErr(exitCode), opts)
@@ -178,7 +182,7 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 			// Create a reader from the JSON bytes
 			reqReader := &jsonReader{data: reqJSON}
 			start := time.Now()
-			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "")
+			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "", token)
 			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
 			// Use synchronous telemetry for exec since the process exits immediately after.
 			telemetry.SendEventSync(apiURL, token, fromSession, "exec", canonicalID, outcomeErr(exitCode), opts)

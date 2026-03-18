@@ -148,6 +148,7 @@ Supports both stdio and HTTP transports.`,
 		}
 
 		if mcpTransport == "http" {
+			fmt.Fprintf(os.Stderr, "MCP server listening on http://127.0.0.1:%d/sse\nPress Ctrl+C to stop.\n", mcpPort)
 			httpServer := mcp.NewHTTPServer(server.GetMCPServer(), mcpPort)
 			err := httpServer.Serve(ctx)
 			// Clean up PID file when server stops

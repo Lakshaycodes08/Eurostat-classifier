@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"gitlab.com/swytchcode/cli/internal/auth"
 	"gitlab.com/swytchcode/cli/internal/commands"
+	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/telemetry"
 )
 
@@ -51,7 +52,7 @@ func openBrowser(url string) {
 		cmd = exec.Command("xdg-open", url)
 	}
 	if err := cmd.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "could not open browser: %v\n", err)
+		output.Warn(os.Stderr, fmt.Sprintf("could not open browser: %v", err))
 	}
 }
 

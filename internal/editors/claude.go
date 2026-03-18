@@ -2,9 +2,13 @@
 package editors
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"gitlab.com/swytchcode/cli/internal/constants"
 )
 
 const claudeTemplatePath = "templates/claude/CLAUDE.md"
@@ -32,4 +36,38 @@ func WriteClaudeConfig(projectRoot string) error {
 	}
 	// File doesn't exist — write fresh
 	return os.WriteFile(dest, content, 0o644)
+}
+
+// WriteClaudeMCPConfig merges the swytchcode MCP server entry into ~/.claude/settings.json.
+// Existing settings are preserved; only the "swytchcode" key under mcpServers is added or overwritten.
+func WriteClaudeMCPConfig() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(home, ".claude", "settings.json")
+
+	config := map[string]interface{}{}
+	if data, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(data, &config)
+	}
+
+	servers, _ := config["mcpServers"].(map[string]interface{})
+	if servers == nil {
+		servers = map[string]interface{}{}
+	}
+	servers["swytchcode"] = map[string]interface{}{
+		"type": "sse",
+		"url":  fmt.Sprintf("http://localhost:%d/sse", constants.MCPDefaultPort),
+	}
+	config["mcpServers"] = servers
+
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
 }

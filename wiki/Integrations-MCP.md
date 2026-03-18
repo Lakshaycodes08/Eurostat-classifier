@@ -23,6 +23,11 @@ The server exposes MCP tools that map to CLI commands, including:
 - `swytchcode_add`
 - `swytchcode_info`
 - `swytchcode_exec`
+- `swytchcode_check` — Check for integration updates (TinyFish)
+- `swytchcode_inspect` — Show full upgrade proposal detail
+- `swytchcode_upgrade` — Approve a pending upgrade
+- `swytchcode_discover` — Semantic capability discovery by natural language intent
+- `swytchcode_plan` — Show workflow steps for a canonical workflow ID
 
 Clients call these tools; the server runs the corresponding Swytchcode command. **Execution still goes through the kernel** – only `swytchcode_exec` runs tools; the rest are discovery and config.
 

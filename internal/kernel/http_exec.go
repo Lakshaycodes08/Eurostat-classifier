@@ -10,14 +10,25 @@ import (
 	"gitlab.com/swytchcode/cli/internal/constants"
 )
 
+// sensitiveHeaders contains header names whose values are redacted in dry-run output.
+var sensitiveHeaders = map[string]bool{
+	"Authorization": true,
+	"X-Api-Key":     true,
+}
+
 // ExecuteDryRun outputs what would be executed without making the HTTP call.
-// Output: method, full url (with query string), all headers (Authorization + from args.headers), and body when present.
+// Output: method, full url (with query string), all headers (with sensitive values redacted), and body when present.
 func ExecuteDryRun(req *http.Request, stdout io.Writer) int {
-	// Headers as flat map[string]string so JSON is clean (spec: "Authorization": "Bearer token123")
+	// Headers as flat map[string]string so JSON is clean. Sensitive headers are redacted
+	// so that piped/logged dry-run output does not leak credentials.
 	headersMap := make(map[string]string)
 	for name, vals := range req.Header {
 		if len(vals) > 0 {
-			headersMap[name] = vals[0]
+			if sensitiveHeaders[name] {
+				headersMap[name] = "[REDACTED]"
+			} else {
+				headersMap[name] = vals[0]
+			}
 		}
 	}
 	dryRunOutput := map[string]interface{}{
@@ -89,14 +100,11 @@ func OutputRawResponse(resp *http.Response, req *http.Request, stdout io.Writer,
 		return ExitCodeInternalError, msg
 	}
 
-	if resp.StatusCode >= 400 {
-		return ExitCodeSDKFailure, fmt.Sprintf("HTTP status %d %s", resp.StatusCode, resp.Status)
-	}
-
 	return ExitCodeOK, ""
 }
 
 // OutputJSONResponse outputs normalized JSON response. Returns (exitCode, errMsg); errMsg is non-empty only when exitCode != ExitCodeOK.
+// API-level errors (HTTP 4xx/5xx) exit 0 — status_code in the JSON conveys success/failure.
 func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) (int, string) {
 	defer resp.Body.Close()
 
@@ -130,10 +138,6 @@ func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer
 		msg := "failed to encode response"
 		writeErrorJSON(stderr, msg)
 		return ExitCodeInternalError, msg
-	}
-
-	if resp.StatusCode >= 400 {
-		return ExitCodeSDKFailure, fmt.Sprintf("HTTP status %d %s", resp.StatusCode, resp.Status)
 	}
 
 	return ExitCodeOK, ""

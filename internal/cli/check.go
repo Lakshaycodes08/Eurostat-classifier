@@ -4,13 +4,13 @@ package cli
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 	"gitlab.com/swytchcode/cli/internal/auth"
 	"gitlab.com/swytchcode/cli/internal/commands"
+	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/telemetry"
 )
 
@@ -58,11 +58,12 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 		if err != nil {
 			var limitErr *commands.ExecLimitError
 			if errors.As(err, &limitErr) {
-				fmt.Fprintln(os.Stderr, "Error:", limitErr.Error())
+				output.Error(os.Stderr, limitErr.Error())
 				os.Exit(2)
 			}
 			// auth / network / server errors → exit 2
-			fmt.Fprintln(os.Stderr, "Error:", err)
+			output.Error(os.Stderr, err.Error())
+			output.Hint(os.Stderr, "run 'swytchcode login' or set SWYTCHCODE_TOKEN")
 			os.Exit(2)
 		}
 		if hasBreaking {

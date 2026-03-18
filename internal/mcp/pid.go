@@ -4,22 +4,22 @@ package mcp
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"syscall"
+
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // PIDFile returns the path to the MCP server PID file.
 func PIDFile(projectRoot string) string {
-	return filepath.Join(projectRoot, ".swytchcode", "mcp.pid")
+	return util.MCPPIDPath(projectRoot)
 }
 
 // WritePID writes the current process ID to the PID file.
 func WritePID(projectRoot string) error {
 	pidPath := PIDFile(projectRoot)
-	dir := filepath.Dir(pidPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(util.SwytchDir(projectRoot), 0o755); err != nil {
 		return fmt.Errorf("create pid directory: %w", err)
 	}
 

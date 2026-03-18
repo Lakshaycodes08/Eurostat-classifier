@@ -3,6 +3,7 @@ package commands
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +12,9 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/manifest"
+	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/registry"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
@@ -28,7 +32,7 @@ type ToolMatch struct {
 // FindToolInAllIntegrations searches for a canonical_id across all fetched integrations.
 // Returns matches so the caller can disambiguate (e.g. interactive prompt) or pass an explicit integration spec to RunAdd.
 func FindToolInAllIntegrations(projectRoot, canonicalID string) ([]ToolMatch, error) {
-	integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations")
+	integrationsDir := util.IntegrationsDir(projectRoot)
 
 	if _, err := os.Stat(integrationsDir); err != nil {
 		return nil, fmt.Errorf("no integrations found. Run: swytchcode get <project>")
@@ -41,7 +45,7 @@ func FindToolInAllIntegrations(projectRoot, canonicalID string) ([]ToolMatch, er
 			return nil
 		}
 
-		if info.Name() == "methods.json" || info.Name() == "workflows.json" {
+		if info.Name() == constants.MethodsJSONFile || info.Name() == constants.WorkflowsJSONFile {
 			relPath, err := filepath.Rel(integrationsDir, path)
 			if err != nil {
 				return nil
@@ -57,7 +61,7 @@ func FindToolInAllIntegrations(projectRoot, canonicalID string) ([]ToolMatch, er
 			version := parts[2]
 
 			toolType := "method"
-			if info.Name() == "workflows.json" {
+			if info.Name() == constants.WorkflowsJSONFile {
 				toolType = "workflow"
 			}
 
@@ -100,13 +104,180 @@ func FindToolInAllIntegrations(projectRoot, canonicalID string) ([]ToolMatch, er
 		return nil
 	})
 
+	// Deduplicate workflow matches: workflows are written to every library's workflows.json
+	// (project-level), so the same canonical_id will appear in multiple directories.
+	// Keep only the first match per workflow canonical_id to avoid false ambiguity.
+	seen := map[string]bool{}
+	deduped := matches[:0]
+	for _, m := range matches {
+		if m.ToolType == "workflow" {
+			if seen[m.CanonicalID] {
+				continue
+			}
+			seen[m.CanonicalID] = true
+		}
+		deduped = append(deduped, m)
+	}
+	matches = deduped
+
 	return matches, err
+}
+
+// wrekenFileInfo holds a wrekenfile path and its parsed project/library/version components.
+type wrekenFileInfo struct {
+	Path    string
+	Project string
+	Library string
+	Version string
+}
+
+// collectAllWrekenFiles scans .swytchcode/integrations/ and returns all wrekenfile.yaml locations.
+func collectAllWrekenFiles(projectRoot string) ([]wrekenFileInfo, error) {
+	integrationsDir := util.IntegrationsDir(projectRoot)
+	var result []wrekenFileInfo
+	err := filepath.Walk(integrationsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || info.Name() != constants.WrekenfileYAMLFile {
+			return nil
+		}
+		rel, relErr := filepath.Rel(integrationsDir, path)
+		if relErr != nil {
+			return nil
+		}
+		parts := strings.Split(filepath.Dir(rel), string(filepath.Separator))
+		if len(parts) != 3 {
+			return nil
+		}
+		result = append(result, wrekenFileInfo{
+			Path:    path,
+			Project: parts[0],
+			Library: parts[1],
+			Version: parts[2],
+		})
+		return nil
+	})
+	return result, err
+}
+
+// findMethodAcrossWrekenfiles searches all wrekenfiles for a method by canonical_id.
+// Returns the matching wrekenFileInfo, method entry map, and full wreken data (for STRUCT resolution).
+func findMethodAcrossWrekenfiles(wrekens []wrekenFileInfo, canonicalID string) (*wrekenFileInfo, map[string]interface{}, map[string]interface{}) {
+	for i := range wrekens {
+		w := &wrekens[i]
+		wreken, err := LoadWrekenfile(w.Path)
+		if err != nil {
+			continue
+		}
+		methods, ok := wreken[constants.WrekenMethods].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		entry, ok := methods[canonicalID]
+		if !ok {
+			continue
+		}
+		methodMap, ok := entry.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		return w, methodMap, wreken
+	}
+	return nil, nil, nil
+}
+
+// ensureWorkflowDependencies checks that all libraries required by workflow steps are available locally.
+// If any are missing and noAutoInstall is false, fetches and saves the missing bundles.
+func ensureWorkflowDependencies(ctx context.Context, projectRoot, project, canonicalID string, steps []registry.WorkflowStep, noAutoInstall bool, stderr io.Writer) error {
+	wrekens, _ := collectAllWrekenFiles(projectRoot)
+
+	// Check if all steps are resolvable locally
+	allFound := true
+	for _, step := range steps {
+		wInfo, _, _ := findMethodAcrossWrekenfiles(wrekens, step.CanonicalID)
+		if wInfo == nil {
+			allFound = false
+			break
+		}
+	}
+	if allFound {
+		return nil
+	}
+
+	if noAutoInstall {
+		return fmt.Errorf("workflow has steps requiring libraries not yet downloaded.\nRun without --no-auto-install to auto-download, or run: swytchcode get %s", project)
+	}
+
+	fmt.Fprintf(stderr, "Resolving dependencies for workflow: %s\n", canonicalID)
+	regClient := registry.NewClient(registry.DefaultConfig())
+	bundlesResp, err := regClient.GetWorkflowBundles(ctx, project, canonicalID)
+	if err != nil {
+		return fmt.Errorf("fetch workflow bundles: %w", err)
+	}
+
+	respProject := bundlesResp.ProjectName
+	if respProject == "" {
+		respProject = project
+	}
+
+	// Fetch project-level methods and workflows once so we can write them alongside
+	// the wrekenfile for each auto-downloaded bundle.
+	projectMethodsResp, _ := regClient.ListMethods(ctx, respProject)
+	projectWorkflowsResp, _ := regClient.ListWorkflows(ctx, respProject)
+	registry.FillEmptyWorkflowNames(projectWorkflowsResp)
+
+	for _, bundle := range bundlesResp.Bundles {
+		if bundle.Integration == "" || bundle.Version == "" {
+			continue
+		}
+		versionedDir := util.IntegrationVersionDir(projectRoot, respProject, bundle.Integration, bundle.Version)
+		wrekenPath := filepath.Join(versionedDir, constants.WrekenfileYAMLFile)
+
+		// Skip if wrekenfile already on disk
+		if _, err := os.Stat(wrekenPath); err == nil {
+			continue
+		}
+
+		fmt.Fprintf(stderr, "  → auto-downloading %s/%s@%s\n", respProject, bundle.Integration, bundle.Version)
+
+		if err := util.EnsureDir(versionedDir, 0o755); err != nil {
+			return fmt.Errorf("create directory for %s: %w", bundle.Integration, err)
+		}
+		wrekenBytes := util.DecodeBase64OrRaw(bundle.Files.Wreken.Content)
+		if err := os.WriteFile(wrekenPath, wrekenBytes, 0o644); err != nil {
+			return fmt.Errorf("write wrekenfile for %s: %w", bundle.Integration, err)
+		}
+
+		// Write methods.json (filtered to this library's canonical IDs) and workflows.json
+		// so that future `swytchcode add` calls can find tools from this auto-downloaded library.
+		if projectMethodsResp != nil {
+			if data, merr := json.MarshalIndent(filterMethodsByWreken(wrekenBytes, projectMethodsResp), "", "  "); merr == nil {
+				os.WriteFile(filepath.Join(versionedDir, constants.MethodsJSONFile), data, 0o644) //nolint:errcheck
+			}
+		}
+		if projectWorkflowsResp != nil {
+			if data, werr := json.MarshalIndent(projectWorkflowsResp, "", "  "); werr == nil {
+				os.WriteFile(filepath.Join(versionedDir, constants.WorkflowsJSONFile), data, 0o644) //nolint:errcheck
+			}
+		}
+
+		sandboxEndpoint := bundle.SandboxEndpoint
+		productionEndpoint := bundle.ProductionEndpoint
+		if sandboxEndpoint == "" {
+			sandboxEndpoint = constants.DefaultLocalEndpoint
+		}
+		if productionEndpoint == "" {
+			productionEndpoint = constants.DefaultLocalEndpoint
+		}
+		projectLibrary := fmt.Sprintf("%s.%s", respProject, bundle.Integration)
+		manifest.UpdateEntry(projectRoot, projectLibrary, bundle.Version, sandboxEndpoint, productionEndpoint, 0, 0, map[string]interface{}{})
+	}
+	return nil
 }
 
 // RunAdd runs the add command: add a tool (method or workflow) to tooling.json by canonical_id.
 // If integrationSpec is empty, searches all fetched integrations (errors if ambiguous).
 // If integrationSpec is set (e.g. "project@library.version"), uses that integration.
-func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, stderr io.Writer) error {
+// noAutoInstall prevents automatic downloading of missing library dependencies for multi-library workflows.
+func RunAdd(ctx context.Context, canonicalID, integrationSpec string, noAutoInstall bool, stdout, stderr io.Writer) error {
 	projectRoot, err := util.ProjectRoot()
 	if err != nil {
 		return fmt.Errorf("detect project root: %w", err)
@@ -148,14 +319,14 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 		}
 
 		// Verify integration exists
-		integrationsDir := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version)
+		integrationsDir := util.IntegrationVersionDir(projectRoot, project, library, version)
 		if _, err := os.Stat(integrationsDir); err != nil {
 			return fmt.Errorf("Integration %s not installed. Run: swytchcode get %s", integrationSpec, project)
 		}
 
 		// Determine tool type by checking methods.json and workflows.json
-		methodsPath := filepath.Join(integrationsDir, "methods.json")
-		workflowsPath := filepath.Join(integrationsDir, "workflows.json")
+		methodsPath := filepath.Join(integrationsDir, constants.MethodsJSONFile)
+		workflowsPath := filepath.Join(integrationsDir, constants.WorkflowsJSONFile)
 
 		toolType = ""
 		if findToolTypeInFile(methodsPath, "methods", canonicalID) {
@@ -169,8 +340,11 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 		}
 	}
 
+	// Validate canonical ID exists in this version on the backend (soft check — skip on network error)
+	validateVersionOnBackend(ctx, project, library, version, canonicalID, stdout)
+
 	// Load tooling.json
-	toolingPath := filepath.Join(projectRoot, ".swytchcode", "tooling.json")
+	toolingPath := util.ToolingPath(projectRoot)
 	data, err := os.ReadFile(toolingPath)
 	if err != nil {
 		return fmt.Errorf("tooling.json not found; run 'swytchcode init' first: %w", err)
@@ -189,7 +363,7 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 	}
 
 	projectLibrary := fmt.Sprintf("%s.%s", project, library)
-	wrekenPath := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version, "wrekenfile.yaml")
+	wrekenPath := filepath.Join(util.IntegrationVersionDir(projectRoot, project, library, version), constants.WrekenfileYAMLFile)
 	wreken, err := LoadWrekenfile(wrekenPath)
 	if err != nil {
 		return fmt.Errorf("load wrekenfile: %w", err)
@@ -197,7 +371,7 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 
 	if toolType == "workflow" {
 		// Handle workflow: define steps within the workflow entry (no top-level method entries for steps)
-		workflowsPath := filepath.Join(projectRoot, ".swytchcode", "integrations", project, library, version, "workflows.json")
+		workflowsPath := filepath.Join(util.IntegrationVersionDir(projectRoot, project, library, version), constants.WorkflowsJSONFile)
 		entry, err := findWorkflowEntryInWorkflowsJSON(workflowsPath, canonicalID)
 		if err != nil {
 			return fmt.Errorf("workflow %q not found in workflows.json: %w", canonicalID, err)
@@ -207,15 +381,49 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 			return err
 		}
 
+		// Ensure all required library bundles are present (auto-download missing deps)
+		if err := ensureWorkflowDependencies(ctx, projectRoot, project, canonicalID, workflow.Steps, noAutoInstall, stderr); err != nil {
+			return err
+		}
+
+		// Collect all available wrekenfiles for cross-library step resolution
+		allWrekens, _ := collectAllWrekenFiles(projectRoot)
+
+		// Separate same-project wrekens so we can prefer them during step resolution.
+		// This prevents a step's method being attributed to an accidentally-downloaded
+		// duplicate wrekenfile from a different project (e.g. book/swytchcode vs ngage/swytchcode).
+		var sameProjectWrekens []wrekenFileInfo
+		for _, w := range allWrekens {
+			if w.Project == project {
+				sameProjectWrekens = append(sameProjectWrekens, w)
+			}
+		}
+
 		integrationStr := fmt.Sprintf("%s@%s", projectLibrary, version)
 
 		// Build steps as array of step definitions (full method details nested inside workflow)
 		stepsArray := make([]interface{}, 0, len(workflow.Steps))
 		for index, step := range workflow.Steps {
-			methodEntry, err := findMethodInWrekenfile(wrekenPath, step.CanonicalID)
-			if err != nil {
-				fmt.Fprintf(stderr, "Warning: method %q from workflow step not found in wrekenfile: %v\n", step.CanonicalID, err)
+			// Prefer the workflow's own project to avoid cross-project ambiguity caused by
+			// duplicate wrekenfiles created during auto-download (filesystem walk is alphabetical,
+			// so an earlier-ordered project can shadow the correct one).
+			wInfo, methodEntry, stepWreken := findMethodAcrossWrekenfiles(sameProjectWrekens, step.CanonicalID)
+			if wInfo == nil {
+				// Fall back to any installed integration (genuine multi-library step)
+				wInfo, methodEntry, stepWreken = findMethodAcrossWrekenfiles(allWrekens, step.CanonicalID)
+			}
+			if wInfo == nil {
+				output.Warn(stderr, fmt.Sprintf("method %q from workflow step not found in any wrekenfile", step.CanonicalID))
 				continue
+			}
+
+			// Use the correct integration string and wreken for STRUCT resolution per step
+			stepIntegrationStr := integrationStr
+			useWreken := wreken
+			if wInfo.Project != project || wInfo.Library != library || wInfo.Version != version {
+				stepProjectLibrary := fmt.Sprintf("%s.%s", wInfo.Project, wInfo.Library)
+				stepIntegrationStr = fmt.Sprintf("%s@%s", stepProjectLibrary, wInfo.Version)
+				useWreken = stepWreken
 			}
 
 			summary := ""
@@ -233,8 +441,8 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 			}
 			if inputsRaw, ok := methodEntry["INPUTS"]; ok {
 				inputs = inputsRaw
-				if resolved, err := ResolveInputs(wreken, inputsRaw); err != nil {
-					fmt.Fprintf(stderr, "Warning: resolve STRUCTs for step %q: %v (using raw inputs)\n", step.CanonicalID, err)
+				if resolved, err := ResolveInputs(useWreken, inputsRaw); err != nil {
+					output.Warn(stderr, fmt.Sprintf("resolve STRUCTs for step %q: %v (using raw inputs)", step.CanonicalID, err))
 				} else if resolved != nil {
 					inputs = resolved
 				}
@@ -246,14 +454,14 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 				"summary":     summary,
 				"desc":        desc,
 				"inputs":      inputs,
-				"integration": integrationStr,
+				"integration": stepIntegrationStr,
 				"index":       index,
 			}
 			if returnsRaw, ok := methodEntry["RETURNS"]; ok {
-				if output, err := ResolveReturns(wreken, returnsRaw); err != nil {
-					fmt.Fprintf(stderr, "Warning: resolve STRUCTs for step %q returns: %v (output omitted)\n", step.CanonicalID, err)
-				} else if output != nil {
-					stepDef["output"] = output
+				if resolved, err := ResolveReturns(useWreken, returnsRaw); err != nil {
+					output.Warn(stderr, fmt.Sprintf("resolve STRUCTs for step %q returns: %v (output omitted)", step.CanonicalID, err))
+				} else if resolved != nil {
+					stepDef["output"] = resolved
 				}
 			}
 			stepsArray = append(stepsArray, stepDef)
@@ -316,6 +524,7 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, stdout, st
 			"type":        toolType,
 			"desc":        desc,
 			"inputs":      inputs,
+			"method_hash": computeMethodHash(toolEntry),
 		}
 		if output != nil {
 			toolEntryMap["output"] = output
@@ -419,6 +628,149 @@ func workflowFromEntry(wMap map[string]interface{}, canonicalID string) (*regist
 		CanonicalID: canonicalID,
 		Steps:       steps,
 	}, nil
+}
+
+// validateVersionOnBackend checks with the backend whether canonicalID exists in the given version.
+// Prints a warning if the method is missing or deprecated; silently skips on network errors.
+func validateVersionOnBackend(ctx context.Context, project, library, version, canonicalID string, w io.Writer) {
+	regClient := registry.NewClient(registry.DefaultConfig())
+	defer regClient.CloseIdleConnections()
+
+	result, err := regClient.GetVersionMethods(ctx, project, library, version)
+	if err != nil || result == nil {
+		return // endpoint not available or network error — don't block
+	}
+
+	found := false
+	for _, id := range result.Methods {
+		if id == canonicalID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		fmt.Fprintf(w, "⚠ method %q not found in backend version %s — it may not exist or may have been removed\n", canonicalID, version)
+		return
+	}
+	for _, id := range result.Deprecated {
+		if id == canonicalID {
+			fmt.Fprintf(w, "⚠ method %q is deprecated in version %s\n", canonicalID, version)
+			return
+		}
+	}
+}
+
+// computeMethodHash returns a SHA-256 hex digest of the JSON-encoded wrekenfile method entry.
+// Stored in tooling.json so swytchcode sync can detect when a method's definition has changed.
+func computeMethodHash(entry map[string]interface{}) string {
+	b, err := json.Marshal(entry)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(b))
+}
+
+// RunAddAll adds all methods and workflows for a given project to tooling.json.
+// Already-present canonical IDs are skipped. Prints a summary at the end.
+func RunAddAll(ctx context.Context, projectName string, stdout, stderr io.Writer) error {
+	projectRoot, err := util.ProjectRoot()
+	if err != nil {
+		return fmt.Errorf("detect project root: %w", err)
+	}
+
+	projectDir := filepath.Join(util.IntegrationsDir(projectRoot), projectName)
+	if _, err := os.Stat(projectDir); err != nil {
+		return fmt.Errorf("project %q not found locally — run: swytchcode get %s", projectName, projectName)
+	}
+
+	// Collect all canonical IDs across all versions of the project.
+	type candidate struct {
+		id       string
+		toolType string
+	}
+	var all []candidate
+
+	err = filepath.Walk(projectDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return nil
+		}
+		if info.Name() != constants.MethodsJSONFile && info.Name() != constants.WorkflowsJSONFile {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		var resp map[string]interface{}
+		if json.Unmarshal(data, &resp) != nil {
+			return nil
+		}
+		key := "methods"
+		toolType := "method"
+		if info.Name() == constants.WorkflowsJSONFile {
+			key = "workflows"
+			toolType = "workflow"
+		}
+		items, _ := resp[key].([]interface{})
+		for _, item := range items {
+			if m, ok := item.(map[string]interface{}); ok {
+				if id, ok := m["canonical_id"].(string); ok && id != "" {
+					all = append(all, candidate{id: id, toolType: toolType})
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk integrations: %w", err)
+	}
+
+	if len(all) == 0 {
+		fmt.Fprintf(stdout, "No methods or workflows found for project %q\n", projectName)
+		return nil
+	}
+
+	// Read tooling.json to determine which are already present.
+	toolingPath := util.ToolingPath(projectRoot)
+	data, err := os.ReadFile(toolingPath)
+	if err != nil {
+		return fmt.Errorf("tooling.json not found; run 'swytchcode init' first: %w", err)
+	}
+	var tooling map[string]interface{}
+	if err := json.Unmarshal(data, &tooling); err != nil {
+		return fmt.Errorf("parse tooling.json: %w", err)
+	}
+	existing, _ := tooling["tools"].(map[string]interface{})
+	if existing == nil {
+		existing = map[string]interface{}{}
+	}
+
+	// Deduplicate candidates.
+	seen := map[string]bool{}
+	var unique []candidate
+	for _, c := range all {
+		if !seen[c.id] {
+			seen[c.id] = true
+			unique = append(unique, c)
+		}
+	}
+
+	added, skipped, failed := 0, 0, 0
+	for _, c := range unique {
+		if _, ok := existing[c.id]; ok {
+			skipped++
+			continue
+		}
+		if err := RunAdd(ctx, c.id, "", false, stdout, stderr); err != nil {
+			fmt.Fprintf(stderr, "  skipping %s: %v\n", c.id, err)
+			failed++
+		} else {
+			added++
+		}
+	}
+
+	fmt.Fprintf(stdout, "\nDone: added %d, skipped %d already present, %d failed\n", added, skipped, failed)
+	return nil
 }
 
 // findMethodInWrekenfile reads a wrekenfile YAML and finds a method by canonical_id key.

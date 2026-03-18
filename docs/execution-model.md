@@ -149,6 +149,26 @@ Retries and idempotency belong **inside** Swytchcode or the underlying integrati
 - The kernel does not retry failed requests automatically.
 - Agents should not attempt to retry with different tools or different endpoints; they should surface the error and let humans decide.
 
+## Workflow execution
+
+When the tool's `type` is `"workflow"`, the kernel runs each step in the `steps` array sequentially:
+
+1. The first step's args come from the original `ExecRequest.Args`.
+2. After each step, the response `data` fields are **merged** into a shared `mergedArgs` map.
+3. Each subsequent step starts with `mergedArgs` as its args — so outputs from step N are automatically available as inputs for step N+1.
+4. **Path parameter substitution**: `BuildRequest` substitutes `{placeholder}` tokens in the endpoint URL from both `args["params"]` **and** top-level args (i.e. merged outputs from prior steps). This means a step that returns `project_uuid` can be used directly as a URL path parameter `{project_uuid}` in the next step without any manual wiring.
+
+**Output format**: the final output of a workflow exec is a JSON object with a `steps` array, each element containing the result of the corresponding step:
+
+```json
+{
+  "steps": [
+    { "request": {...}, "status_code": 201, "data": { "project_uuid": "abc-123" } },
+    { "request": {...}, "status_code": 200, "data": { ... } }
+  ]
+}
+```
+
 ## Integration not found / missing tooling
 
 If an integration is not installed or a tool is not present in `tooling.json`:

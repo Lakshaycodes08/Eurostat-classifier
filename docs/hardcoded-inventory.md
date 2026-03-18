@@ -25,9 +25,8 @@ This file catalogs notable hardcoded values in the Swytchcode CLI codebase and w
 - **`internal/kernel/request_test.go`**
   - Uses `http://localhost` as the base URL in tests for request-building logic.
 
-- **`internal/commands/get.go` / `internal/commands/bootstrap.go`**
-  - Comment: “Use endpoints directly from bundle (use http://localhost if empty)”.
-  - If bundle endpoints are empty, sandbox and production endpoints fall back to `http://localhost`.
+- **`internal/commands/get.go` / `internal/commands/bootstrap.go` / `internal/commands/sync.go`**
+  - If bundle endpoints are empty, sandbox and production endpoints fall back to `constants.DefaultLocalEndpoint` (`”http://localhost”`). ✅ Resolved — no bare string literals remain.
 
 **Implication:** A missing endpoint in the bundle produces a localhost base URL. This is convenient for local dev but should be clearly documented and may deserve a configurable default or validation rule.
 
@@ -79,6 +78,18 @@ This file catalogs notable hardcoded values in the Swytchcode CLI codebase and w
   - Telemetry uses `SWYTCHCODE_API_URL` (default `https://api-v2.swytchcode.com`) and includes `constants.Version` in events. Sending is centralised in `SendEvent()` — CLI commands no longer build `Event` structs directly.
 
 **Implication:** MCP HTTP transport uses a fixed bearer token; for production this should likely become configurable (env var or config file) and documented.
+
+---
+
+## 6. Directory/file names and Wrekenfile section keys ✅ Resolved
+
+All previously hardcoded directory/file names and Wrekenfile section keys have been extracted to named constants in `internal/constants/constants.go` and path helpers in `internal/util/fs.go`:
+
+- `SwytchDirName`, `IntegrationsDirName`, `ToolingJSONFile`, `WrekenfileYAMLFile`, `MethodsJSONFile`, `WorkflowsJSONFile`, `ManifestJSONFile`, `MCPPIDFile`
+- `DefaultLocalEndpoint`
+- `WrekenMethods`, `WrekenWorkflows`, `WrekenStructs`, `WrekenInputs`, `WrekenReturns`, `WrekenSummary`, `WrekenDesc`, `WrekenHTTP`, `WrekenEndpoint`, `WrekenHTTPMethod`, `WrekenHeaders`
+
+Path helpers in `util/fs.go`: `SwytchDir`, `ToolingPath`, `IntegrationsDir`, `IntegrationVersionDir`, `ManifestPath`, `MCPPIDPath`.
 
 ---
 

@@ -10,6 +10,7 @@ import (
 // Config holds the registry API configuration.
 type Config struct {
 	BaseURL string
+	Token   string // optional bearer token; set Authorization header when non-empty
 }
 
 // DefaultConfig returns the default registry configuration.
@@ -20,6 +21,13 @@ func DefaultConfig() *Config {
 		u = constants.RegistryURL
 	}
 	return &Config{BaseURL: u}
+}
+
+// DefaultConfigWithToken returns a Config with the given bearer token.
+func DefaultConfigWithToken(token string) *Config {
+	cfg := DefaultConfig()
+	cfg.Token = token
+	return cfg
 }
 
 // APIBasePath returns the full API base path with version prefix.

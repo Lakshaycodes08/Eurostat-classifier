@@ -2,6 +2,7 @@
 package registry
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,12 +32,13 @@ type ListIntegrationsResponse struct {
 type IntegrationBundle struct {
 	Integration        string `json:"integration"`
 	Version           string `json:"version"`
+	LibraryUUID       string `json:"library_uuid"`
 	SandboxEndpoint   string `json:"sandbox_endpoint"`
 	ProductionEndpoint string `json:"production_endpoint"`
 	Files             struct {
 		Wreken struct {
 			Format  string `json:"format"`
-			Content string `json:"content"` // YAML content as string
+			Content string `json:"content"` // YAML content as string (base64)
 		} `json:"wreken"`
 		Manifest struct {
 			Format  string                 `json:"format"`
@@ -55,6 +57,7 @@ type IntegrationBundlesResponse struct {
 type WorkflowStep struct {
 	Name        string `json:"name"`
 	CanonicalID string `json:"canonical_id"`
+	LibraryUUID string `json:"library_uuid"`
 }
 
 // Workflow represents a workflow from the list (used in workflows.json and downstream).
@@ -83,6 +86,7 @@ type workflowStepAPI struct {
 	MethodName  string `json:"method_name"`
 	MethodUUID  string `json:"method_uuid"`
 	CanonicalID string `json:"canonical_id"`
+	LibraryUUID string `json:"library_uuid"`
 }
 
 // FillEmptyWorkflowNames sets Name on any workflow or step that has an empty Name,
@@ -180,6 +184,31 @@ func (c *Client) GetIntegrationBundles(ctx context.Context, projectName string) 
 	return &result, nil
 }
 
+// GetWorkflowBundles fetches all integration bundles required for a specific workflow.
+// Route: GET /integrations/{project_name}/workflow/{canonical_id}/bundles
+// The backend resolves which libraries the workflow uses and returns only those bundles.
+func (c *Client) GetWorkflowBundles(ctx context.Context, projectName, canonicalID string) (*IntegrationBundlesResponse, error) {
+	path := fmt.Sprintf("/integrations/%s/workflow/%s/bundles", url.PathEscape(projectName), url.PathEscape(canonicalID))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("workflow %q not found for project %q", canonicalID, projectName)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var result IntegrationBundlesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
 // GetIntegrationBundleVersion finds a specific integration bundle from the bundles response.
 // This is a helper that filters GetIntegrationBundles by integration ID and version.
 // If exact match fails, tries to match by integration ID only (ignoring version).
@@ -257,6 +286,7 @@ func (c *Client) ListWorkflows(ctx context.Context, projectName string) (*ListWo
 			steps = append(steps, WorkflowStep{
 				Name:        name,
 				CanonicalID: s.CanonicalID,
+				LibraryUUID: s.LibraryUUID,
 			})
 		}
 		name := strings.TrimSpace(w.Title)
@@ -291,6 +321,235 @@ func (c *Client) ListMethods(ctx context.Context, projectName string) (*ListMeth
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
+	return &result, nil
+}
+
+// DiscoveryCapability represents a single result from semantic capability discovery.
+type DiscoveryCapability struct {
+	CanonicalID string   `json:"canonical_id"`
+	Type        string   `json:"type"` // "api" | "sdk" | "workflow"
+	Summary     string   `json:"summary"`
+	Library     string   `json:"library"`
+	LibGroup    string   `json:"lib_group"`
+	Version     string   `json:"lib_version"`
+	LibraryUUID  string   `json:"library_uuid"`
+	LibraryUUIDs []string `json:"library_uuids"`
+	Distance    float64  `json:"distance"`
+	Tags        []string `json:"tags"`
+}
+
+// DiscoverResponse is the response from POST /discover.
+type DiscoverResponse struct {
+	Capabilities        []DiscoveryCapability  `json:"capabilities"`
+	RecommendedWorkflow *DiscoveryCapability   `json:"recommended_workflow"`
+}
+
+// WorkflowDetail is a single workflow returned by GET /workflows/:canonical_id.
+type WorkflowDetail struct {
+	Title       string         `json:"title"`
+	CanonicalID string         `json:"canonical_id"`
+	Steps       []WorkflowStep `json:"steps"`
+}
+
+// DiscoverCapabilities calls POST /discover with the given intent.
+// projectName and libraryName are optional — pass empty strings to search across all projects/libraries.
+func (c *Client) DiscoverCapabilities(ctx context.Context, intent, projectName, libraryName string, topK int) (*DiscoverResponse, error) {
+	payload := map[string]interface{}{
+		"intent": intent,
+		"top_k":  topK,
+	}
+	if projectName != "" {
+		payload["project_name"] = projectName
+	}
+	if libraryName != "" {
+		payload["library_name"] = libraryName
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	resp, err := c.Post(ctx, "/discover", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var result DiscoverResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
+// GetWorkflow fetches a single workflow by project name and canonical ID.
+// Route: GET /workflows/{canonical_id}?project_name={project_name}
+func (c *Client) GetWorkflow(ctx context.Context, projectName, canonicalID string) (*WorkflowDetail, error) {
+	path := fmt.Sprintf("/workflows/%s?project_name=%s", url.PathEscape(canonicalID), url.QueryEscape(projectName))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("workflow %q not found for project %q", canonicalID, projectName)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var raw workflowAPI
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	steps := make([]WorkflowStep, 0, len(raw.Steps))
+	for _, s := range raw.Steps {
+		name := strings.TrimSpace(s.MethodName)
+		if name == "" {
+			name = strings.TrimSpace(s.Description)
+		}
+		if name == "" && s.CanonicalID != "" {
+			name = nameFromCanonicalID(s.CanonicalID)
+		}
+		steps = append(steps, WorkflowStep{Name: name, CanonicalID: s.CanonicalID, LibraryUUID: s.LibraryUUID})
+	}
+
+	title := strings.TrimSpace(raw.Title)
+	if title == "" && raw.CanonicalID != "" {
+		title = nameFromCanonicalID(raw.CanonicalID)
+	}
+
+	return &WorkflowDetail{
+		Title:       title,
+		CanonicalID: raw.CanonicalID,
+		Steps:       steps,
+	}, nil
+}
+
+// VersionMethodsResponse is the response from GET /integrations/{project}/{library}/{version}/methods.
+type VersionMethodsResponse struct {
+	Methods    []string `json:"methods"`
+	Deprecated []string `json:"deprecated"`
+}
+
+// GetVersionMethods fetches the list of canonical IDs available in a specific integration version.
+// Route: GET /integrations/{project}/{library}/{version}/methods
+// Returns nil error and nil response when the endpoint is not yet available (graceful degradation).
+func (c *Client) GetVersionMethods(ctx context.Context, project, library, version string) (*VersionMethodsResponse, error) {
+	path := fmt.Sprintf("/integrations/%s/%s/%s/methods",
+		url.PathEscape(project), url.PathEscape(library), url.PathEscape(version))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // endpoint or version not found; caller skips validation
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var result VersionMethodsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
+// CanonicalIDResolution is the response from GET /canonical-id/resolve.
+type CanonicalIDResolution struct {
+	Status          string `json:"status"`            // "active" | "renamed" | "removed"
+	NewID           string `json:"new_id,omitempty"`
+	DeprecatedSince string `json:"deprecated_since,omitempty"`
+}
+
+// ResolveCanonicalID checks whether a canonical ID has been renamed or removed.
+// Route: GET /canonical-id/resolve?id=<id>
+// Returns nil, nil when the endpoint is not yet implemented (graceful degradation).
+func (c *Client) ResolveCanonicalID(ctx context.Context, id string) (*CanonicalIDResolution, error) {
+	path := fmt.Sprintf("/canonical-id/resolve?id=%s", url.QueryEscape(id))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // endpoint not implemented yet
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var result CanonicalIDResolution
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return &result, nil
+}
+
+// InputField describes a single input parameter on a method.
+type InputField struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	Required bool   `json:"required"`
+}
+
+// InputChange describes a change to an existing input field.
+type InputChange struct {
+	Name    string `json:"name"`
+	OldType string `json:"old_type"`
+	NewType string `json:"new_type"`
+}
+
+// MethodChange describes signature-level changes to a single method.
+type MethodChange struct {
+	CanonicalID   string       `json:"canonical_id"`
+	AddedInputs   []InputField `json:"added_inputs"`
+	RemovedInputs []InputField `json:"removed_inputs"`
+	ChangedInputs []InputChange `json:"changed_inputs"`
+}
+
+// ProposalDiff is the response from GET /proposals/diff.
+type ProposalDiff struct {
+	Library         string         `json:"library"`
+	CurrentVersion  string         `json:"current_version"`
+	ProposedVersion string         `json:"proposed_version"`
+	Added           []string       `json:"added"`
+	Removed         []string       `json:"removed"`
+	Changed         []MethodChange `json:"changed"`
+}
+
+// GetProposalDiff fetches the method-level diff between the installed version and the pending proposal.
+// Route: GET /proposals/diff?library=<library>
+// Returns nil, nil when no proposal exists or the endpoint is not yet available.
+func (c *Client) GetProposalDiff(ctx context.Context, library string) (*ProposalDiff, error) {
+	path := fmt.Sprintf("/proposals/diff?library=%s", url.QueryEscape(library))
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // no pending proposal for this library
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, c.handleError(resp)
+	}
+
+	var result ProposalDiff
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
 	return &result, nil
 }
 

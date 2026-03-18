@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
+
+	"gitlab.com/swytchcode/cli/internal/util"
 )
 
 // Entry represents a single project.library entry in manifest.json.
@@ -20,7 +21,7 @@ type Entry struct {
 
 // Path returns the path to .swytchcode/integrations/manifest.json.
 func Path(projectRoot string) string {
-	return filepath.Join(projectRoot, ".swytchcode", "integrations", "manifest.json")
+	return util.ManifestPath(projectRoot)
 }
 
 // Read reads the manifest.json file.
@@ -53,8 +54,7 @@ func Write(projectRoot string, manifest map[string]Entry) error {
 		return err
 	}
 	p := Path(projectRoot)
-	dir := filepath.Dir(p)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(util.IntegrationsDir(projectRoot), 0o755); err != nil {
 		return err
 	}
 	return os.WriteFile(p, data, 0o644)
