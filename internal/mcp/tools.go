@@ -735,7 +735,7 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 	mcpToken, _, _ := auth.ResolveToken()
 
 	// Create a reader from JSON
-	reqReader := &jsonReader{data: reqJSON}
+	reqReader := util.NewJSONReader(reqJSON)
 	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), allowRaw, dryRun, rawOutput, jsonOutput, "", mcpToken)
 
 	if exitCode != kernel.ExitCodeOK {
@@ -746,23 +746,6 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 	return oc.GetCombinedOutput(), nil
 }
 
-// jsonReader implements io.Reader for JSON data
-type jsonReader struct {
-	data []byte
-	pos  int
-}
-
-func (r *jsonReader) Read(p []byte) (n int, err error) {
-	if r.pos >= len(r.data) {
-		return 0, io.EOF
-	}
-	n = copy(p, r.data[r.pos:])
-	r.pos += n
-	if r.pos >= len(r.data) {
-		err = io.EOF
-	}
-	return n, err
-}
 
 // runAddCommand runs the add command logic.
 func runAddCommand(ctx context.Context, canonicalID, integrationSpec string, stdout, stderr io.Writer) error {

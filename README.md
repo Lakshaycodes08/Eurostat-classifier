@@ -92,12 +92,12 @@ echo '{
 | `swytchcode add [spec] <canonical_id>` | Add a tool to `tooling.json`; auto-downloads missing library deps for multi-library workflows |
 | `swytchcode info <canonical_id>` | Show information about a tool by canonical ID |
 | `swytchcode exec [canonical_id]` | Execute a tool (CLI or JSON stdin); supports `--json`, `--raw`, `--dry-run` |
-| `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec` |
+| `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec`, `swytchcode_check`, `swytchcode_inspect`, `swytchcode_upgrade`, `swytchcode_diff`, `swytchcode_discover`, `swytchcode_plan` |
 | `swytchcode mcp status` | Check if MCP server is running (daemon mode) |
 | `swytchcode mcp stop` | Stop MCP server (daemon mode) |
 | `swytchcode login` | Device-flow browser login; saves session to `~/.swytchcode/auth.json` |
 | `swytchcode logout` | Delete saved session |
-| `swytchcode whoami` | Show current session (email, customer UUID, expiry); prints "Not logged in" if no session |
+| `swytchcode whoami` | Show current auth state: user session (email, UUID, expiry) or service token (masked); accepts `SWYTCHCODE_TOKEN` |
 | `swytchcode check [project_or_library]` | Check for integration update proposals; exits 1 on breaking changes; requires `SWYTCHCODE_TOKEN` or login |
 | `swytchcode inspect <library>` | Show full proposal detail for a library (requires login) |
 | `swytchcode upgrade <library> [--apply]` | Approve a pending integration update proposal (requires login); `--apply` also re-downloads and refreshes tools |
@@ -645,7 +645,7 @@ Auth requirements vary by command:
 |---------|--------------|---------------------------|
 | `login` | No (this is how you authenticate) | — |
 | `logout` | No | — |
-| `whoami` | Optional — prints "Not logged in" if no session | No |
+| `whoami` | Optional — prints "Not logged in" if no session or token | Yes |
 | `check` | Optional — passes empty token if missing (server returns 401) | Yes |
 | `inspect` | Yes — user session only | No |
 | `upgrade` | Yes — user session only | No |
@@ -666,6 +666,62 @@ Cloud commands contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode
 - **CI/CD:** Define as a secret/CI variable.
 
 See `docs/cli-reference.md` → "Setting SWYTCHCODE_TOKEN" for full detail.
+
+**Calling the CLI from Node.js code (without the runtime package):**
+
+The recommended way is the [swytchcode-runtime](https://www.npmjs.com/package/swytchcode-runtime) package, which handles all of this automatically. If you call the CLI directly, use `spawnSync`/`spawn` — **not** `child_process.exec`:
+
+| Problem with `exec()` | Why it fails |
+|----------------------|--------------|
+| Default `maxBuffer` is 200KB | Large API responses are silently truncated |
+| No easy stdin | CLI in JSON-stdin mode hangs waiting for input |
+| stdout/stderr arrive as Buffer | `JSON.parse(buffer)` throws unless you call `.toString()` |
+| Uses a subshell — PATH may differ | `swytchcode` not found even if installed |
+
+Sync pattern:
+```js
+import { spawnSync } from 'node:child_process';
+
+const result = spawnSync(
+  'swytchcode',
+  ['exec', '--json', 'books.book.get'],
+  {
+    input: JSON.stringify({ params: { id: '123' } }), // JSON args on stdin
+    encoding: 'utf8',             // stdout/stderr as strings, not Buffers
+    maxBuffer: 10 * 1024 * 1024, // 10MB — match runtime default
+    env: process.env,             // SWYTCHCODE_TOKEN is inherited automatically
+  }
+);
+
+if (result.error) throw result.error; // binary not found / permission denied
+if (result.status !== 0) throw new Error(result.stderr || 'swytchcode failed');
+
+const output = JSON.parse(result.stdout);
+if (output.status_code >= 400) throw new Error(`API ${output.status_code}: ${JSON.stringify(output.data)}`);
+```
+
+Async pattern:
+```js
+import { spawn } from 'node:child_process';
+
+function execTool(canonicalId, args = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('swytchcode', ['exec', '--json', canonicalId], { env: process.env });
+    let stdout = '', stderr = '';
+    child.stdout.on('data', d => { stdout += d; });
+    child.stderr.on('data', d => { stderr += d; });
+    child.stdin.write(JSON.stringify(args));
+    child.stdin.end();
+    child.on('close', code => {
+      if (code !== 0) return reject(new Error(stderr || `exit ${code}`));
+      try { resolve(JSON.parse(stdout)); }
+      catch { reject(new Error('invalid JSON: ' + stdout)); }
+    });
+  });
+}
+```
+
+If `swytchcode` is not found, pass the absolute binary path (e.g. `/usr/local/bin/swytchcode`) or ensure the spawning process has the correct `PATH`.
 
 #### `swytchcode login`
 
@@ -691,7 +747,14 @@ Prints the current session: email, customer UUID, and token expiry.
 swytchcode whoami
 ```
 
-Prints "Not logged in." if no session exists. Does not accept `SWYTCHCODE_TOKEN`.
+If `SWYTCHCODE_TOKEN` is set, prints the masked token and auth source instead of the user session:
+
+```
+auth:    service token (SWYTCHCODE_TOKEN)
+token:   sc12****5678
+```
+
+Prints "Not logged in." if neither a session nor a token is present.
 
 #### `swytchcode check [project_or_library]`
 
@@ -756,7 +819,7 @@ See `commands.md` for full verification detail on these commands.
 - `--port <number>`: Port for HTTP transport, default: `5476`
 
 **What it does:**
-- Starts an MCP server exposing nine tools:
+- Starts an MCP server exposing fifteen tools:
   - `swytchcode_init` — Initialize Swytchcode in the project
   - `swytchcode_bootstrap` — Fetch all integrations declared in tooling.json
   - `swytchcode_version` — Get Swytchcode version
@@ -766,6 +829,12 @@ See `commands.md` for full verification detail on these commands.
   - `swytchcode_add` — Add tools to tooling.json
   - `swytchcode_info` — Get information about a tool by canonical ID
   - `swytchcode_exec` — Execute tools
+  - `swytchcode_check` — Check for integration update proposals
+  - `swytchcode_inspect` — Show full proposal detail for a library
+  - `swytchcode_upgrade` — Approve a pending integration update proposal
+  - `swytchcode_diff` — Show method-level signature diff for a pending upgrade
+  - `swytchcode_discover` — Semantic search for capabilities by natural-language intent
+  - `swytchcode_plan` — Preview ordered steps of a workflow
 - All tool output is captured and returned through the MCP protocol (not streamed to terminal)
 - In daemon mode (`-d`):
   - Forks a new process that runs independently in the background
@@ -930,7 +999,7 @@ When you run `swytchcode init --editor=<cursor|claude>`, the CLI installs rule t
 | **cursor** | `.cursor/rules/swytchcode.mdc` | `~/.cursor/mcp.json` (SSE URL entry) |
 | **claude** | `CLAUDE.md` (repo root) | `~/.claude/settings.json` (SSE URL entry) |
 
-Templates are embedded in the binary; source lives in `editors/` (see `editors/README.md`). Rules require using MCP tools `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec` and generating runtime code that calls `swytchcode exec <canonical_id>`.
+Templates are embedded in the binary; source lives in `editors/` (see `editors/README.md`). Rules require using MCP tools `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec`, `swytchcode_check`, `swytchcode_inspect`, `swytchcode_upgrade`, `swytchcode_diff`, `swytchcode_discover`, `swytchcode_plan` and generating runtime code that calls `swytchcode exec <canonical_id>`.
 
 ---
 

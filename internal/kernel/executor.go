@@ -310,9 +310,7 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 
 	// Step 9: Output response (include request URL so caller can verify base URL)
 	if rawOutput {
-		code, _ := OutputRawResponse(resp, httpReq, stdout, stderr)
-		return code
+		return OutputRawResponse(resp, httpReq, stdout, stderr)
 	}
-	code, _ := OutputJSONResponse(resp, httpReq, stdout, stderr)
-	return code
+	return OutputJSONResponse(resp, httpReq, stdout, stderr)
 }

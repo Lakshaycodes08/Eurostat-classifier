@@ -14,11 +14,28 @@ func EnsureDir(path string, perm os.FileMode) error {
 	return os.MkdirAll(path, perm)
 }
 
-// ProjectRoot returns the current working directory.
-// In the future this can be extended to walk up for markers
-// (e.g. go.mod, .git, .swytchcode) if needed.
+// ProjectRoot returns the nearest ancestor directory (inclusive of cwd) that contains
+// .swytchcode/tooling.json. Falls back to cwd if no such directory is found, so that
+// existing "tooling.json not found" error messages are preserved for uninitialised projects.
+// This mirrors how git walks up to find .git from any subdirectory.
 func ProjectRoot() (string, error) {
-	return os.Getwd()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	dir := cwd
+	for {
+		if _, err := os.Stat(filepath.Join(dir, constants.SwytchDirName, constants.ToolingJSONFile)); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// reached filesystem root without finding tooling.json
+			break
+		}
+		dir = parent
+	}
+	return cwd, nil // fallback — caller will get the usual "not found" error
 }
 
 // Join is a thin wrapper around filepath.Join for convenience.

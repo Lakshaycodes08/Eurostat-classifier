@@ -69,8 +69,8 @@ func ExecuteHTTP(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// OutputRawResponse outputs the raw HTTP response. Returns (exitCode, errMsg); errMsg is non-empty only when exitCode != ExitCodeOK.
-func OutputRawResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) (int, string) {
+// OutputRawResponse outputs the raw HTTP response. Error details are written to stderr; returns exit code only.
+func OutputRawResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) int {
 	defer resp.Body.Close()
 
 	// Output request URL for verification, then status and headers
@@ -87,41 +87,37 @@ func OutputRawResponse(resp *http.Response, req *http.Request, stdout io.Writer,
 	// Read body
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		msg := "failed to read response body: " + err.Error()
-		writeErrorJSON(stderr, msg)
-		return ExitCodeSDKFailure, msg
+		writeErrorJSON(stderr, "failed to read response body: "+err.Error())
+		return ExitCodeSDKFailure
 	}
 
 	output["body"] = string(bodyBytes)
 
 	if err := json.NewEncoder(stdout).Encode(output); err != nil {
-		msg := "failed to encode response"
-		writeErrorJSON(stderr, msg)
-		return ExitCodeInternalError, msg
+		writeErrorJSON(stderr, "failed to encode response")
+		return ExitCodeInternalError
 	}
 
-	return ExitCodeOK, ""
+	return ExitCodeOK
 }
 
-// OutputJSONResponse outputs normalized JSON response. Returns (exitCode, errMsg); errMsg is non-empty only when exitCode != ExitCodeOK.
+// OutputJSONResponse outputs normalized JSON response. Error details are written to stderr; returns exit code only.
 // API-level errors (HTTP 4xx/5xx) exit 0 — status_code in the JSON conveys success/failure.
-func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) (int, string) {
+func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer, stderr io.Writer) int {
 	defer resp.Body.Close()
 
 	// Read response body
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		msg := "failed to read response body: " + err.Error()
-		writeErrorJSON(stderr, msg)
-		return ExitCodeSDKFailure, msg
+		writeErrorJSON(stderr, "failed to read response body: "+err.Error())
+		return ExitCodeSDKFailure
 	}
 
 	// Parse JSON response
 	var responseJSON interface{}
 	if err := json.Unmarshal(bodyBytes, &responseJSON); err != nil {
-		msg := "response is not valid JSON"
-		writeErrorJSON(stderr, msg)
-		return ExitCodeSDKFailure, msg
+		writeErrorJSON(stderr, "response is not valid JSON")
+		return ExitCodeSDKFailure
 	}
 
 	// Output normalized JSON; include request URL so caller can verify base URL was applied
@@ -135,10 +131,9 @@ func OutputJSONResponse(resp *http.Response, req *http.Request, stdout io.Writer
 	}
 
 	if err := json.NewEncoder(stdout).Encode(output); err != nil {
-		msg := "failed to encode response"
-		writeErrorJSON(stderr, msg)
-		return ExitCodeInternalError, msg
+		writeErrorJSON(stderr, "failed to encode response")
+		return ExitCodeInternalError
 	}
 
-	return ExitCodeOK, ""
+	return ExitCodeOK
 }
