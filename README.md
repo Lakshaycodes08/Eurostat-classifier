@@ -1,4 +1,4 @@
-# Swytchcode Kernel
+# Swytchcode CLI
 
 Swytchcode is the **execution kernel** for tools. Editors, agents, and languages call `swytchcode exec` to execute tools deterministically.
 
@@ -652,7 +652,7 @@ Auth requirements vary by command:
 
 Cloud commands contact `SWYTCHCODE_API_URL` (default: `https://api-v2.swytchcode.com`).
 
-**Telemetry:** Usage events are sent only when you are logged in via `swytchcode login`. If `SWYTCHCODE_TOKEN` is set, telemetry is not sent. With no auth, a one-time hint may be shown. See `CLI_TELEMETRY.md` for the full contract. Telemetry is **independent of exec success** — HTTP 4xx/5xx responses from the target API (including 404s from `http://localhost`) are still real API responses; debug them via tool info, `--dry-run`, and your project’s `tooling.json` / `manifest.json`, not by changing telemetry settings.
+**Telemetry:** Usage events are sent when authenticated — either via `swytchcode login` (user session) or `SWYTCHCODE_TOKEN` (service token). The backend identifies your account from the bearer token, so server-side exec calls are tracked the same way as interactive ones. With no auth, telemetry is skipped and a one-time hint may be shown. See `CLI_TELEMETRY.md` for the full contract. Telemetry is **independent of exec success** — HTTP 4xx/5xx responses from the target API (including 404s from `http://localhost`) are still real API responses; debug them via tool info, `--dry-run`, and your project’s `tooling.json` / `manifest.json`, not by changing telemetry settings.
 
 **Where to set SWYTCHCODE_TOKEN:** The CLI reads the token only from the process environment (it does not load `.env` files). Quick reference:
 
@@ -758,7 +758,7 @@ Prints "Not logged in." if neither a session nor a token is present.
 
 #### `swytchcode check [project_or_library]`
 
-Fetches integration update proposals and prints a summary.
+Fetches integration update proposals for the authenticated customer and prints a summary. Both `SWYTCHCODE_TOKEN` (service token) and `swytchcode login` (user session) are fully supported — proposals are scoped to your account in both cases.
 
 ```bash
 swytchcode check                    # all proposals for the authed user
@@ -766,12 +766,35 @@ swytchcode check weaviate           # filter by project name
 swytchcode check weaviate.lyrid     # filter by project.library
 ```
 
+**Flags:**
+- `--json` — Output structured JSON (for programmatic use)
+
 **Exit codes:**
 - `0` — No proposals (or no breaking ones)
 - `1` — Breaking-impact proposals found
 - `2` — CLI/auth error
 
 Requires `SWYTCHCODE_TOKEN` or `~/.swytchcode/auth.json`.
+
+**Server-side usage (Node.js):**
+
+```js
+const { spawnSync } = require('node:child_process');
+
+const r = spawnSync('swytchcode', ['check', '--json'], {
+  encoding: 'utf8',
+  env: process.env,  // inherits SWYTCHCODE_TOKEN
+});
+if (r.error) throw r.error;
+const result = JSON.parse(r.stdout);
+// result.up_to_date    — true if no proposals
+// result.has_breaking  — true if any major-impact proposals
+// result.proposals     — full proposal array
+if (result.has_breaking) {
+  const breaking = result.proposals.filter(p => p.impact === 'major');
+  console.warn('Breaking integration updates available:', breaking);
+}
+```
 
 #### `swytchcode inspect <library>`
 

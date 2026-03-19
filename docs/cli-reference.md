@@ -357,5 +357,5 @@ Define `SWYTCHCODE_TOKEN` as a secret or CI variable so the job environment has 
 
 ### Telemetry
 
-Telemetry is **opt-in by identity**: events are only sent when you are logged in via `swytchcode login`. When `SWYTCHCODE_TOKEN` is set (service token), telemetry is **not** sent. When you have no auth, no events are sent and the CLI may print a one-time hint. See `CLI_TELEMETRY.md` in the repo for the full contract (event schema, endpoint, error classification).
+**Telemetry:** Usage events are sent when authenticated — either via `swytchcode login` (user session) or `SWYTCHCODE_TOKEN` (service token). The backend identifies your account from the bearer token, so server-side exec calls are tracked the same way as interactive ones. When you have no auth, no events are sent and the CLI may print a one-time hint. See `CLI_TELEMETRY.md` in the repo for the full contract (event schema, endpoint, error classification).
 
