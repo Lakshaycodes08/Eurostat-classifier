@@ -180,7 +180,7 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 			}
 
 			// Create a reader from the JSON bytes
-			reqReader := &jsonReader{data: reqJSON}
+			reqReader := util.NewJSONReader(reqJSON)
 			start := time.Now()
 			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "", token)
 			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
@@ -192,23 +192,6 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 	},
 }
 
-// jsonReader implements io.Reader for JSON data
-type jsonReader struct {
-	data []byte
-	pos  int
-}
-
-func (r *jsonReader) Read(p []byte) (n int, err error) {
-	if r.pos >= len(r.data) {
-		return 0, io.EOF
-	}
-	n = copy(p, r.data[r.pos:])
-	r.pos += n
-	if r.pos >= len(r.data) {
-		err = io.EOF
-	}
-	return n, err
-}
 
 // outcomeErr returns a non-nil error value when exitCode indicates failure,
 // so telemetry.SendEvent can record the correct outcome.

@@ -25,7 +25,7 @@ This document summarizes the Swytchcode CLI surface, with a focus on inputs, out
 | `swytchcode plan <canonical_id>` | Preview ordered steps of a workflow before running it. |
 | `swytchcode check` | Check for integration update proposals from the backend. |
 | `swytchcode login` / `logout` / `whoami` | Manage CLI auth sessions. |
-| `swytchcode inspect <library> [--project <uuid>]` | Show full proposal detail for a library (requires login). |
+| `swytchcode inspect <library>` | Show full proposal detail for a library (requires login). |
 | `swytchcode upgrade <library> [--apply]` | Approve a pending integration update proposal (requires login). `--apply` also refreshes local bundle and tooling.json. |
 | `swytchcode diff <library>` | Show method-level signature diff for a pending upgrade proposal (requires login or token). |
 
@@ -314,8 +314,6 @@ See backend-specific docs for exact payloads and behavior. From the CLI's perspe
 - Resolve project UUIDs and tokens via `internal/auth`.
 - Call backend endpoints for account/project/introspection and plan/usage info.
 - Exit with non-zero codes on auth/network/server errors, printing clear messages on stderr.
-
-`check`, `inspect`, and `upgrade` accept `--project <uuid>` to override `SWYTCHCODE_PROJECT_UUID`.
 
 ### Setting SWYTCHCODE_TOKEN
 
