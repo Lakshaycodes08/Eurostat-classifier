@@ -117,6 +117,36 @@ func FetchProposals(cfg CheckConfig) ([]Proposal, error) {
 	return result.Proposals, nil
 }
 
+// CheckJSONOutput is the structured output for swytchcode check --json.
+type CheckJSONOutput struct {
+	UpToDate    bool       `json:"up_to_date"`
+	HasBreaking bool       `json:"has_breaking"`
+	Proposals   []Proposal `json:"proposals"`
+}
+
+// RunCheckJSON fetches proposals and writes a JSON summary to w.
+// Reuses FetchProposals — no additional API calls.
+func RunCheckJSON(cfg CheckConfig, w io.Writer) (hasBreaking bool, err error) {
+	proposals, err := FetchProposals(cfg)
+	if err != nil {
+		return false, err
+	}
+	for _, p := range proposals {
+		if p.Impact == "major" {
+			hasBreaking = true
+			break
+		}
+	}
+	if proposals == nil {
+		proposals = []Proposal{}
+	}
+	return hasBreaking, json.NewEncoder(w).Encode(CheckJSONOutput{
+		UpToDate:    len(proposals) == 0,
+		HasBreaking: hasBreaking,
+		Proposals:   proposals,
+	})
+}
+
 // RunCheck fetches proposals, prints a summary line per proposal, and returns
 // hasBreaking=true if any proposal has impact "major".
 func RunCheck(cfg CheckConfig, w io.Writer) (hasBreaking bool, err error) {

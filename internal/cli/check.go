@@ -14,6 +14,8 @@ import (
 	"gitlab.com/swytchcode/cli/internal/telemetry"
 )
 
+var checkJSON bool
+
 var checkCmd = &cobra.Command{
 	Use:   "check [project_or_library]",
 	Short: "Check for available integration updates",
@@ -47,12 +49,15 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 			telemetry.MaybeHintNoAuth()
 		}
 
+		cfg := commands.CheckConfig{APIURL: apiURL, Token: token, Library: library}
 		start := time.Now()
-		hasBreaking, err := commands.RunCheck(commands.CheckConfig{
-			APIURL:  apiURL,
-			Token:   token,
-			Library: library,
-		}, os.Stdout)
+		var hasBreaking bool
+		var err error
+		if checkJSON {
+			hasBreaking, err = commands.RunCheckJSON(cfg, os.Stdout)
+		} else {
+			hasBreaking, err = commands.RunCheck(cfg, os.Stdout)
+		}
 		opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
 		telemetry.SendEvent(apiURL, token, fromSession, "proposals_check", library, err, opts)
 		if err != nil {
@@ -71,4 +76,8 @@ Alternatively, log in with 'swytchcode login' to authenticate as a user.`,
 		}
 		return nil
 	},
+}
+
+func init() {
+	checkCmd.Flags().BoolVar(&checkJSON, "json", false, "Output proposals as JSON (for programmatic use)")
 }
