@@ -81,14 +81,18 @@ Only continue after the integration has been explicitly added.
 
 
 ### Step 3 — Ensure tool is enabled
-If the required method or workflow is not present in local Swytchcode state:
+Run `swytchcode list tooling` (or MCP `swytchcode_list` with filter `tooling`) to see what
+is currently enabled in tooling.json.
 
-- STOP.
-- Ask the user for permission to add it to Swytchcode configuration.
-- Do NOT invent or placeholder canonical IDs.
-- Do NOT generate code.
+- If the canonical_id IS already listed: proceed directly to Step 4. Do NOT call `swytchcode add` again.
+- If the canonical_id is NOT listed:
+  - STOP.
+  - Ask the user for permission to add it to Swytchcode configuration.
+  - Do NOT invent or placeholder canonical IDs.
+  - Do NOT generate code.
+  - Run `swytchcode add <canonical_id>`, then confirm it appears in `swytchcode list tooling`.
 
-Only continue after the tool is explicitly present.
+Never skip this check. Never assume a tool is in tooling.json without verifying via `swytchcode list tooling`.
 
 
 
@@ -108,19 +112,23 @@ If contract information is unavailable:
 ### Step 5 — Generate code
 Only after Steps 1–4 are complete:
 
+**Pre-generation gate:** Run `swytchcode list tooling` and confirm the canonical_id appears
+in the output. If it is missing, do NOT generate code — go back to Step 3.
+
 - Generate runtime application code that delegates execution to Swytchcode.
 - Use the exact canonical ID discovered locally.
 - Use only the fields defined in the discovered input schema.
 - Show all the defined fields and their usage. Don't miss any.
 - Say which fields are mandatory and which are optional
-- If available, show all the output fields in return as well 
+- If available, show all the output fields in return as well
 
 
 ## Absolute Prohibitions (NON-NEGOTIABLE)
 
-RULE: Before calling swytchcode_exec for any canonical_id, verify it exists in
-tooling.json using swytchcode_list. If it is not listed, call swytchcode_add first.
-Never exec a tool that has not been added.
+RULE: Before generating any execution code OR calling swytchcode_exec, verify the
+canonical_id exists in tooling.json using `swytchcode list tooling` (MCP: `swytchcode_list`
+with filter `tooling`). If it is not listed, call swytchcode_add first. Never generate
+code for or exec a tool that has not been added.
 
 You MUST NOT:
 
@@ -145,12 +153,50 @@ If progress cannot be made with certainty:
 When generating code:
 
 - Always delegate execution to Swytchcode
-- Use an official Swytchcode runtime library if available. Currently available for go, python and javascript (swytchcode-runtime)
-- Otherwise invoke Swytchcode via subprocess
+- Use an official Swytchcode runtime library if available (see Runtime Usage below). Otherwise invoke Swytchcode via subprocess.
 - Pass a single structured input object
 - Handle stdout, stderr, and exit codes
 
 Generated code MUST be immediately executable without placeholders.
+
+### Runtime Usage
+
+Use EXACTLY the following patterns — do NOT invent class names, module paths, or method signatures:
+
+**JavaScript/Node.js:**
+```js
+const { exec } = require("swytchcode-runtime");
+
+const result = await exec("canonical.id", { /* args */ });
+```
+
+**Python:**
+```python
+from swytchcode_runtime import exec
+
+result = exec("canonical.id", { /* args */ })
+```
+
+**Go:**
+```go
+import runtime "github.com/swytchcode/go-runtime"
+
+result, err := runtime.Exec("canonical.id", map[string]interface{}{ /* args */ })
+```
+
+### Authentication & Environment Variables
+
+When `swytchcode info` shows `HTTP Headers` containing `Authorization` or similar credential headers, OR shows an `Auth` section:
+
+- NEVER hardcode credentials.
+- ALWAYS read from environment variables.
+- ALWAYS add `.env` loading at the top of the generated file:
+  - Node.js: `require('dotenv').config();`
+  - Python: `from dotenv import load_dotenv; load_dotenv()`
+  - Go: use `os.Getenv()`
+- Name the env var after the service (e.g. `<SERVICE>_API_KEY`).
+- Pass the auth header as an arg to override the static placeholder:
+  - `api_key` type: `Authorization: \`Bearer \${process.env.<SERVICE>_API_KEY}\``
 
 
 ## Methods and Workflows

@@ -16,9 +16,9 @@ var (
 
 // listCmd implements `swytchcode list` - lists locally available tools and integrations.
 var listCmd = &cobra.Command{
-	Use:   "list [methods|workflows|integrations] [pattern]",
+	Use:   "list [methods|workflows|integrations|tooling] [pattern]",
 	Short: "List locally available tools and integrations",
-	Long:  "Scans .swytchcode/integrations recursively. Lists methods from methods.json, workflows from workflows.json, and integration names. Optional pattern filters by canonical_id or project name (case-insensitive). No registry calls.",
+	Long:  "Scans .swytchcode/integrations recursively. Lists methods from methods.json, workflows from workflows.json, and integration names. Use 'tooling' to list only what has been explicitly enabled in tooling.json via 'swytchcode add'. Optional pattern filters by canonical_id or project name (case-insensitive). No registry calls.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		projectRoot, err := util.ProjectRoot()
 		if err != nil {
