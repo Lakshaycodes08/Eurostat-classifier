@@ -26,6 +26,17 @@ type ListResult struct {
 	Integrations []string    `json:"integrations,omitempty"`
 }
 
+// printEntries writes a slice of ListEntry to stdout, one per line.
+func printEntries(stdout io.Writer, entries []ListEntry) {
+	for _, e := range entries {
+		if e.Integration != "" {
+			fmt.Fprintf(stdout, "  %s  %s\n", e.CanonicalID, e.Integration)
+		} else {
+			fmt.Fprintf(stdout, "  %s\n", e.CanonicalID)
+		}
+	}
+}
+
 // RunList lists locally available tools and integrations (no registry calls).
 func RunList(projectRoot, filter, prefix string, jsonOutput bool, stdout io.Writer) (*ListResult, error) {
 	methods, workflows, integrations, err := getLocalState(projectRoot, filter, prefix)
@@ -43,6 +54,10 @@ func RunList(projectRoot, filter, prefix string, jsonOutput bool, stdout io.Writ
 	if filter == "" || filter == "integrations" {
 		result.Integrations = integrations
 	}
+	if filter == "tooling" {
+		result.Methods = methods
+		result.Workflows = workflows
+	}
 
 	if jsonOutput {
 		if err := json.NewEncoder(stdout).Encode(result); err != nil {
@@ -52,37 +67,26 @@ func RunList(projectRoot, filter, prefix string, jsonOutput bool, stdout io.Writ
 		// Human-readable output: show canonical_id and project.library@version for identification
 		if filter == "" || filter == "methods" {
 			fmt.Fprintln(stdout, "Methods:")
-			if len(methods) > 0 {
-				for _, e := range methods {
-					if e.Integration != "" {
-						fmt.Fprintf(stdout, "  %s  %s\n", e.CanonicalID, e.Integration)
-					} else {
-						fmt.Fprintf(stdout, "  %s\n", e.CanonicalID)
-					}
-				}
-			}
+			printEntries(stdout, methods)
 			fmt.Fprintln(stdout)
 		}
 		if filter == "" || filter == "workflows" {
 			fmt.Fprintln(stdout, "Workflows:")
-			if len(workflows) > 0 {
-				for _, e := range workflows {
-					if e.Integration != "" {
-						fmt.Fprintf(stdout, "  %s  %s\n", e.CanonicalID, e.Integration)
-					} else {
-						fmt.Fprintf(stdout, "  %s\n", e.CanonicalID)
-					}
-				}
-			}
+			printEntries(stdout, workflows)
 			fmt.Fprintln(stdout)
 		}
 		if filter == "" || filter == "integrations" {
 			fmt.Fprintln(stdout, "Integrations:")
-			if len(integrations) > 0 {
-				for _, i := range integrations {
-					fmt.Fprintf(stdout, "  %s\n", i)
-				}
+			for _, i := range integrations {
+				fmt.Fprintf(stdout, "  %s\n", i)
 			}
+		}
+		if filter == "tooling" {
+			fmt.Fprintln(stdout, "Enabled Methods (tooling.json):")
+			printEntries(stdout, methods)
+			fmt.Fprintln(stdout)
+			fmt.Fprintln(stdout, "Enabled Workflows (tooling.json):")
+			printEntries(stdout, workflows)
 		}
 	}
 
@@ -91,8 +95,37 @@ func RunList(projectRoot, filter, prefix string, jsonOutput bool, stdout io.Writ
 
 // getLocalState reads local state by scanning .swytchcode/integrations recursively.
 // Methods and workflows are discovered from methods.json and workflows.json in each integration.
+// When filter is "tooling", reads from tooling.json instead to show what has been enabled via swytchcode add.
 // prefix is used as a filter pattern: match canonical_id or project name (case-insensitive substring/project match).
 func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, workflows []ListEntry, integrations []string, err error) {
+	// Tooling filter: read from tooling.json to show what the user has explicitly added.
+	if filter == "tooling" {
+		toolingPath := util.Join(projectRoot, constants.SwytchDirName, constants.ToolingJSONFile)
+		data, readErr := os.ReadFile(toolingPath)
+		if readErr != nil {
+			return nil, nil, nil, fmt.Errorf("tooling.json not found: run 'swytchcode init' first")
+		}
+		var tooling map[string]interface{}
+		if jsonErr := json.Unmarshal(data, &tooling); jsonErr != nil {
+			return nil, nil, nil, fmt.Errorf("failed to parse tooling.json: %w", jsonErr)
+		}
+		tools, _ := tooling["tools"].(map[string]interface{})
+		for canonicalID, entryRaw := range tools {
+			entry, _ := entryRaw.(map[string]interface{})
+			integration, _ := entry["integration"].(string)
+			toolType, _ := entry["type"].(string)
+			if !matchesPattern(canonicalID, integration, "", prefix) {
+				continue
+			}
+			if toolType == "workflow" {
+				workflows = append(workflows, ListEntry{CanonicalID: canonicalID, Integration: integration})
+			} else {
+				methods = append(methods, ListEntry{CanonicalID: canonicalID, Integration: integration})
+			}
+		}
+		return methods, workflows, nil, nil
+	}
+
 	integrationsDir := util.IntegrationsDir(projectRoot)
 	if _, statErr := os.Stat(integrationsDir); statErr != nil {
 		if filter == "methods" || filter == "workflows" {

@@ -11,6 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/cli/internal/manifest"
 	"gitlab.com/swytchcode/cli/internal/output"
 	"gitlab.com/swytchcode/cli/internal/util"
 )
@@ -25,9 +26,11 @@ type ToolInfo struct {
 	Integration  string                 `json:"integration"` // "project.library@version"
 	Summary      string                 `json:"summary,omitempty"`
 	Description  string                 `json:"description,omitempty"`
-	Inputs       interface{}            `json:"inputs,omitempty"`  // Resolved to scalars when STRUCTS available
-	Output       interface{}            `json:"output,omitempty"`   // Resolved return schema when RETURNS/STRUCTS available
-	Wrekenfile   map[string]interface{} `json:"wrekenfile,omitempty"` // Full entry from wrekenfile
+	Inputs       interface{}            `json:"inputs,omitempty"`       // Resolved to scalars when STRUCTS available
+	Output       interface{}            `json:"output,omitempty"`        // Resolved return schema when RETURNS/STRUCTS available
+	HTTPHeaders  map[string]string      `json:"http_headers,omitempty"`  // Static headers from wrekenfile HTTP.HEADERS (can be overridden via args)
+	Auth         map[string]interface{} `json:"auth,omitempty"`          // Auth metadata from manifest
+	Wrekenfile   map[string]interface{} `json:"wrekenfile,omitempty"`    // Full entry from wrekenfile
 }
 
 // RunInfo runs the info command: search for a canonical_id and return its information.
@@ -47,6 +50,9 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("canonical ID %q not found in any fetched integrations", canonicalID)
 	}
+
+	// Read manifest once — reused to populate Auth metadata for every match.
+	mf, _ := manifest.Read(projectRoot)
 
 	// For each match, get tool details from wrekenfile (methods) or workflows.json (workflows)
 	var toolInfos []ToolInfo
@@ -139,6 +145,33 @@ func RunInfo(ctx context.Context, canonicalID string, stdout, stderr io.Writer) 
 			Inputs:      inputs,
 			Output:      toolOutput,
 			Wrekenfile:  toolEntry,
+		}
+
+		// Extract static HTTP headers from wrekenfile (methods only).
+		// These headers are sent on every request but can be overridden at call time via args.
+		// Surfacing them lets the AI see auth requirements (e.g. Authorization: bearer_token).
+		if match.ToolType == "method" {
+			if httpRaw, ok := toolEntry[constants.WrekenHTTP]; ok {
+				if httpMap, ok := httpRaw.(map[string]interface{}); ok {
+					if headersRaw, ok := httpMap[constants.WrekenHeaders]; ok {
+						if headersMap, ok := headersRaw.(map[string]interface{}); ok {
+							toolInfo.HTTPHeaders = make(map[string]string, len(headersMap))
+							for k, v := range headersMap {
+								if vStr, ok := v.(string); ok {
+									toolInfo.HTTPHeaders[k] = vStr
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Populate auth metadata from manifest (type, header, etc.) as an additional signal.
+		if mf != nil {
+			if entry, ok := mf[projectLibrary]; ok && entry.Auth != nil {
+				toolInfo.Auth = entry.Auth
+			}
 		}
 
 		toolInfos = append(toolInfos, toolInfo)
@@ -258,6 +291,18 @@ func FormatInfoOutput(toolInfos []ToolInfo, jsonOutput bool, stdout io.Writer) e
 			outputJSON, err := json.MarshalIndent(info.Output, "", "  ")
 			if err == nil {
 				fmt.Fprintf(stdout, "Output:\n%s\n", outputJSON)
+			}
+		}
+		if info.HTTPHeaders != nil {
+			headersJSON, err := json.MarshalIndent(info.HTTPHeaders, "", "  ")
+			if err == nil {
+				fmt.Fprintf(stdout, "HTTP Headers (static, can be overridden via args):\n%s\n", headersJSON)
+			}
+		}
+		if info.Auth != nil {
+			authJSON, err := json.MarshalIndent(info.Auth, "", "  ")
+			if err == nil {
+				fmt.Fprintf(stdout, "Auth:\n%s\n", authJSON)
 			}
 		}
 	}
