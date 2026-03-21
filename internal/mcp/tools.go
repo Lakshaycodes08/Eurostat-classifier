@@ -26,7 +26,7 @@ type ToolOutput struct {
 
 // ListArgs represents arguments for swytchcode_list.
 type ListArgs struct {
-	Filter string `json:"filter,omitempty" jsonschema:"Filter type: 'methods', 'workflows', 'integrations', or empty for all"`
+	Filter string `json:"filter,omitempty" jsonschema:"Filter type: 'methods', 'workflows', 'integrations', 'tooling' (enabled in tooling.json only), or empty for all"`
 	Prefix string `json:"prefix,omitempty" jsonschema:"Project prefix filter (e.g., 'stripe')"`
 	JSON   bool   `json:"json,omitempty" jsonschema:"Output as JSON object"`
 }

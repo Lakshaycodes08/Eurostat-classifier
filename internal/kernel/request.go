@@ -149,10 +149,12 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 		req.Header.Set(key, value)
 	}
 
-	// Route args declared as LOCATION: header
+	// Route args declared as LOCATION: header — skip empty strings (don't send blank headers)
 	for key, val := range args {
 		if inputLocation(method, key) == "header" {
-			req.Header.Set(key, argValueToQueryString(val))
+			if str := argValueToQueryString(val); str != "" {
+				req.Header.Set(key, str)
+			}
 		}
 	}
 
@@ -164,13 +166,17 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 	}
 	if headersMap, ok := args["headers"].(map[string]interface{}); ok {
 		for key, val := range headersMap {
-			req.Header.Set(key, argValueToQueryString(val))
+			if str := argValueToQueryString(val); str != "" {
+				req.Header.Set(key, str)
+			}
 		}
 	}
 	// Also support args["headers"] as map[string]string (e.g. from JSON)
 	if headersMap, ok := args["headers"].(map[string]string); ok {
 		for key, val := range headersMap {
-			req.Header.Set(key, val)
+			if val != "" {
+				req.Header.Set(key, val)
+			}
 		}
 	}
 

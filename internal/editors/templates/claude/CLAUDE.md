@@ -111,12 +111,29 @@ Only after Steps 1–4 are complete:
 **Pre-generation gate:** Run `swytchcode list tooling` and confirm the canonical_id appears
 in the output. If it is missing, do NOT generate code — go back to Step 3.
 
-- Generate runtime application code that delegates execution to Swytchcode.
-- Use the exact canonical ID discovered locally.
-- Use only the fields defined in the discovered input schema.
-- Show all the defined fields and their usage. Don't miss any.
-- Say which fields are mandatory and which are optional
-- If available, show all the output fields in return as well
+Generate runtime application code that delegates execution to Swytchcode.
+
+**Golden rule: the generated code must run as-is. No edits required beyond supplying
+real values for required fields.**
+
+Use the output of `swytchcode info <canonical_id>` to determine which fields are
+required vs optional and what the auth header looks like.
+
+1. **Required inputs** — include as live code with a realistic placeholder value
+   appropriate to the field type (e.g. a real-looking string, not `""`).
+2. **Auth** — always read the auth header name and token format from the `Auth` /
+   `HTTPHeaders` section in `swytchcode info`. Add `.env` loading at the top and
+   read the credential from an env var named after the service
+   (e.g. `process.env.STRIPE_SECRET_KEY`, `process.env.RESEND_API_KEY`).
+3. **Optional inputs** — do NOT include as live code. Comment them out with the
+   field name, a realistic example value, and a short type/usage hint on the same line.
+   Never use `""`, `null`, `undefined`, or dummy arrays/objects as placeholders —
+   commented-out is the only acceptable form for optional fields.
+4. **No dummy data** — do not invent attachment content, fake IDs, or stub arrays.
+   If an optional field needs non-trivial setup (e.g. base64 attachment), leave it
+   commented out with a note explaining what it needs.
+5. **Output** — add a `// Returns: { ... }` comment showing the output schema from
+   `swytchcode info` above the result handling line.
 
 ---
 

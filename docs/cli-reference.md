@@ -148,10 +148,14 @@ swytchcode list
 swytchcode list methods [pattern]
 swytchcode list workflows [pattern]
 swytchcode list integrations [pattern]
+swytchcode list tooling [pattern]
 ```
 
 - Reads only local state:
   - `.swytchcode/integrations` (Wrekenfiles, methods.json, workflows.json).
+  - `tooling` filter reads from `.swytchcode/tooling.json` — shows only what has been
+    explicitly enabled via `swytchcode add`. Use this to verify a canonical ID is
+    registered before generating execution code.
 - Default output:
   - Human-readable lists of methods, workflows, and integrations.
 - `--json` (where supported) returns a machine-readable `ListResult`:
