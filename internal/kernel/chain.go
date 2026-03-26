@@ -9,7 +9,7 @@ import (
 	"io"
 	"net/http"
 
-	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
 )
 
 // StepResult holds the outcome of a single workflow step execution.

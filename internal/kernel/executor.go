@@ -9,8 +9,8 @@ import (
 	"io"
 	"strings"
 
-	"gitlab.com/swytchcode/cli/internal/registry"
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // ExecRequest is the JSON input shape expected on stdin for swytchcode exec.

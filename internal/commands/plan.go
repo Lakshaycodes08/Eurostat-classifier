@@ -8,8 +8,8 @@ import (
 	"io"
 	"strings"
 
-	"gitlab.com/swytchcode/cli/internal/output"
-	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/output"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
 )
 
 // RunPlan fetches and prints the steps of a workflow by canonical ID.

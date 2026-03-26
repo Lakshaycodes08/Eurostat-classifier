@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // ListEntry is a tool (method or workflow) with its integration for identification.

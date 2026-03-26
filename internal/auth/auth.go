@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 )
 
 // AuthSession is the credential stored in ~/.swytchcode/auth.json after `swytchcode login`.

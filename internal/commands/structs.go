@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 )
 
 // LoadWrekenfile reads and parses a wrekenfile.yaml into a map.

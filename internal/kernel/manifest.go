@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
-	"gitlab.com/swytchcode/cli/internal/manifest"
-	"gitlab.com/swytchcode/cli/internal/output"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/manifest"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/output"
 )
 
 // GetBaseURL gets the base URL for an integration from manifest.json based on mode.

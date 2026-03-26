@@ -1,4 +1,4 @@
-module gitlab.com/swytchcode/cli
+module gitlab.com/swytchcode/swytchcode-cli
 
 go 1.23.0
 

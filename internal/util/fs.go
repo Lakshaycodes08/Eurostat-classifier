@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 )
 
 // EnsureDir ensures that the given directory exists, creating it

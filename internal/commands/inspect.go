@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 )
 
 // ProposalDetail is the richer response from GET /v2/app/proposals/:uuid.

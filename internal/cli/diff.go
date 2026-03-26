@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/cli/internal/auth"
-	"gitlab.com/swytchcode/cli/internal/commands"
-	"gitlab.com/swytchcode/cli/internal/telemetry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/auth"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/commands"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/telemetry"
 )
 
 var diffCmd = &cobra.Command{

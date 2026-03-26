@@ -23,7 +23,7 @@ auto_tag:
       if [ -z "${GITLAB_TOKEN:-}" ]; then
         echo "ERROR: GITLAB_TOKEN is not set!"
         echo "Please add GITLAB_TOKEN to CI/CD Variables:"
-        echo "https://gitlab.com/swytchcode/cli/-/settings/ci_cd"
+        echo "https://gitlab.com/swytchcode/swytchcode-cli/-/settings/ci_cd"
         exit 1
       fi
     # Configure Git user identity for tag creation
@@ -31,7 +31,7 @@ auto_tag:
     - git config --global user.name "GitLab CI"
     # Push tags using a token with read_repository + write_repository scopes
     # Use project path format: swytchcode/cli (URL-encoded: swytchcode%2Fcli)
-    - git remote set-url origin "https://oauth2:${GITLAB_TOKEN}@gitlab.com/swytchcode/cli.git"
+    - git remote set-url origin "https://oauth2:${GITLAB_TOKEN}@gitlab.com/swytchcode/swytchcode-cli.git"
     - git fetch --tags --force
   script:
     - bash scripts/auto_tag.sh
@@ -76,6 +76,8 @@ pages:
       - public
 
 # 4) Publish npm packages (main + 6 platform packages).
+# Uses npm Trusted Publishers (OIDC) — no stored NPM_TOKEN needed.
+# One-time setup on npmjs.com per package: Trusted Publishers → namespace=swytchcode, project=cli, file=.gitlab-ci.yml
 npm-publish:
   stage: npm-publish
   image: node:20-alpine
@@ -84,9 +86,12 @@ npm-publish:
   needs:
     - job: goreleaser
       artifacts: true
+  id_tokens:
+    OIDC_TOKEN:
+      aud: https://registry.npmjs.org
   before_script:
     - apk add --no-cache tar unzip
-    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+    - echo "//registry.npmjs.org/:_authToken=${OIDC_TOKEN}" > ~/.npmrc
   script:
     - VERSION=${CI_COMMIT_TAG#v}
     # Extract each platform binary from the goreleaser dist/ artifacts
@@ -97,9 +102,22 @@ npm-publish:
     - tar -xzf dist/swytchcode_linux_amd64.tar.gz   -C npm/platforms/linux-x64/bin/    swytchcode
     - unzip -o dist/swytchcode_windows_arm64.zip swytchcode.exe -d npm/platforms/win32-arm64/bin/
     - unzip -o dist/swytchcode_windows_amd64.zip swytchcode.exe -d npm/platforms/win32-x64/bin/
-    # Stamp the release version into every package.json (replaces placeholder 0.0.0)
-    - find npm -name package.json | xargs sed -i "s/0\.0\.0/${VERSION}/g"
+    # Stamp the release version into every package.json (version + optionalDependencies)
+    - |
+      for f in $(find npm -name package.json); do
+        node -e "
+          var fs = require('fs');
+          var p = JSON.parse(fs.readFileSync('$f', 'utf8'));
+          p.version = '${VERSION}';
+          if (p.optionalDependencies) {
+            Object.keys(p.optionalDependencies).forEach(function(k) {
+              p.optionalDependencies[k] = '${VERSION}';
+            });
+          }
+          fs.writeFileSync('$f', JSON.stringify(p, null, 2) + '\n');
+        "
+      done
     # Publish platform packages first, then the main wrapper
-    - for dir in npm/platforms/*/; do (cd "$dir" && npm publish --access public); done
-    - (cd npm && npm publish --access public)
+    - for dir in npm/platforms/*/; do (cd "$dir" && npm publish --access public --provenance); done
+    - (cd npm && npm publish --access public --provenance)
 

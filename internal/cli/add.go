@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/cli/internal/commands"
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/commands"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 var noAutoInstall bool

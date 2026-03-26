@@ -11,8 +11,8 @@ import (
 	"os"
 	"strings"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // UpgradeConfig holds configuration for an upgrade run.

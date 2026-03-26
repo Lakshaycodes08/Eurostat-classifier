@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/cli/internal/auth"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/auth"
 )
 
 var whoamiCmd = &cobra.Command{

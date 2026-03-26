@@ -10,10 +10,10 @@ import (
 	"strconv"
 	"syscall"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
-	"gitlab.com/swytchcode/cli/internal/editors"
-	"gitlab.com/swytchcode/cli/internal/output"
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/editors"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/output"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // RunInit runs the init command: creates .swytchcode/, tooling.json, and editor-specific config.

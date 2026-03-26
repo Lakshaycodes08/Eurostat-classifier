@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/cli/internal/auth"
-	"gitlab.com/swytchcode/cli/internal/kernel"
-	"gitlab.com/swytchcode/cli/internal/telemetry"
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/auth"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/kernel"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/telemetry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // readStdinIfAvailable reads all of stdin. Caller can use the result to merge args when in CLI-args mode.
