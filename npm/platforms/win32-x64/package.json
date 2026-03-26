@@ -1,0 +1,11 @@
+{
+  "name": "swytchcode-cli-win32-x64",
+  "version": "0.0.0",
+  "description": "Swytchcode CLI binary for Windows (x64)",
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "preferUnplugged": true,
+  "files": [
+    "bin/swytchcode.exe"
+  ]
+}

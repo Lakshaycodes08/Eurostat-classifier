@@ -1,0 +1,11 @@
+{
+  "name": "swytchcode-cli-linux-arm64",
+  "version": "0.0.0",
+  "description": "Swytchcode CLI binary for Linux (ARM64)",
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "preferUnplugged": true,
+  "files": [
+    "bin/swytchcode"
+  ]
+}
