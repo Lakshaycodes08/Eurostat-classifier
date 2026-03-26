@@ -55,6 +55,7 @@
     }
     .copy-btn:hover { background: #333; }
     .copy-btn.copied { background: #0a6b0a; border-color: #0a6b0a; }
+    .install-note { color: #999; font-size: 0.8rem; margin: 0.25rem 0 0; }
   </style>
 </head>
 <body>
@@ -86,9 +87,16 @@
     <button type="button" class="copy-btn" id="copy-btn-win" aria-label="Copy Windows install command">Copy</button>
   </div>
 
+  <h3>Node.js / npm</h3>
+  <div class="install-block">
+    <code id="install-cmd-npm">npm install -g swytchcode-cli</code>
+    <button type="button" class="copy-btn" id="copy-btn-npm" aria-label="Copy npm install command">Copy</button>
+  </div>
+  <p class="install-note">Requires Node.js 14+. Works on macOS, Linux, and Windows.</p>
+
   <p class="note">
-    The install script downloads the correct binary for your OS/arch, verifies checksums,
-    and installs it locally. It prints the installed binary path and runs `swytchcode --version` at the end.
+    The shell/PowerShell scripts download the correct binary for your OS/arch, verify checksums,
+    and install locally. The npm package uses the same prebuilt binaries.
   </p>
 
   <h2>Links</h2>
@@ -121,6 +129,7 @@
       }
       wireCopy('copy-btn', 'install-cmd');
       wireCopy('copy-btn-win', 'install-cmd-win');
+      wireCopy('copy-btn-npm', 'install-cmd-npm');
     })();
   </script>
 </body>

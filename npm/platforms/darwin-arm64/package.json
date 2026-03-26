@@ -1,0 +1,11 @@
+{
+  "name": "swytchcode-cli-darwin-arm64",
+  "version": "0.0.0",
+  "description": "Swytchcode CLI binary for macOS (Apple Silicon)",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "preferUnplugged": true,
+  "files": [
+    "bin/swytchcode"
+  ]
+}
