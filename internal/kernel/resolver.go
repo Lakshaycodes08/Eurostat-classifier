@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // LocalWorkflowStep is a workflow step read from the local tooling.json.

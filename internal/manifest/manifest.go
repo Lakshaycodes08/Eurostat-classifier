@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // Entry represents a single project.library entry in manifest.json.

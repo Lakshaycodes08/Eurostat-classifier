@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 )
 
 const cursorTemplatePath = "templates/cursor/swytchcode.mdc"

@@ -10,11 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
-	"gitlab.com/swytchcode/cli/internal/manifest"
-	"gitlab.com/swytchcode/cli/internal/output"
-	"gitlab.com/swytchcode/cli/internal/registry"
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/manifest"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/output"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // RunBootstrap runs the bootstrap command: fetches all integrations declared in tooling.json.

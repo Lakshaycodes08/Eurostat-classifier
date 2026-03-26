@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/cli/internal/commands"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/commands"
 )
 
 var syncCmd = &cobra.Command{

@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
 )
 
 // RunDiff shows a human-readable diff of what would change if the pending proposal for

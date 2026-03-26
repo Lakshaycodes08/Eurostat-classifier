@@ -83,7 +83,7 @@ var EnvVarsCI = []string{
 // Application configuration
 //
 // Note: Version must be a variable (not a const) so it can be overridden at build time
-// via `-ldflags "-X gitlab.com/swytchcode/cli/internal/constants.Version=<version>"` (Goreleaser).
+// via `-ldflags "-X gitlab.com/swytchcode/swytchcode-cli/internal/constants.Version=<version>"` (Goreleaser).
 var (
 	// Version is the Swytchcode CLI version (overridden by release builds).
 	Version = "1.0.8"

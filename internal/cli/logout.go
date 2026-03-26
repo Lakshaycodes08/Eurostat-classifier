@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/cli/internal/auth"
-	"gitlab.com/swytchcode/cli/internal/telemetry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/auth"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/telemetry"
 )
 
 var logoutCmd = &cobra.Command{

@@ -12,11 +12,11 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-	"gitlab.com/swytchcode/cli/internal/constants"
-	"gitlab.com/swytchcode/cli/internal/manifest"
-	"gitlab.com/swytchcode/cli/internal/output"
-	"gitlab.com/swytchcode/cli/internal/registry"
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/manifest"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/output"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // ToolMatch represents a found tool (method or workflow) in an integration.

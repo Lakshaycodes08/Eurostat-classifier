@@ -8,8 +8,8 @@ import (
 	"io"
 	"strings"
 
-	"gitlab.com/swytchcode/cli/internal/output"
-	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/output"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
 )
 
 // RunDiscover searches for API capabilities matching intent.

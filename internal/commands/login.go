@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"time"
 
-	"gitlab.com/swytchcode/cli/internal/auth"
-	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/auth"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 )
 
 // LoginConfig holds configuration for the login flow.

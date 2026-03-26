@@ -1,6 +1,6 @@
 {
   "name": "swytchcode-cli",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Execution layer for API integrations",
   "keywords": ["api", "integration", "cli", "execution", "ai", "agents"],
   "homepage": "https://cli.swytchcode.com",

@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // PIDFile returns the path to the MCP server PID file.

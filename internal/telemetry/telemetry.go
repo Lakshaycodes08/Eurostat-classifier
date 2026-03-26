@@ -13,8 +13,8 @@ import (
 	"os"
 	"sync"
 
-	"gitlab.com/swytchcode/cli/internal/auth"
-	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/auth"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 )
 
 var hintOnce sync.Once

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 )
 
 // Client wraps HTTP client for registry API calls.

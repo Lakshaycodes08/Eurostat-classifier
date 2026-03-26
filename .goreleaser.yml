@@ -25,7 +25,7 @@ builds:
     ldflags:
       - -s -w
       # Embed version from tag (e.g. v0.1.0 -> 0.1.0)
-      - -X gitlab.com/swytchcode/cli/internal/constants.Version={{.Version}}
+      - -X gitlab.com/swytchcode/swytchcode-cli/internal/constants.Version={{.Version}}
 
 archives:
   - id: tgz
@@ -49,7 +49,7 @@ release:
   # unless you publish them elsewhere (e.g. GitLab Pages) or make the project public.
   gitlab:
     owner: swytchcode
-    name: cli
+    name: swytchcode-cli
 
 changelog:
   sort: asc

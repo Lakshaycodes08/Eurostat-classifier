@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"gitlab.com/swytchcode/cli/internal/registry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
 )
 
 var (

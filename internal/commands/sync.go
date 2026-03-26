@@ -12,11 +12,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
-	"gitlab.com/swytchcode/cli/internal/manifest"
-	"gitlab.com/swytchcode/cli/internal/output"
-	"gitlab.com/swytchcode/cli/internal/registry"
-	"gitlab.com/swytchcode/cli/internal/util"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/manifest"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/output"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
 // RunSync re-fetches the workflow/method list from the backend for each installed project,

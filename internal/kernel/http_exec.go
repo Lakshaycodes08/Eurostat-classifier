@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	"gitlab.com/swytchcode/cli/internal/constants"
+	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 )
 
 // sensitiveHeaders contains header names whose values are redacted in dry-run output.
