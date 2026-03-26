@@ -1,9 +1,6 @@
 # Install swytchcode from GitLab Releases (Windows).
 # Usage: irm https://cli.swytchcode.com/install.ps1 | iex
 # Env: $env:VERSION (default: latest), $env:INSTALL_DIR (override install path), $env:BASE_URL (override release base).
-#
-# Alternatively, install via npm (requires Node.js 14+):
-#   npm install -g swytchcode-cli
 
 $ErrorActionPreference = "Stop"
 $BinaryName = "swytchcode"

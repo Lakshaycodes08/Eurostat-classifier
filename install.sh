@@ -2,9 +2,6 @@
 # Install swytchcode from GitLab Releases.
 # Usage: curl -fsSL https://cli.swytchcode.com/install.sh | sh
 # Env: VERSION (default: latest), INSTALL_DIR (override install path), BASE_URL (override release base URL).
-#
-# Alternatively, install via npm (requires Node.js 14+):
-#   npm install -g swytchcode-cli
 
 set -e
 
