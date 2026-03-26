@@ -102,9 +102,21 @@ npm-publish:
     - tar -xzf dist/swytchcode_linux_amd64.tar.gz   -C npm/platforms/linux-x64/bin/    swytchcode
     - unzip -o dist/swytchcode_windows_arm64.zip swytchcode.exe -d npm/platforms/win32-arm64/bin/
     - unzip -o dist/swytchcode_windows_amd64.zip swytchcode.exe -d npm/platforms/win32-x64/bin/
-    # Stamp the release version into every package.json (version field + optionalDependencies)
-    - find npm -name package.json | xargs perl -pi -e "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/g"
-    - find npm -name package.json | xargs perl -pi -e "s/(\"swytchcode-cli[^\"]*\": )\"[^\"]*\"/\${1}\"${VERSION}\"/g"
+    # Stamp the release version into every package.json (version + optionalDependencies)
+    - |
+      for f in $(find npm -name package.json); do
+        node -e "
+          var fs = require('fs');
+          var p = JSON.parse(fs.readFileSync('$f', 'utf8'));
+          p.version = '${VERSION}';
+          if (p.optionalDependencies) {
+            Object.keys(p.optionalDependencies).forEach(function(k) {
+              p.optionalDependencies[k] = '${VERSION}';
+            });
+          }
+          fs.writeFileSync('$f', JSON.stringify(p, null, 2) + '\n');
+        "
+      done
     # Publish platform packages first, then the main wrapper
     - for dir in npm/platforms/*/; do (cd "$dir" && npm publish --access public --provenance); done
     - (cd npm && npm publish --access public --provenance)
