@@ -75,6 +75,20 @@ func NewHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{Timeout: timeout, Transport: transport}
 }
 
+// NewHTTPTransport returns a cloned DefaultTransport with optional TLS skip-verify for SWYTCHCODE_INSECURE=1.
+func NewHTTPTransport() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if os.Getenv("SWYTCHCODE_INSECURE") == "1" {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+	}
+	return transport
+}
+
+// NewHTTPClientNoTimeout returns a client whose deadline must come from the request context.
+func NewHTTPClientNoTimeout() *http.Client {
+	return &http.Client{Transport: NewHTTPTransport()}
+}
+
 // EnvVarsCI lists environment variable names that indicate CI execution (for telemetry source detection).
 var EnvVarsCI = []string{
 	"CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "TRAVIS", "JENKINS_URL", "BUILDKITE",

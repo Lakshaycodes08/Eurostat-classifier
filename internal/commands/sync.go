@@ -168,13 +168,9 @@ func syncProject(ctx context.Context, regClient *registry.Client, projectRoot, p
 	}
 
 	// Warn about updated workflows already in tooling.json
-	toolingPath := util.ToolingPath(projectRoot)
 	var toolingTools map[string]interface{}
-	if toolingData, err := os.ReadFile(toolingPath); err == nil {
-		var tooling map[string]interface{}
-		if json.Unmarshal(toolingData, &tooling) == nil {
-			toolingTools, _ = tooling["tools"].(map[string]interface{})
-		}
+	if tooling, err := util.LoadToolingJSON(projectRoot); err == nil {
+		toolingTools, _ = tooling["tools"].(map[string]interface{})
 	}
 
 	if len(updatedWorkflows) > 0 && toolingTools != nil {

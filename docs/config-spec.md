@@ -131,6 +131,41 @@ Fields (from `internal/manifest/manifest.go`):
 - `methods` – Number of methods for this integration (int).
 - `workflows` – Number of workflows (int).
 - `auth` – Optional auth metadata (arbitrary JSON).
+- `execution_policy` – Optional per-integration HTTP execution policy (see `internal/manifest/manifest.go`). Shape:
+
+```json
+"execution_policy": {
+  "max_retries": 3,
+  "base_delay_ms": 500,
+  "http_timeout_ms": 30000,
+  "idempotency": {
+    "mode": "none",
+    "header_name": "Idempotency-Key"
+  }
+}
+```
+
+Semantics:
+
+- **Retries** – Applied inside the kernel for transient failures (network, 429, 503, 504); honor `Retry-After` on 429; do not retry most other 4xx.
+- **Timeout** – Per-integration default for `context` / HTTP client; merged with global defaults when fields are omitted.
+- **Idempotency** – Controls whether and how an idempotency header is set so retries do not double-execute mutating APIs (e.g. Stripe-style `Idempotency-Key`).
+
+The CLI does **not** expose `--retries` / `--timeout` as the primary knobs; policy lives here (and may be populated or defaulted by the registry over time).
+
+### HTTPS and HTTP base URLs (tool execution)
+
+Before each HTTP tool or workflow step, the kernel validates the resolved base URL ([`ValidateExecutionBaseURL`](internal/kernel/base_url_validate.go)):
+
+- **`https://`** — Allowed for any host (normal choice for production and remote APIs).
+- **`http://`** — Allowed **only** when the hostname is loopback: `localhost`, `127.0.0.1`, or `::1` (any port). Plain HTTP to any other host or IP is rejected.
+
+Valid examples: `https://api.example.com`, `http://localhost:8080`, `http://127.0.0.1:3000`, `http://[::1]:8080`.  
+Invalid examples: `http://api.internal`, `http://10.0.0.5`, `http://my-service:8080` (use HTTPS, or put a TLS-terminated or HTTP listener on loopback and point the manifest at that).
+
+**CI (GitHub Actions, GitLab CI, etc.) and Docker:** The same rules apply in every environment. HTTPS endpoints reachable from the job or container work as on a laptop. HTTP is fine for a server listening on **`127.0.0.1` / `localhost` / `::1` in the same process namespace** as `swytchcode` (e.g. a test API started in the job). In Docker, `http://localhost` is the **container’s** loopback, not the host or another service by Compose service name — cross-container or host access usually requires **`https://`** (or a local proxy bound to loopback).
+
+**`SWYTCHCODE_INSECURE=1`:** Turns off TLS certificate verification for shared HTTP clients (registry, execution targets, auth, telemetry, etc.) — for local dev with self-signed certs only. Outside CI, the CLI emits a one-time stderr warning. If **`CI`**, **`GITHUB_ACTIONS`**, or **`GITLAB_CI`** is truthy (`1`, `true`, `yes`), **registry** HTTP requests **fail** when this is set ([`checkInsecureBlockedInCI`](internal/registry/insecure.go)). This variable does **not** relax the execution base URL rules: arbitrary non-loopback `http://` URLs remain invalid.
 
 ### How manifest.json is written
 
@@ -139,6 +174,7 @@ Fields (from `internal/manifest/manifest.go`):
 - Reads existing `manifest.json` (or initializes an empty map).
 - Updates/creates an entry for a given `projectLibrary` key:
   - Version, endpoints, counts, auth.
+  - Preserves existing `execution_policy` on the entry when updating from `get` / `bootstrap` (until the registry supplies policy).
 - Writes the updated map back to `manifest.json`.
 
 `RunGet` and `RunBootstrap`:
@@ -164,6 +200,8 @@ Fields (from `internal/manifest/manifest.go`):
     - The chosen endpoint is empty.
 
 The base URL returned by `GetBaseURL` is then combined with the path from the Wreken method/workflow definition to form the final HTTP request URL.
+
+The kernel reads `execution_policy` from the same manifest entry when executing HTTP for that integration (retries, per-attempt timeout, idempotency) and merges with built-in defaults when fields are omitted.
 
 ## Relationship between tooling.json and manifest.json
 

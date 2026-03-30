@@ -2,6 +2,7 @@
 package util
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -15,9 +16,8 @@ func EnsureDir(path string, perm os.FileMode) error {
 }
 
 // ProjectRoot returns the nearest ancestor directory (inclusive of cwd) that contains
-// .swytchcode/tooling.json. Falls back to cwd if no such directory is found, so that
-// existing "tooling.json not found" error messages are preserved for uninitialised projects.
-// This mirrors how git walks up to find .git from any subdirectory.
+// .swytchcode/tooling.json. If none is found, returns an error that tells the user to run
+// swytchcode init — mirroring how git walks up to find .git from any subdirectory.
 func ProjectRoot() (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -30,12 +30,11 @@ func ProjectRoot() (string, error) {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// reached filesystem root without finding tooling.json
 			break
 		}
 		dir = parent
 	}
-	return cwd, nil // fallback — caller will get the usual "not found" error
+	return "", fmt.Errorf("no .swytchcode/tooling.json found in %q or any parent directory — run 'swytchcode init' to initialize", cwd)
 }
 
 // Join is a thin wrapper around filepath.Join for convenience.
@@ -73,3 +72,22 @@ func MCPPIDPath(projectRoot string) string {
 	return filepath.Join(SwytchDir(projectRoot), constants.MCPPIDFile)
 }
 
+// InitProjectRoot returns the directory used for swytchcode init: the nearest ancestor with
+// .swytchcode/tooling.json, or the current working directory if none exists (first-time init).
+func InitProjectRoot() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	dir := cwd
+	for {
+		if _, err := os.Stat(filepath.Join(dir, constants.SwytchDirName, constants.ToolingJSONFile)); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return cwd, nil
+		}
+		dir = parent
+	}
+}

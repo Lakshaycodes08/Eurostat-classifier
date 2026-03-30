@@ -19,16 +19,9 @@ import (
 
 // RunBootstrap runs the bootstrap command: fetches all integrations declared in tooling.json.
 func RunBootstrap(ctx context.Context, projectRoot string, stdout, stderr io.Writer) error {
-	// Load tooling.json
-	toolingPath := util.ToolingPath(projectRoot)
-	data, err := os.ReadFile(toolingPath)
+	tooling, err := util.LoadToolingJSON(projectRoot)
 	if err != nil {
-		return fmt.Errorf("tooling.json not found; run 'swytchcode init' first: %w", err)
-	}
-
-	var tooling map[string]interface{}
-	if err := json.Unmarshal(data, &tooling); err != nil {
-		return fmt.Errorf("parse tooling.json: %w", err)
+		return err
 	}
 
 	// Get integrations section

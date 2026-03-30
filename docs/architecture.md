@@ -16,7 +16,7 @@ Swytchcode is a **secure execution layer** for AI agents and CLIs. Editors and a
 - `internal/constants/` – Shared constants (timeouts, registry URL, version, MCP defaults).
 - `pages/` – GitLab Pages landing page (install one-liner, links to releases, wiki, docs).
 - `scripts/` – CI helper scripts (e.g. `auto_tag.sh` for semantic version tags).
-- `docs/` – Technical documentation (architecture, execution model, config spec, CLI reference, etc).
+- `docs/` – Technical documentation ([architecture.md](architecture.md), [execution-model.md](execution-model.md), [config-spec.md](config-spec.md), [cli-reference.md](cli-reference.md), etc.).
 
 ## High-level data flow
 
@@ -79,21 +79,22 @@ The kernel is responsible for deterministic, policy-respecting execution. Its ma
   - JSON shape: `{ "tool": "<canonical_id>", "args": { ... } }`.
 
 - **Execution pipeline** (`executor.go` comments and implementation):
-  1. Parse JSON input (`util.ReadJSON`).
+  1. Read stdin and parse JSON into [`ExecRequest`](internal/kernel/executor.go) (`io.ReadAll` + `json.Unmarshal`; see [execution-model.md](execution-model.md)).
   2. Detect project root (via `util.ProjectRoot`) if not provided.
   3. Enforce raw method policy (`raw.` prefix requires `--allow-raw`).
   4. Resolve tool from `tooling.json` via [`ResolveTool`](internal/kernel/resolver.go).
   5. Load integration bundle (Wrekenfile + methods/workflows) via [`LoadIntegrationBundle`](internal/kernel/bundle.go).
   6. Resolve method/workflow from Wreken `METHODS` section via [`ResolveMethod`](internal/kernel/bundle.go).
   7. Resolve base URL from `manifest.json` via [`GetBaseURL`](internal/kernel/manifest.go) based on mode (`production`/`sandbox`).
-  8. Validate input schema via [`ValidateInput`](internal/kernel/validator.go).
-  9. Build HTTP request via [`BuildRequest`](internal/kernel/http_exec.go).
-  10. Execute (or dry-run) and normalize output:
+  8. Validate the base URL via [`ValidateExecutionBaseURL`](internal/kernel/base_url_validate.go): `https://` for any host, or `http://` only for loopback (`localhost`, `127.0.0.1`, `::1`).
+  9. Validate input schema via [`ValidateInput`](internal/kernel/validator.go).
+  10. Build HTTP request via [`BuildRequest`](internal/kernel/request.go).
+  11. Execute (or dry-run) and normalize output:
       - Raw: `OutputRawResponse`.
       - JSON: `OutputJSONResponse`.
 
 - **Tool resolution** (`resolver.go`):
-  - Reads `.swytchcode/tooling.json`.
+  - Reads `.swytchcode/tooling.json` via [`util.LoadToolingJSON`](internal/util/tooling.go) (shared with commands that mutate or inspect tooling).
   - Finds the tool in `tooling.json.tools[canonical_id]`.
   - Extracts:
     - `integration` (string like `project.library@version`).
@@ -133,6 +134,8 @@ The registry client is used only when fetching or searching for integrations:
   - `FillEmptyWorkflowNames` and related helpers normalize API responses.
 
 The **kernel never calls the registry**. Only `get`, `bootstrap`, and `search` use this client to populate or query integration metadata.
+
+Registry `Get`/`Post` call [`checkInsecureBlockedInCI`](internal/registry/insecure.go) first: when `SWYTCHCODE_INSECURE=1` and CI env vars (`CI`, `GITHUB_ACTIONS`, `GITLAB_CI`) are truthy, registry requests fail. Tool execution uses the same TLS settings from [`constants.NewHTTPClient`](internal/constants/constants.go) but is subject to separate base URL validation in the kernel (HTTPS or loopback HTTP only).
 
 ## Shared commands (`internal/commands/`)
 

@@ -2,6 +2,7 @@
 package kernel
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -47,14 +48,90 @@ func paramsFromArgs(args map[string]interface{}) map[string]string {
 	return nil
 }
 
+// effectiveRequestContentType returns the Content-Type header value that BuildRequest will apply,
+// so the body can be encoded to match. Later header application must match this logic: method
+// headers first, then args["headers"] overrides.
+func effectiveRequestContentType(method *Method, args map[string]interface{}) string {
+	ct := ""
+	for k, v := range method.Headers {
+		if strings.EqualFold(k, "Content-Type") && strings.TrimSpace(v) != "" {
+			ct = strings.TrimSpace(v)
+		}
+	}
+	if headersMap, ok := args["headers"].(map[string]interface{}); ok {
+		for k, val := range headersMap {
+			if strings.EqualFold(k, "Content-Type") {
+				if s := argValueToQueryString(val); s != "" {
+					ct = s
+				}
+			}
+		}
+	}
+	if headersMap, ok := args["headers"].(map[string]string); ok {
+		for k, val := range headersMap {
+			if strings.EqualFold(k, "Content-Type") && val != "" {
+				ct = val
+			}
+		}
+	}
+	return ct
+}
+
+// flattenToFormValues encodes nested maps and slices as application/x-www-form-urlencoded keys
+// (e.g. line_items[0][price]=price_xxx) for Stripe-style APIs.
+func flattenToFormValues(prefix string, v interface{}, form url.Values) {
+	switch x := v.(type) {
+	case map[string]interface{}:
+		for k, val := range x {
+			next := k
+			if prefix != "" {
+				next = prefix + "[" + k + "]"
+			}
+			flattenToFormValues(next, val, form)
+		}
+	case []interface{}:
+		for i, val := range x {
+			next := fmt.Sprintf("%s[%d]", prefix, i)
+			flattenToFormValues(next, val, form)
+		}
+	case nil:
+		return
+	default:
+		if prefix == "" {
+			return
+		}
+		form.Set(prefix, argValueToQueryString(x))
+	}
+}
+
+func encodeBody(bodyRaw interface{}, contentType string) ([]byte, error) {
+	ct := strings.ToLower(contentType)
+	if strings.Contains(ct, "application/x-www-form-urlencoded") {
+		m, ok := bodyRaw.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("form-urlencoded body must be a JSON object (map), got %T", bodyRaw)
+		}
+		form := url.Values{}
+		for k, val := range m {
+			flattenToFormValues(k, val, form)
+		}
+		return []byte(form.Encode()), nil
+	}
+	b, err := json.Marshal(bodyRaw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal body: %w", err)
+	}
+	return b, nil
+}
+
 // BuildRequest builds an HTTP request from method definition, base URL, and input args.
 // baseURL is the manifest endpoint (sandbox or production) and is prepended to the method path.
 //
 // GET: path params from args["params"] (e.g. /api/{id}); query from args["params"] + all other top-level args
 // (e.g. project_name, filter). No body.
 //
-// POST/PUT/PATCH: same URL and query as above; body from args["body"] (JSON); Content-Type application/json
-// if body is set and not already set by method headers.
+// POST/PUT/PATCH: same URL and query as above; body from args["body"]. Encoding follows the effective
+// Content-Type from method HEADERS and args["headers"] (application/json default when unset).
 //
 // Headers: (1) method.Headers from Wreken, (2) args["Authorization"], (3) args["headers"] map (any extra headers).
 func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (*http.Request, error) {
@@ -122,21 +199,20 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 	}
 	parsedURL.RawQuery = query.Encode()
 
-	// Prepare body
-	var bodyReader *strings.Reader
-	if bodyRaw, ok := args["body"]; ok {
-		// Body is provided as JSON object
-		bodyJSON, err := json.Marshal(bodyRaw)
+	// Prepare body (encoding matches effective Content-Type from wrekenfile + args headers)
+	var bodyBytes []byte
+	if bodyRaw, ok := args["body"]; ok && bodyRaw != nil {
+		ct := effectiveRequestContentType(method, args)
+		bodyBytes, err = encodeBody(bodyRaw, ct)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal body: %w", err)
+			return nil, err
 		}
-		bodyReader = strings.NewReader(string(bodyJSON))
 	}
 
 	// Create HTTP request
 	var req *http.Request
-	if bodyReader != nil {
-		req, err = http.NewRequest(method.HTTPMethod, parsedURL.String(), bodyReader)
+	if len(bodyBytes) > 0 {
+		req, err = http.NewRequest(method.HTTPMethod, parsedURL.String(), bytes.NewReader(bodyBytes))
 	} else {
 		req, err = http.NewRequest(method.HTTPMethod, parsedURL.String(), nil)
 	}
@@ -180,11 +256,9 @@ func BuildRequest(method *Method, baseURL string, args map[string]interface{}) (
 		}
 	}
 
-	// Set Content-Type if body is present
-	if bodyReader != nil {
-		if req.Header.Get("Content-Type") == "" {
-			req.Header.Set("Content-Type", "application/json")
-		}
+	// Set Content-Type if body is present and not already set
+	if len(bodyBytes) > 0 && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
 	}
 
 	return req, nil

@@ -22,6 +22,10 @@ Agents and editors should be **read-only** over the tool list. They may call `sw
 
 Retries and idempotency belong **inside** Swytchcode (or inside the tool implementation), not in the agent. If exec fails, the agent should surface the error and stop, not improvise.
 
+## Where requests go (base URL rules)
+
+The kernel resolves `sandbox_endpoint` / `production_endpoint` from `manifest.json` and validates the scheme/host: **`https://`** anywhere, or **`http://`** only on loopback (`localhost`, `127.0.0.1`, `::1`). The same rules apply in CI and containers. Details: [docs/config-spec.md](https://gitlab.com/swytchcode/swytchcode-cli/-/blob/main/docs/config-spec.md) (manifest section).
+
 ## Integration not found
 
 If an integration is not installed or a tool is not in tooling.json, exec fails explicitly. Agents must **stop** and report; they must not try alternative execution paths.

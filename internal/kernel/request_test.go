@@ -13,66 +13,66 @@ func TestBuildRequest_StdinMapping(t *testing.T) {
 	methodPOST := &Method{HTTPMethod: "POST", Endpoint: "/v2/cli/create"}
 
 	tests := []struct {
-		name     string
-		method   *Method
-		args     map[string]interface{}
-		wantURL  string // substring or full URL to check
-		wantQuery string
+		name         string
+		method       *Method
+		args         map[string]interface{}
+		wantURL      string // substring or full URL to check
+		wantQuery    string
 		checkHeaders map[string]string
-		wantBody string // optional JSON body
+		wantBody     string // optional JSON body
 	}{
 		{
-			name:    "empty args - no query, no extra headers, no body",
-			method:  methodGET,
-			args:    map[string]interface{}{},
-			wantURL: "http://localhost/v2/cli/methods",
+			name:      "empty args - no query, no extra headers, no body",
+			method:    methodGET,
+			args:      map[string]interface{}{},
+			wantURL:   "http://localhost/v2/cli/methods",
 			wantQuery: "",
 		},
 		{
-			name:    "project_name top-level - GET url has query",
-			method:  methodGET,
-			args:    map[string]interface{}{"project_name": "swytchcode"},
-			wantURL: "http://localhost/v2/cli/methods",
+			name:      "project_name top-level - GET url has query",
+			method:    methodGET,
+			args:      map[string]interface{}{"project_name": "swytchcode"},
+			wantURL:   "http://localhost/v2/cli/methods",
 			wantQuery: "project_name=swytchcode",
 		},
 		{
-			name:    "params.project_name - same as top-level",
-			method:  methodGET,
-			args:    map[string]interface{}{"params": map[string]interface{}{"project_name": "swytchcode"}},
-			wantURL: "http://localhost/v2/cli/methods",
+			name:      "params.project_name - same as top-level",
+			method:    methodGET,
+			args:      map[string]interface{}{"params": map[string]interface{}{"project_name": "swytchcode"}},
+			wantURL:   "http://localhost/v2/cli/methods",
 			wantQuery: "project_name=swytchcode",
 		},
 		{
-			name:    "Authorization - header set",
-			method:  methodGET,
-			args:    map[string]interface{}{"Authorization": "Bearer xyz"},
+			name:         "Authorization - header set",
+			method:       methodGET,
+			args:         map[string]interface{}{"Authorization": "Bearer xyz"},
 			checkHeaders: map[string]string{"Authorization": "Bearer xyz"},
 		},
 		{
-			name:    "headers map - custom header set",
-			method:  methodGET,
-			args:    map[string]interface{}{"headers": map[string]interface{}{"X-Custom": "val"}},
+			name:         "headers map - custom header set",
+			method:       methodGET,
+			args:         map[string]interface{}{"headers": map[string]interface{}{"X-Custom": "val"}},
 			checkHeaders: map[string]string{"X-Custom": "val"},
 		},
 		{
-			name:    "body for POST - request body and dry-run",
-			method:  methodPOST,
-			args:    map[string]interface{}{"body": map[string]interface{}{"key": "value"}},
+			name:     "body for POST - request body and dry-run",
+			method:   methodPOST,
+			args:     map[string]interface{}{"body": map[string]interface{}{"key": "value"}},
 			wantBody: `{"key":"value"}`,
 		},
 		{
-			name:    "path param - placeholder replaced, not in query",
-			method:  &Method{HTTPMethod: "GET", Endpoint: "/v2/cli/methods/{canonical_id}"},
-			args:    map[string]interface{}{"params": map[string]interface{}{"canonical_id": "shell.integration.list"}},
-			wantURL: "http://localhost/v2/cli/methods/shell.integration.list",
+			name:      "path param - placeholder replaced, not in query",
+			method:    &Method{HTTPMethod: "GET", Endpoint: "/v2/cli/methods/{canonical_id}"},
+			args:      map[string]interface{}{"params": map[string]interface{}{"canonical_id": "shell.integration.list"}},
+			wantURL:   "http://localhost/v2/cli/methods/shell.integration.list",
 			wantQuery: "",
 		},
 		{
-			name:    "params preferred over top-level when both set",
-			method:  methodGET,
-			args:    map[string]interface{}{
-				"params":        map[string]interface{}{"project_name": "from-params"},
-				"project_name":  "from-top-level",
+			name:   "params preferred over top-level when both set",
+			method: methodGET,
+			args: map[string]interface{}{
+				"params":       map[string]interface{}{"project_name": "from-params"},
+				"project_name": "from-top-level",
 			},
 			wantQuery: "project_name=from-params",
 		},
@@ -119,10 +119,10 @@ func TestExecuteDryRun_OutputShape(t *testing.T) {
 	// Build a request with query, headers, and body so dry-run reflects them
 	method := &Method{HTTPMethod: "POST", Endpoint: "/v2/cli/create"}
 	args := map[string]interface{}{
-		"project_name": "swytchcode",
+		"project_name":  "swytchcode",
 		"Authorization": "Bearer token123",
-		"headers": map[string]interface{}{"X-Request-Id": "abc"},
-		"body": map[string]interface{}{"name": "my-tool"},
+		"headers":       map[string]interface{}{"X-Request-Id": "abc"},
+		"body":          map[string]interface{}{"name": "my-tool"},
 	}
 	req, err := BuildRequest(method, "http://localhost", args)
 	if err != nil {
@@ -173,5 +173,59 @@ func TestParamsFromArgs_JSONMap(t *testing.T) {
 	}
 	if params["limit"] != "10" {
 		t.Errorf("limit = %q", params["limit"])
+	}
+}
+
+func TestBuildRequest_FormURLEncoded(t *testing.T) {
+	method := &Method{
+		HTTPMethod: "POST",
+		Endpoint:   "/v1/charges",
+		Headers: map[string]string{
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+	}
+	args := map[string]interface{}{
+		"body": map[string]interface{}{
+			"amount": "1000",
+			"line_items": []interface{}{
+				map[string]interface{}{
+					"price":    "price_xxx",
+					"quantity": float64(1),
+				},
+			},
+		},
+	}
+	req, err := BuildRequest(method, "https://api.stripe.com", args)
+	if err != nil {
+		t.Fatalf("BuildRequest: %v", err)
+	}
+	bodyBytes, _ := io.ReadAll(req.Body)
+	got := string(bodyBytes)
+	// Order of form keys may vary; check required fragments
+	if !strings.Contains(got, "amount=1000") {
+		t.Errorf("body %q missing amount", got)
+	}
+	if !strings.Contains(got, "line_items%5B0%5D%5Bprice%5D=price_xxx") && !strings.Contains(got, "line_items[0][price]=price_xxx") {
+		t.Errorf("body %q missing nested line_items price", got)
+	}
+	if !strings.Contains(got, "line_items") || !strings.Contains(got, "quantity") {
+		t.Errorf("body %q missing line_items quantity", got)
+	}
+	if ct := req.Header.Get("Content-Type"); ct != "application/x-www-form-urlencoded" {
+		t.Errorf("Content-Type = %q", ct)
+	}
+}
+
+func TestEffectiveRequestContentType_ArgsOverride(t *testing.T) {
+	m := &Method{
+		Headers: map[string]string{"Content-Type": "application/json"},
+	}
+	args := map[string]interface{}{
+		"headers": map[string]interface{}{
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+	}
+	if got := effectiveRequestContentType(m, args); !strings.Contains(strings.ToLower(got), "form-urlencoded") {
+		t.Fatalf("got %q", got)
 	}
 }

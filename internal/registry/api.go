@@ -31,11 +31,11 @@ type ListIntegrationsResponse struct {
 // IntegrationBundle represents a single bundle in the bundles array.
 type IntegrationBundle struct {
 	Integration        string `json:"integration"`
-	Version           string `json:"version"`
-	LibraryUUID       string `json:"library_uuid"`
-	SandboxEndpoint   string `json:"sandbox_endpoint"`
+	Version            string `json:"version"`
+	LibraryUUID        string `json:"library_uuid"`
+	SandboxEndpoint    string `json:"sandbox_endpoint"`
 	ProductionEndpoint string `json:"production_endpoint"`
-	Files             struct {
+	Files              struct {
 		Wreken struct {
 			Format  string `json:"format"`
 			Content string `json:"content"` // YAML content as string (base64)
@@ -49,7 +49,7 @@ type IntegrationBundle struct {
 
 // IntegrationBundlesResponse represents the response from GET /integrations/{project_name}/bundle.
 type IntegrationBundlesResponse struct {
-	ProjectName string             `json:"project_name"`
+	ProjectName string              `json:"project_name"`
 	Bundles     []IntegrationBundle `json:"bundles"`
 }
 
@@ -62,8 +62,8 @@ type WorkflowStep struct {
 
 // Workflow represents a workflow from the list (used in workflows.json and downstream).
 type Workflow struct {
-	Name        string        `json:"name"`
-	CanonicalID string        `json:"canonical_id"`
+	Name        string         `json:"name"`
+	CanonicalID string         `json:"canonical_id"`
 	Steps       []WorkflowStep `json:"steps"`
 }
 
@@ -77,8 +77,8 @@ type listWorkflowsAPI struct {
 	Workflows []workflowAPI `json:"workflows"`
 }
 type workflowAPI struct {
-	Title       string          `json:"title"`
-	CanonicalID string          `json:"canonical_id"`
+	Title       string            `json:"title"`
+	CanonicalID string            `json:"canonical_id"`
 	Steps       []workflowStepAPI `json:"steps"`
 }
 type workflowStepAPI struct {
@@ -326,22 +326,22 @@ func (c *Client) ListMethods(ctx context.Context, projectName string) (*ListMeth
 
 // DiscoveryCapability represents a single result from semantic capability discovery.
 type DiscoveryCapability struct {
-	CanonicalID string   `json:"canonical_id"`
-	Type        string   `json:"type"` // "api" | "sdk" | "workflow"
-	Summary     string   `json:"summary"`
-	Library     string   `json:"library"`
-	LibGroup    string   `json:"lib_group"`
-	Version     string   `json:"lib_version"`
+	CanonicalID  string   `json:"canonical_id"`
+	Type         string   `json:"type"` // "api" | "sdk" | "workflow"
+	Summary      string   `json:"summary"`
+	Library      string   `json:"library"`
+	LibGroup     string   `json:"lib_group"`
+	Version      string   `json:"lib_version"`
 	LibraryUUID  string   `json:"library_uuid"`
 	LibraryUUIDs []string `json:"library_uuids"`
-	Distance    float64  `json:"distance"`
-	Tags        []string `json:"tags"`
+	Distance     float64  `json:"distance"`
+	Tags         []string `json:"tags"`
 }
 
 // DiscoverResponse is the response from POST /discover.
 type DiscoverResponse struct {
-	Capabilities        []DiscoveryCapability  `json:"capabilities"`
-	RecommendedWorkflow *DiscoveryCapability   `json:"recommended_workflow"`
+	Capabilities        []DiscoveryCapability `json:"capabilities"`
+	RecommendedWorkflow *DiscoveryCapability  `json:"recommended_workflow"`
 }
 
 // WorkflowDetail is a single workflow returned by GET /workflows/:canonical_id.
@@ -466,7 +466,7 @@ func (c *Client) GetVersionMethods(ctx context.Context, project, library, versio
 
 // CanonicalIDResolution is the response from GET /canonical-id/resolve.
 type CanonicalIDResolution struct {
-	Status          string `json:"status"`            // "active" | "renamed" | "removed"
+	Status          string `json:"status"` // "active" | "renamed" | "removed"
 	NewID           string `json:"new_id,omitempty"`
 	DeprecatedSince string `json:"deprecated_since,omitempty"`
 }
@@ -512,9 +512,9 @@ type InputChange struct {
 
 // MethodChange describes signature-level changes to a single method.
 type MethodChange struct {
-	CanonicalID   string       `json:"canonical_id"`
-	AddedInputs   []InputField `json:"added_inputs"`
-	RemovedInputs []InputField `json:"removed_inputs"`
+	CanonicalID   string        `json:"canonical_id"`
+	AddedInputs   []InputField  `json:"added_inputs"`
+	RemovedInputs []InputField  `json:"removed_inputs"`
 	ChangedInputs []InputChange `json:"changed_inputs"`
 }
 

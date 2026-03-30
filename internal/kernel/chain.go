@@ -20,7 +20,7 @@ type StepResult struct {
 	Output        map[string]interface{} // object fields for step chaining (empty for array/scalar responses)
 	RawOutput     interface{}            // actual parsed response value (array, object, scalar, or nil)
 	StatusCode    int
-	Failed        bool  // true when step HTTP status >= 400
+	Failed        bool // true when step HTTP status >= 400
 	Error         error
 	RequestMethod string // HTTP method of the step request (e.g. "POST")
 	RequestURL    string // Full URL of the step request
@@ -42,12 +42,13 @@ func (e *WorkflowError) Error() string {
 // Each step's HTTP response body is merged into the accumulated args for subsequent steps.
 // On step failure, returns a partial []StepResult and a *WorkflowError.
 func RunWorkflow(
-	_ context.Context,
+	ctx context.Context,
 	workflow *registry.WorkflowDetail,
 	bundleMap BundleMap,
 	initialInputs map[string]interface{},
 	mode string,
 	out, errOut io.Writer,
+	projectRoot string,
 ) ([]StepResult, error) {
 	results := make([]StepResult, 0, len(workflow.Steps))
 	completedIndexes := make([]int, 0)
@@ -107,6 +108,16 @@ func RunWorkflow(
 			}
 		}
 
+		if err := ValidateExecutionBaseURL(baseURL); err != nil {
+			fmt.Fprintf(errOut, " ✗ %v\n", err)
+			return results, &WorkflowError{
+				FailedStep:     i,
+				StepName:       stepName,
+				Err:            err,
+				CompletedSteps: completedIndexes,
+			}
+		}
+
 		// Build and execute the HTTP request
 		httpReq, err := BuildRequest(method, baseURL, mergedArgs)
 		if err != nil {
@@ -119,7 +130,20 @@ func RunWorkflow(
 			}
 		}
 
-		resp, err := ExecuteHTTP(httpReq)
+		integrationSpec := fmt.Sprintf("%s.%s@%s", bundle.Project, bundle.Library, bundle.Version)
+		policy, polErr := GetExecutionPolicy(projectRoot, integrationSpec)
+		if polErr != nil {
+			err := fmt.Errorf("execution policy: %w", polErr)
+			fmt.Fprintf(errOut, " ✗ %v\n", err)
+			return results, &WorkflowError{
+				FailedStep:     i,
+				StepName:       stepName,
+				Err:            err,
+				CompletedSteps: completedIndexes,
+			}
+		}
+
+		resp, err := ExecuteHTTP(ctx, httpReq, policy)
 		if err != nil {
 			fmt.Fprintf(errOut, " ✗ %v\n", err)
 			return results, &WorkflowError{

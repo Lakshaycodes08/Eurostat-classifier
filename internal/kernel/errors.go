@@ -12,17 +12,20 @@ import (
 
 // Exit codes are part of the public contract and must not change casually.
 const (
-	ExitCodeOK             = 0
-	ExitCodeInvalidInput   = 1
-	ExitCodeToolNotFound   = 2
-	ExitCodeAuthError      = 3
-	ExitCodeSDKFailure     = 4
-	ExitCodeInternalError  = 5
+	ExitCodeOK            = 0
+	ExitCodeInvalidInput  = 1
+	ExitCodeToolNotFound  = 2
+	ExitCodeAuthError     = 3
+	ExitCodeSDKFailure    = 4
+	ExitCodeInternalError = 5
 )
 
 // errorResponse is the JSON error shape written to stderr on failure.
+// Category and Retryable are omitted when zero so the shape is backward-compatible.
 type errorResponse struct {
-	Error string `json:"error"`
+	Error     string `json:"error"`
+	Category  string `json:"category,omitempty"`  // auth | validation | not_found | network | rate_limit | internal
+	Retryable bool   `json:"retryable,omitempty"` // true when the caller may safely retry
 }
 
 // writeErrorJSON writes a JSON error object to the provided writer.
@@ -30,6 +33,11 @@ type errorResponse struct {
 // recover, since we are already in an error path.
 func writeErrorJSON(w io.Writer, msg string) {
 	_ = util.WriteJSON(w, errorResponse{Error: msg})
+}
+
+// writeClassifiedError writes a JSON error with machine-readable category and retryable fields.
+func writeClassifiedError(w io.Writer, msg, category string, retryable bool) {
+	_ = util.WriteJSON(w, errorResponse{Error: msg, Category: category, Retryable: retryable})
 }
 
 // sensitiveKeys are argument keys whose values are redacted in request logs.

@@ -23,11 +23,20 @@ This document summarizes the Swytchcode CLI surface, with a focus on inputs, out
 | `swytchcode sync [project]` | Re-fetch workflow/method list from backend; updates local files without touching `tooling.json`. Warns on stale method hashes. |
 | `swytchcode discover <intent>` | Semantic search: find methods and workflows by natural-language description. |
 | `swytchcode plan <canonical_id>` | Preview ordered steps of a workflow before running it. |
+| `swytchcode doctor` | Local diagnostics: `tooling.json`, bundles, `manifest.json`, HTTPS base URLs, auth; `--json` for machines; exits **1** if any error-level check fails. |
 | `swytchcode check` | Check for integration update proposals from the backend. |
 | `swytchcode login` / `logout` / `whoami` | Manage CLI auth sessions. |
 | `swytchcode inspect <library>` | Show full proposal detail for a library (requires login). |
 | `swytchcode upgrade <library> [--apply]` | Approve a pending integration update proposal (requires login). `--apply` also refreshes local bundle and tooling.json. |
 | `swytchcode diff <library>` | Show method-level signature diff for a pending upgrade proposal (requires login or token). |
+
+## swytchcode doctor
+
+- **Flags:** `--json` — emit the full report as JSON (`ok`, `checks[]` with `id`, `status`, `message`).
+- **Exit code:** `0` if no check has status `error`; `1` otherwise. Warnings do not fail the command.
+- **Scope:** Read-only; no registry or execution calls. Validates integration bundles with the same load path as `exec`.
+
+See [docs/security.md](security.md) and [docs/windows-guide.md](windows-guide.md) for related operational guidance.
 
 ## swytchcode exec
 
@@ -64,12 +73,28 @@ Arguments:
   - Response status, headers, and body (normalized where possible).
 - `--raw`: write raw HTTP response to stdout/stderr instead of normalized JSON.
 - `--dry-run`: do not execute; print a representation of the request that would be sent.
+- `--verbose`: log request and response details to stderr before and after the HTTP call. Output is two JSON lines (one per event) with `"verbose":"request"` and `"verbose":"response"`. Sensitive header values (`Authorization`, `X-Api-Key`) are redacted automatically.
+
+```bash
+swytchcode exec stripe.checkout_session_create \
+  --body request.json --verbose 2>debug.log
+```
+
+- `--output <file>`: write the response body to a file instead of stdout when the API returns a binary `Content-Type` (e.g. `application/pdf`, `image/png`). stdout still receives a JSON summary:
+
+```json
+{ "saved_to": "invoice.pdf", "size_bytes": 45231, "content_type": "application/pdf", "status_code": 200 }
+```
+
+If the response is binary and `--output` is omitted, the CLI exits with an error rather than writing binary data to the terminal.
 
 Errors are written to stderr as:
 
 ```json
-{ "error": "message" }
+{ "error": "message", "category": "network", "retryable": true }
 ```
+
+`category` values: `auth` | `validation` | `not_found` | `network` | `rate_limit` | `internal`. `retryable` is `true` when the error is transient (network failures, rate limiting).
 
 ### Exit codes (from `internal/kernel/errors.go`)
 
@@ -358,6 +383,15 @@ Configure the MCP server's `env` block with `SWYTCHCODE_TOKEN` so the server pro
 #### CI/CD
 
 Define `SWYTCHCODE_TOKEN` as a secret or CI variable so the job environment has it.
+
+### `SWYTCHCODE_INSECURE` (TLS verification)
+
+When set to `1`, the CLI disables TLS certificate verification for shared HTTP clients (registry, tool execution, auth, telemetry). Use **only** for local development against servers with self-signed certificates.
+
+- Outside CI, a **one-time warning** is printed to stderr.
+- If **`CI`**, **`GITHUB_ACTIONS`**, or **`GITLAB_CI`** is truthy (`1`, `true`, `yes`), **registry** `Get`/`Post` calls **fail** when `SWYTCHCODE_INSECURE=1` is set.
+
+This does **not** allow non-loopback **`http://`** integration base URLs. Execution still requires `https://` or `http://` on `localhost` / `127.0.0.1` / `::1` only. See [config-spec.md](config-spec.md) (manifest → HTTPS and HTTP base URLs) and the README “Base URL Resolution” section.
 
 ### Telemetry
 

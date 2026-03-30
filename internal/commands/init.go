@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"strconv"
-	"syscall"
 
 	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/editors"
@@ -24,7 +21,7 @@ func RunInit(projectRoot, editor, mode string, stdout, stderr io.Writer) error {
 	if mode != "production" && mode != "sandbox" {
 		validationErrs = append(validationErrs, fmt.Sprintf("invalid mode %q (expected production or sandbox)", mode))
 	}
-	validEditors := map[string]bool{"cursor": true, "claude": true, "none": true}
+	validEditors := map[string]bool{"cursor": true, "claude": true, "copilot": true, "none": true}
 	if editor != "" && !validEditors[editor] {
 		validationErrs = append(validationErrs, fmt.Sprintf("unknown editor %q (expected cursor|claude|none)", editor))
 	}
@@ -92,7 +89,6 @@ func RunInit(projectRoot, editor, mode string, stdout, stderr io.Writer) error {
 			if err := editors.WriteCursorMCPConfig(); err != nil {
 				output.Warn(stderr, "could not update ~/.cursor/mcp.json: "+err.Error())
 			}
-			startMCPDaemonIfNeeded(projectRoot, stderr)
 		case "claude":
 			if err := editors.WriteClaudeConfig(projectRoot); err != nil {
 				return fmt.Errorf("write Claude config: %w", err)
@@ -100,7 +96,13 @@ func RunInit(projectRoot, editor, mode string, stdout, stderr io.Writer) error {
 			if err := editors.WriteClaudeMCPConfig(); err != nil {
 				output.Warn(stderr, "could not update ~/.claude/settings.json: "+err.Error())
 			}
-			startMCPDaemonIfNeeded(projectRoot, stderr)
+		case "copilot":
+			if err := editors.WriteGitHubCopilotConfig(projectRoot); err != nil {
+				return fmt.Errorf("write GitHub Copilot config: %w", err)
+			}
+			if err := editors.WriteVSCodeMCPConfig(projectRoot); err != nil {
+				output.Warn(stderr, "could not write .vscode/mcp.json: "+err.Error())
+			}
 		}
 	}
 
@@ -108,47 +110,3 @@ func RunInit(projectRoot, editor, mode string, stdout, stderr io.Writer) error {
 	return nil
 }
 
-// startMCPDaemonIfNeeded starts the MCP HTTP daemon if one isn't already running.
-// Spawns the HTTP server directly (single fork) with devNull I/O and a new session
-// so it never interacts with the caller's terminal.
-// Non-fatal: warns on error so init still succeeds.
-func startMCPDaemonIfNeeded(projectRoot string, stderr io.Writer) {
-	pidPath := util.MCPPIDPath(projectRoot)
-	if data, err := os.ReadFile(pidPath); err == nil {
-		if pid, err := strconv.Atoi(string(data)); err == nil {
-			if proc, err := os.FindProcess(pid); err == nil {
-				if proc.Signal(syscall.Signal(0)) == nil {
-					return // already running
-				}
-			}
-		}
-	}
-
-	executable, err := os.Executable()
-	if err != nil {
-		output.Warn(stderr, "could not resolve executable path: "+err.Error())
-		return
-	}
-
-	// Spawn the HTTP server directly — no intermediate "daemon parent" process.
-	// Redirect I/O to /dev/null so the child never interacts with our terminal.
-	cmd := exec.Command(executable, "mcp", "serve", "--transport", "http",
-		"--port", fmt.Sprintf("%d", constants.MCPDefaultPort))
-	if devNull, err := os.OpenFile(os.DevNull, os.O_RDWR, 0); err == nil {
-		cmd.Stdin = devNull
-		cmd.Stdout = devNull
-		cmd.Stderr = devNull
-	}
-	cmd.SysProcAttr = daemonSysProcAttr() // detach from terminal (Setsid on Unix)
-
-	if err := cmd.Start(); err != nil {
-		output.Warn(stderr, "could not start MCP daemon: "+err.Error())
-		return
-	}
-
-	// Write PID file immediately so `mcp status` works before child finishes starting.
-	_ = os.WriteFile(pidPath, []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o644)
-
-	cmd.Process.Release() //nolint:errcheck
-	fmt.Fprintf(stderr, "MCP server started on http://localhost:%d/sse\n", constants.MCPDefaultPort)
-}
