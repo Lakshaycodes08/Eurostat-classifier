@@ -136,8 +136,20 @@ npm-publish:
       extract_swytchcode_from_tgz dist/swytchcode_darwin_amd64.tar.gz npm/platforms/darwin-x64/bin/
       extract_swytchcode_from_tgz dist/swytchcode_linux_arm64.tar.gz  npm/platforms/linux-arm64/bin/
       extract_swytchcode_from_tgz dist/swytchcode_linux_amd64.tar.gz  npm/platforms/linux-x64/bin/
-    - unzip -jo dist/swytchcode_windows_arm64.zip '*/swytchcode.exe' -d npm/platforms/win32-arm64/bin/
-    - unzip -jo dist/swytchcode_windows_amd64.zip '*/swytchcode.exe' -d npm/platforms/win32-x64/bin/
+      extract_swytchcode_from_zip() {
+        zip="$1"
+        outdir="$2"
+        exepath="$(unzip -Z1 "$zip" | awk -F/ '$NF=="swytchcode.exe"{print $0; exit 0}')"
+        if [ -z "$exepath" ]; then
+          echo "ERROR: swytchcode.exe not found in archive: $zip"
+          echo "Archive contents (first 50):"
+          unzip -Z1 "$zip" | head -n 50
+          exit 11
+        fi
+        unzip -jo "$zip" "$exepath" -d "$outdir"
+      }
+      extract_swytchcode_from_zip dist/swytchcode_windows_arm64.zip npm/platforms/win32-arm64/bin/
+      extract_swytchcode_from_zip dist/swytchcode_windows_amd64.zip npm/platforms/win32-x64/bin/
     # Stamp the release version into every package.json (version + optionalDependencies)
     - |
       for f in $(find npm -name package.json); do
