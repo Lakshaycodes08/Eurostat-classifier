@@ -119,15 +119,17 @@ npm-publish:
       extract_swytchcode_from_tgz() {
         tgz="$1"
         outdir="$2"
-        binpath="$(tar -tzf "$tgz" | awk -F/ '$NF=="swytchcode"{print $0; exit 0}')"
-        if [ -z "$binpath" ]; then
+        tmpdir=$(mktemp -d)
+        tar -xzf "$tgz" -C "$tmpdir"
+        binary=$(find "$tmpdir" -name "swytchcode" -type f | head -1)
+        if [ -z "$binary" ]; then
           echo "ERROR: swytchcode binary not found in archive: $tgz"
-          echo "Archive contents (first 50):"
-          tar -tzf "$tgz" | head -n 50
+          find "$tmpdir" | head -20
           exit 2
         fi
-        # Strip the leading directory component (archive root folder).
-        tar -xzf "$tgz" --strip-components=1 -C "$outdir" "$binpath"
+        cp "$binary" "$outdir/swytchcode"
+        chmod +x "$outdir/swytchcode"
+        rm -rf "$tmpdir"
       }
       extract_swytchcode_from_tgz dist/swytchcode_darwin_arm64.tar.gz npm/platforms/darwin-arm64/bin/
       extract_swytchcode_from_tgz dist/swytchcode_darwin_amd64.tar.gz npm/platforms/darwin-x64/bin/
