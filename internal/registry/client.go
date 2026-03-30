@@ -44,6 +44,9 @@ func NewClient(config *Config) *Client {
 
 // Get performs a GET request to the registry API.
 func (c *Client) Get(ctx context.Context, path string) (*http.Response, error) {
+	if err := checkInsecureBlockedInCI(); err != nil {
+		return nil, err
+	}
 	url := c.config.APIBasePath() + path
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -66,6 +69,9 @@ func (c *Client) Get(ctx context.Context, path string) (*http.Response, error) {
 
 // Post performs a POST request to the registry API.
 func (c *Client) Post(ctx context.Context, path string, body io.Reader) (*http.Response, error) {
+	if err := checkInsecureBlockedInCI(); err != nil {
+		return nil, err
+	}
 	url := c.config.APIBasePath() + path
 	req, err := http.NewRequestWithContext(ctx, "POST", url, body)
 	if err != nil {

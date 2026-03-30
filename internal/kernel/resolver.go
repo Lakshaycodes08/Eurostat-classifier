@@ -2,9 +2,7 @@
 package kernel
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 
 	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
@@ -30,16 +28,9 @@ type Tool struct {
 
 // ResolveTool resolves a canonical_id to a Tool from tooling.json.
 func ResolveTool(projectRoot, canonicalID string, isRaw bool) (*Tool, error) {
-	// Load tooling.json
-	toolingPath := util.ToolingPath(projectRoot)
-	data, err := os.ReadFile(toolingPath)
+	tooling, err := util.LoadToolingJSON(projectRoot)
 	if err != nil {
-		return nil, fmt.Errorf("tooling.json not found; run 'swytchcode init' first")
-	}
-
-	var tooling map[string]interface{}
-	if err := json.Unmarshal(data, &tooling); err != nil {
-		return nil, fmt.Errorf("failed to parse tooling.json: %w", err)
+		return nil, err
 	}
 
 	// Get mode from tooling.json (defaults to "production")

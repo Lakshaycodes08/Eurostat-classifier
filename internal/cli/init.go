@@ -45,7 +45,7 @@ var initCmd = &cobra.Command{
 		if interactive && editorChoice == "" {
 			// Interactive mode: prompt for editor selection
 			fmt.Println()
-			_, editorChoice = util.SelectWithRetry("Which editor do you use?", []string{"cursor", "claude", "none"})
+			_, editorChoice = util.SelectWithRetry("Which editor do you use?", []string{"cursor", "claude", "copilot", "none"})
 		}
 
 		modeChoice := strings.ToLower(initMode)
@@ -55,7 +55,7 @@ var initCmd = &cobra.Command{
 			_, modeChoice = util.SelectWithRetry("Which execution mode do you want to use?", []string{"production", "sandbox"})
 		}
 
-		projectRoot, err := util.ProjectRoot()
+		projectRoot, err := util.InitProjectRoot()
 		if err != nil {
 			return fmt.Errorf("detect project root: %w", err)
 		}
@@ -70,4 +70,3 @@ func init() {
 	initCmd.Flags().StringVar(&initMode, "mode", "", "production | sandbox")
 	initCmd.Flags().BoolVar(&initNonInteractive, "non-interactive", false, "disable prompts; suitable for CI")
 }
-

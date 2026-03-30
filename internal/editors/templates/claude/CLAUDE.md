@@ -12,7 +12,7 @@ Use swytchcode when the user wants to:
 Available MCP tools: swytchcode_init, swytchcode_bootstrap, swytchcode_version,
 swytchcode_list, swytchcode_search, swytchcode_get, swytchcode_add,
 swytchcode_exec, swytchcode_info, swytchcode_check, swytchcode_inspect, swytchcode_upgrade,
-swytchcode_discover, swytchcode_plan, swytchcode_diff
+swytchcode_discover, swytchcode_plan, swytchcode_diff, swytchcode_doctor
 
 CLI-only commands (NOT available as MCP tools — user runs these manually in terminal):
 swytchcode login / swytchcode whoami / swytchcode logout / swytchcode sync
@@ -46,7 +46,21 @@ To add a new integration, follow these steps in precise order
 7. swytchcode diff <library>: Show method-level signature changes in a pending upgrade proposal before approving (MCP: swytchcode_diff, requires auth)
 8. swytchcode discover "<intent>" [--library <name>]: Find API capabilities matching a natural language description (MCP: swytchcode_discover)
 9. swytchcode plan <canonical_id>: Show the steps of a workflow before executing it (MCP: swytchcode_plan)
-10. swytchcode sync [project_name]: Pull new/updated workflows and methods from backend without touching tooling.json. Run when new workflows were created remotely since last `get`.
+10. swytchcode doctor: Diagnose project setup (MCP: swytchcode_doctor; CLI: swytchcode doctor)
+11. swytchcode sync [project_name]: Pull new/updated workflows and methods from backend without touching tooling.json. Run when new workflows were created remotely since last `get`.
+
+### Debugging execution:
+- `swytchcode exec <canonical_id> --dry-run`: Preview the exact HTTP request (method, URL, headers, body) without making the call. MCP: `swytchcode_exec` with `dry_run: true`.
+- `swytchcode exec <canonical_id> --verbose`: Log full request + response JSON to stderr (sensitive headers like `Authorization` are redacted). Redirect with `2>debug.log`. MCP: `swytchcode_exec` with `verbose: true`.
+- `swytchcode exec <canonical_id> --output <file>`: Write binary response body to a file; stdout receives a JSON summary with `saved_to` and `bytes`.
+
+Errors from `swytchcode exec` are written to stderr as structured JSON:
+```json
+{ "error": "message", "category": "network", "retryable": true }
+```
+`category` values: `auth` | `validation` | `not_found` | `network` | `rate_limit` | `internal`.
+`retryable: true` means the error is transient — retry is safe. Non-retryable errors require user action.
+In MCP context, parse the stderr JSON `category` field before deciding how to respond to an `swytchcode_exec` error.
 
 
 

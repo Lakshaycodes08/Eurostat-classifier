@@ -100,14 +100,9 @@ func RunList(projectRoot, filter, prefix string, jsonOutput bool, stdout io.Writ
 func getLocalState(projectRoot, filter, prefix string) (methods []ListEntry, workflows []ListEntry, integrations []string, err error) {
 	// Tooling filter: read from tooling.json to show what the user has explicitly added.
 	if filter == "tooling" {
-		toolingPath := util.Join(projectRoot, constants.SwytchDirName, constants.ToolingJSONFile)
-		data, readErr := os.ReadFile(toolingPath)
-		if readErr != nil {
-			return nil, nil, nil, fmt.Errorf("tooling.json not found: run 'swytchcode init' first")
-		}
-		var tooling map[string]interface{}
-		if jsonErr := json.Unmarshal(data, &tooling); jsonErr != nil {
-			return nil, nil, nil, fmt.Errorf("failed to parse tooling.json: %w", jsonErr)
+		tooling, err := util.LoadToolingJSON(projectRoot)
+		if err != nil {
+			return nil, nil, nil, err
 		}
 		tools, _ := tooling["tools"].(map[string]interface{})
 		for canonicalID, entryRaw := range tools {

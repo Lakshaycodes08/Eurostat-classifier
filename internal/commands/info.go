@@ -9,28 +9,29 @@ import (
 	"os"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/manifest"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/output"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
+	"gopkg.in/yaml.v3"
 )
 
 // ToolInfo represents information about a tool (method or workflow).
 type ToolInfo struct {
-	CanonicalID  string                 `json:"canonical_id"`
-	Type         string                 `json:"type"` // "method" or "workflow"
-	Project      string                 `json:"project"`
-	Library      string                 `json:"library"`
-	Version      string                 `json:"version"`
-	Integration  string                 `json:"integration"` // "project.library@version"
-	Summary      string                 `json:"summary,omitempty"`
-	Description  string                 `json:"description,omitempty"`
-	Inputs       interface{}            `json:"inputs,omitempty"`       // Resolved to scalars when STRUCTS available
-	Output       interface{}            `json:"output,omitempty"`        // Resolved return schema when RETURNS/STRUCTS available
-	HTTPHeaders  map[string]string      `json:"http_headers,omitempty"`  // Static headers from wrekenfile HTTP.HEADERS (can be overridden via args)
-	Auth         map[string]interface{} `json:"auth,omitempty"`          // Auth metadata from manifest
-	Wrekenfile   map[string]interface{} `json:"wrekenfile,omitempty"`    // Full entry from wrekenfile
+	CanonicalID     string                 `json:"canonical_id"`
+	CanonicalIDNote string                 `json:"canonical_id_note,omitempty"`
+	Type            string                 `json:"type"` // "method" or "workflow"
+	Project         string                 `json:"project"`
+	Library         string                 `json:"library"`
+	Version         string                 `json:"version"`
+	Integration     string                 `json:"integration"` // "project.library@version"
+	Summary         string                 `json:"summary,omitempty"`
+	Description     string                 `json:"description,omitempty"`
+	Inputs          interface{}            `json:"inputs,omitempty"`       // Resolved to scalars when STRUCTS available
+	Output          interface{}            `json:"output,omitempty"`       // Resolved return schema when RETURNS/STRUCTS available
+	HTTPHeaders     map[string]string      `json:"http_headers,omitempty"` // Static headers from wrekenfile HTTP.HEADERS (can be overridden via args)
+	Auth            map[string]interface{} `json:"auth,omitempty"`         // Auth metadata from manifest
+	Wrekenfile      map[string]interface{} `json:"wrekenfile,omitempty"`   // Full entry from wrekenfile
 }
 
 // RunInfo runs the info command: search for a canonical_id and return its information.
@@ -260,14 +261,51 @@ func findWorkflowEntryInWorkflowsJSON(workflowsPath, canonicalID string) (map[st
 	return nil, fmt.Errorf("workflow %q not found in workflows.json", canonicalID)
 }
 
+func sanitizeToolInfoField(v interface{}) interface{} {
+	return util.SanitizeForJSON(v)
+}
+
+func sanitizeToolInfoWrekenfile(m map[string]interface{}) map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	s, ok := util.SanitizeForJSON(m).(map[string]interface{})
+	if !ok {
+		return m
+	}
+	return s
+}
+
+func sanitizeToolInfoAuth(m map[string]interface{}) map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	s, ok := util.SanitizeForJSON(m).(map[string]interface{})
+	if !ok {
+		return m
+	}
+	return s
+}
+
 // FormatInfoOutput formats tool info for display.
 func FormatInfoOutput(toolInfos []ToolInfo, jsonOutput bool, stdout io.Writer) error {
+	const canonicalIDNote = "Suffixes such as _abcd on a canonical_id are disambiguation hashes from the registry — use the full canonical_id exactly as shown in exec and tooling.json."
 	if jsonOutput {
-		// Output as JSON array
-		return json.NewEncoder(stdout).Encode(toolInfos)
+		out := make([]ToolInfo, len(toolInfos))
+		copy(out, toolInfos)
+		for i := range out {
+			out[i].CanonicalIDNote = canonicalIDNote
+			out[i].Inputs = sanitizeToolInfoField(out[i].Inputs)
+			out[i].Output = sanitizeToolInfoField(out[i].Output)
+			out[i].Wrekenfile = sanitizeToolInfoWrekenfile(out[i].Wrekenfile)
+			out[i].Auth = sanitizeToolInfoAuth(out[i].Auth)
+		}
+		return json.NewEncoder(stdout).Encode(out)
 	}
 
 	// Human-readable output
+	fmt.Fprintln(stdout, canonicalIDNote)
+	fmt.Fprintln(stdout)
 	for i, info := range toolInfos {
 		if i > 0 {
 			fmt.Fprintln(stdout)

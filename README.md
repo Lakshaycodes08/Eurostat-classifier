@@ -13,6 +13,8 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 - [CLI reference](docs/cli-reference.md) – commands, inputs/outputs, exit codes.
 - [MCP & integrations](docs/mcp-and-integrations.md) – MCP server and editor integrations.
 - [Install & upgrade](docs/install-upgrade.md) – install scripts (including Windows) and upgrade behavior.
+- [Security](docs/security.md) – trust boundaries, HTTPS, `SWYTCHCODE_INSECURE`.
+- [Windows guide](docs/windows-guide.md) – JSON, `cmd.exe`, and `--body`.
 
 ### Install
 
@@ -89,10 +91,11 @@ echo '{
 | `swytchcode list integrations` | List locally fetched integrations |
 | `swytchcode search [keyword]` | Search remote registry; no keyword = all integrations, with keyword = matching names |
 | `swytchcode sync [project_name]` | Re-fetch workflow/method list from backend; updates local files without modifying tooling.json |
+| `swytchcode doctor` | Local diagnostics: `tooling.json`, bundles, `manifest.json`, HTTPS base URLs, auth; `--json` for machines; exits 1 on errors |
 | `swytchcode add [spec] <canonical_id>` | Add a tool to `tooling.json`; auto-downloads missing library deps for multi-library workflows |
 | `swytchcode info <canonical_id>` | Show information about a tool by canonical ID |
 | `swytchcode exec [canonical_id]` | Execute a tool (CLI or JSON stdin); supports `--json`, `--raw`, `--dry-run` |
-| `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec`, `swytchcode_check`, `swytchcode_inspect`, `swytchcode_upgrade`, `swytchcode_diff`, `swytchcode_discover`, `swytchcode_plan` |
+| `swytchcode mcp serve` | Start MCP server (stdio or HTTP); exposes `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec`, `swytchcode_check`, `swytchcode_inspect`, `swytchcode_upgrade`, `swytchcode_diff`, `swytchcode_discover`, `swytchcode_plan`, `swytchcode_doctor` |
 | `swytchcode mcp status` | Check if MCP server is running (daemon mode) |
 | `swytchcode mcp stop` | Stop MCP server (daemon mode) |
 | `swytchcode login` | Device-flow browser login; saves session to `~/.swytchcode/auth.json` |
@@ -378,6 +381,20 @@ Syncing project: weaviate
 **Error messages:**
 - `"no integrations found — run: swytchcode get <project>"` — No projects installed yet
 - `"fetch workflows from backend: %w"` — Network or auth error when calling the backend
+
+---
+
+### `swytchcode doctor`
+
+Run a **read-only** checklist for the current project: `tooling.json` parses, declared integration bundles exist and Wrekenfiles parse, `manifest.json` parses, non-empty integration base URLs satisfy HTTPS/loopback rules, auth posture (`SWYTCHCODE_TOKEN` or user session), and `SWYTCHCODE_INSECURE` / CI interaction.
+
+**Usage:**
+```bash
+swytchcode doctor
+swytchcode doctor --json
+```
+
+**Exit codes:** `0` if no **error**-level checks failed; `1` otherwise. **Warnings** (e.g. no auth — fine for offline `exec`) do not fail the command.
 
 ---
 
@@ -858,6 +875,7 @@ See `commands.md` for full verification detail on these commands.
   - `swytchcode_diff` — Show method-level signature diff for a pending upgrade
   - `swytchcode_discover` — Semantic search for capabilities by natural-language intent
   - `swytchcode_plan` — Preview ordered steps of a workflow
+  - `swytchcode_doctor` — Local project diagnostics (tooling, bundles, manifest, HTTPS URLs, auth)
 - All tool output is captured and returned through the MCP protocol (not streamed to terminal)
 - In daemon mode (`-d`):
   - Forks a new process that runs independently in the background
@@ -1022,7 +1040,7 @@ When you run `swytchcode init --editor=<cursor|claude>`, the CLI installs rule t
 | **cursor** | `.cursor/rules/swytchcode.mdc` | `~/.cursor/mcp.json` (SSE URL entry) |
 | **claude** | `CLAUDE.md` (repo root) | `~/.claude/settings.json` (SSE URL entry) |
 
-Templates are embedded in the binary; source lives in `editors/` (see `editors/README.md`). Rules require using MCP tools `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec`, `swytchcode_check`, `swytchcode_inspect`, `swytchcode_upgrade`, `swytchcode_diff`, `swytchcode_discover`, `swytchcode_plan` and generating runtime code that calls `swytchcode exec <canonical_id>`.
+Templates are embedded in the binary; source lives in `editors/` (see `editors/README.md`). Rules require using MCP tools `swytchcode_init`, `swytchcode_bootstrap`, `swytchcode_version`, `swytchcode_list`, `swytchcode_search`, `swytchcode_get`, `swytchcode_add`, `swytchcode_info`, `swytchcode_exec`, `swytchcode_check`, `swytchcode_inspect`, `swytchcode_upgrade`, `swytchcode_diff`, `swytchcode_discover`, `swytchcode_plan`, `swytchcode_doctor` and generating runtime code that calls `swytchcode exec <canonical_id>`.
 
 ---
 
@@ -1034,6 +1052,19 @@ When executing a tool, the base URL is resolved from `manifest.json` based on th
 - Otherwise → use `production_endpoint` from `manifest.json`
 
 The full URL is constructed as: `baseURL + endpoint` (where `endpoint` comes from the Wreken METHOD definition).
+
+### HTTPS, localhost, CI, and Docker
+
+Before sending a request, the CLI validates the integration base URL:
+
+- **`https://`** is allowed for any host.
+- **`http://`** is allowed **only** for loopback: `localhost`, `127.0.0.1`, or `::1` (any port). Other `http://` bases are rejected.
+
+So remote or container service names (for example `http://api:8080` or `http://host.docker.internal`) must use **`https://`** unless you terminate TLS or proxy to something listening on loopback in the same namespace as `swytchcode`.
+
+**GitHub Actions, GitLab CI, and similar:** Same rules as locally — use HTTPS for real APIs; use `http://127.0.0.1` / `http://localhost` only when your mock or API listens on loopback inside that job.
+
+**`SWYTCHCODE_INSECURE=1`:** Skips TLS certificate verification (self-signed dev servers). Registry calls **refuse** this when `CI`, `GITHUB_ACTIONS`, or `GITLAB_CI` is set. It does **not** allow non-loopback `http://` execution URLs. See [docs/config-spec.md](docs/config-spec.md) (manifest section) for full detail.
 
 ---
 

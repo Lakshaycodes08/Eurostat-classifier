@@ -19,105 +19,9 @@ import (
 	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
-// ToolOutput represents the output from MCP tools (matches CLI output).
-type ToolOutput struct {
-	Output string `json:"output"`
-}
-
-// ListArgs represents arguments for swytchcode_list.
-type ListArgs struct {
-	Filter string `json:"filter,omitempty" jsonschema:"Filter type: 'methods', 'workflows', 'integrations', 'tooling' (enabled in tooling.json only), or empty for all"`
-	Prefix string `json:"prefix,omitempty" jsonschema:"Project prefix filter (e.g., 'stripe')"`
-	JSON   bool   `json:"json,omitempty" jsonschema:"Output as JSON object"`
-}
-
-// GetArgs represents arguments for swytchcode_get.
-type GetArgs struct {
-	ProjectName string `json:"project_name" jsonschema:"Project name to fetch"`
-	Yes         bool   `json:"yes,omitempty" jsonschema:"Auto-confirm overwrite"`
-}
-
-// AddArgs represents arguments for swytchcode_add.
-type AddArgs struct {
-	CanonicalID     string `json:"canonical_id,omitempty" jsonschema:"Canonical ID of the tool to add (required unless all=true)"`
-	IntegrationSpec string `json:"integration_spec,omitempty" jsonschema:"Optional integration spec (project@library.version)"`
-	All             bool   `json:"all,omitempty" jsonschema:"When true, add all tools from the project specified by canonical_id (treated as project name)"`
-}
-
-// SearchArgs represents arguments for swytchcode_search.
-type SearchArgs struct {
-	Keyword string `json:"keyword,omitempty" jsonschema:"Optional search keyword; if empty, returns all integrations"`
-	JSON    bool   `json:"json,omitempty" jsonschema:"Output as JSON array"`
-}
-
-// InitArgs represents arguments for swytchcode_init.
-type InitArgs struct {
-	Editor string `json:"editor" jsonschema:"Editor choice: 'cursor', 'claude', or 'none'"`
-	Mode   string `json:"mode" jsonschema:"Execution mode: 'production' or 'sandbox'"`
-}
-
-// BootstrapArgs represents arguments for swytchcode_bootstrap (no arguments needed).
-type BootstrapArgs struct{}
-
-// VersionArgs represents arguments for swytchcode_version (no arguments needed).
-type VersionArgs struct{}
-
-// InfoArgs represents arguments for swytchcode_info.
-type InfoArgs struct {
-	CanonicalID string `json:"canonical_id" jsonschema:"Canonical ID of the tool to get information about"`
-	JSON        bool   `json:"json,omitempty" jsonschema:"Output as JSON array instead of human-readable format"`
-}
-
-// CheckArgs represents arguments for swytchcode_check.
-type CheckArgs struct {
-	Library string `json:"library,omitempty" jsonschema:"Optional project or project.library filter"`
-}
-
-// InspectArgs represents arguments for swytchcode_inspect.
-type InspectArgs struct {
-	Library string `json:"library" jsonschema:"Project or project.library name to inspect"`
-}
-
-// UpgradeArgs represents arguments for swytchcode_upgrade.
-type UpgradeArgs struct {
-	Library string `json:"library" jsonschema:"Project or project.library name to upgrade"`
-	Confirm bool   `json:"confirm" jsonschema:"Set to true to confirm the upgrade"`
-	Apply   bool   `json:"apply,omitempty" jsonschema:"When true, automatically re-fetch integration bundle and re-add affected methods after approval"`
-}
-
-// DiffArgs represents arguments for swytchcode_diff.
-type DiffArgs struct {
-	Library string `json:"library" jsonschema:"Project or project.library name to show diff for"`
-}
-
-// DiscoverArgs represents arguments for swytchcode_discover.
-type DiscoverArgs struct {
-	Intent  string `json:"intent" jsonschema:"Natural language description of the capability to find"`
-	Project string `json:"project,omitempty" jsonschema:"Optional project name to scope the search"`
-	Library string `json:"library,omitempty" jsonschema:"Optional library name to scope the search within a project"`
-	Top     int    `json:"top,omitempty" jsonschema:"Number of results to return (default 5)"`
-	JSON    bool   `json:"json,omitempty" jsonschema:"Output as JSON"`
-}
-
-// PlanArgs represents arguments for swytchcode_plan.
-type PlanArgs struct {
-	CanonicalID string `json:"canonical_id" jsonschema:"Canonical workflow ID to show steps for"`
-	Project     string `json:"project,omitempty" jsonschema:"Project name (defaults to prefix of canonical_id)"`
-	JSON        bool   `json:"json,omitempty" jsonschema:"Output as JSON"`
-}
-
-// ExecArgs represents arguments for swytchcode_exec.
-type ExecArgs struct {
-	Tool      string                 `json:"tool" jsonschema:"Canonical ID of the tool to execute"`
-	Args      map[string]interface{} `json:"args,omitempty" jsonschema:"Tool arguments (body, params, Authorization, etc.)"`
-	DryRun    bool                   `json:"dry_run,omitempty" jsonschema:"Show what would be executed without making HTTP call"`
-	Raw       bool                   `json:"raw,omitempty" jsonschema:"Output raw HTTP response instead of normalized JSON"`
-	AllowRaw  bool                   `json:"allow_raw,omitempty" jsonschema:"Allow execution of raw methods"`
-	JSON      bool                   `json:"json,omitempty" jsonschema:"Output response as a single JSON object"`
-}
 
 // RegisterTools registers all MCP tools with the server.
-// Registers 15 tools total:
+// Registers 16 tools total:
 //  1. swytchcode_init
 //  2. swytchcode_bootstrap
 //  3. swytchcode_version
@@ -126,20 +30,21 @@ type ExecArgs struct {
 //  6. swytchcode_get
 //  7. swytchcode_add
 //  8. swytchcode_exec
-//  9. swytchcode_info
-//  10. swytchcode_check
-//  11. swytchcode_inspect
-//  12. swytchcode_upgrade
-//  13. swytchcode_diff
-//  14. swytchcode_discover
-//  15. swytchcode_plan
+//  9. swytchcode_check
+//  10. swytchcode_inspect
+//  11. swytchcode_upgrade
+//  12. swytchcode_diff
+//  13. swytchcode_discover
+//  14. swytchcode_plan
+//  15. swytchcode_doctor
+//  16. swytchcode_info
 func RegisterTools(server *mcp.Server, streamOutput bool) error {
 	// swytchcode_init
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "swytchcode_init",
 		Description: "Initialize Swytchcode in this project. Creates .swytchcode/, tooling.json, and editor-specific config.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args InitArgs) (*mcp.CallToolResult, ToolOutput, error) {
-		projectRoot, err := util.ProjectRoot()
+		projectRoot, err := util.InitProjectRoot()
 		if err != nil {
 			return nil, ToolOutput{}, fmt.Errorf("detect project root: %w", err)
 		}
@@ -318,7 +223,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 	// swytchcode_exec
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "swytchcode_exec",
-		Description: "Execute a tool via the Swytchcode kernel. Use dry_run: true to see the planned request (method, url, headers, body) without making the HTTP call. The tool result content is always the full stdout/stderr output (dry-run payload or execution result).",
+		Description: "Execute a tool via the Swytchcode kernel. Use dry_run: true to see the planned request (method, url, headers, body) without making the HTTP call. Use verbose: true to log full request/response details to stderr (sensitive headers redacted). The tool result content is always the full stdout/stderr output (dry-run payload or execution result).",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, args ExecArgs) (*mcp.CallToolResult, ToolOutput, error) {
 		toolCtx, cancel := context.WithTimeout(ctx, constants.MCPRequestTimeout)
 		defer cancel()
@@ -334,6 +239,7 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		argsMap["raw"] = args.Raw
 		argsMap["allow_raw"] = args.AllowRaw
 		argsMap["json"] = args.JSON
+		argsMap["verbose"] = args.Verbose
 		result, err := handleExec(toolCtx, argsMap, oc)
 		output := oc.GetCombinedOutput()
 		if err != nil {
@@ -574,6 +480,34 @@ func RegisterTools(server *mcp.Server, streamOutput bool) error {
 		}, ToolOutput{Output: result}, nil
 	})
 
+	// swytchcode_doctor
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "swytchcode_doctor",
+		Description: "Run local diagnostics: tooling.json, integration bundles, manifest.json, HTTPS base URLs, and auth posture. Use json=true for machine-readable output. Fails if any error-level check fails (CI-friendly).",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, args DoctorArgs) (*mcp.CallToolResult, ToolOutput, error) {
+		projectRoot, err := util.ProjectRoot()
+		if err != nil {
+			return nil, ToolOutput{}, fmt.Errorf("detect project root: %w", err)
+		}
+		rep := commands.RunDoctor(projectRoot)
+		var out string
+		if args.JSON {
+			b, e := json.MarshalIndent(rep, "", "  ")
+			if e != nil {
+				return nil, ToolOutput{}, e
+			}
+			out = string(b)
+		} else {
+			out = commands.FormatDoctorHuman(rep)
+		}
+		result := &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: out}}}
+		to := ToolOutput{Output: out}
+		if !rep.OK {
+			return result, to, fmt.Errorf("doctor: one or more checks failed")
+		}
+		return result, to, nil
+	})
+
 	// swytchcode_info
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "swytchcode_info",
@@ -725,6 +659,11 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 		jsonOutput = jsonRaw
 	}
 
+	verbose := false
+	if verboseRaw, ok := args["verbose"].(bool); ok {
+		verbose = verboseRaw
+	}
+
 	// Convert exec request to JSON for kernel.Execute
 	reqJSON, err := json.Marshal(execReq)
 	if err != nil {
@@ -736,7 +675,9 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 
 	// Create a reader from JSON
 	reqReader := util.NewJSONReader(reqJSON)
-	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), allowRaw, dryRun, rawOutput, jsonOutput, "", mcpToken)
+	exitCode := kernel.Execute(reqReader, oc.Stdout(), oc.Stderr(), kernel.ExecOptions{
+		AllowRaw: allowRaw, DryRun: dryRun, RawOutput: rawOutput, JSONOutput: jsonOutput, Token: mcpToken, Verbose: verbose,
+	})
 
 	if exitCode != kernel.ExitCodeOK {
 		log.Printf("[swytchcode_exec] failed tool=%s exit_code=%d (stderr captured)", tool, exitCode)
@@ -745,7 +686,6 @@ func handleExec(ctx context.Context, args map[string]interface{}, oc *OutputCapt
 
 	return oc.GetCombinedOutput(), nil
 }
-
 
 // runAddCommand runs the add command logic.
 func runAddCommand(ctx context.Context, canonicalID, integrationSpec string, stdout, stderr io.Writer) error {

@@ -192,3 +192,27 @@ Every workflow must have an owner project/library in the data model for organiza
 - No rename tracking or redirect mechanism — a renamed canonical_id breaks existing exec calls with no helpful error pointing to the new name. (`GET /v2/cli/canonical-id/resolve` endpoint contract is documented in `BACKEND_API_CONTRACTS.md`; CLI degrades gracefully when backend endpoint isn't live yet.)
 - No backend-driven stale detection — hash comparison is local-only today. Phase 2 (`GET /v2/cli/methods/hashes`) will compare against backend hashes when that endpoint is live.
 - `swytchcode sync` warns on workflow step changes and method hash mismatches but does not update method version pins.
+
+---
+
+## Q11: Can tool execution use `http://` (non-HTTPS) endpoints? What about localhost, CI, and Docker?
+
+**Execution base URLs** (`sandbox_endpoint` / `production_endpoint` in `manifest.json`) are validated by [`ValidateExecutionBaseURL`](internal/kernel/base_url_validate.go):
+
+| URL | Allowed? |
+|-----|----------|
+| `https://` on any host | Yes |
+| `http://` on `localhost`, `127.0.0.1`, or `::1` | Yes |
+| `http://` on any other hostname or IP | No |
+
+**CI (GitHub Actions, GitLab CI, etc.)** and **Docker** use the same rules. HTTPS to a reachable API works as usual. `http://127.0.0.1` is valid when a mock or API listens on loopback **in the same container/job** as the CLI. `http://localhost` inside a container is that container’s loopback, not the host or another Compose service — use HTTPS (or a loopback proxy) for those.
+
+**`SWYTCHCODE_INSECURE=1`:** Skips TLS certificate verification only; it does **not** bypass the scheme/host rules above. Registry traffic is **blocked** in CI when `CI` / `GITHUB_ACTIONS` / `GITLAB_CI` is truthy and `SWYTCHCODE_INSECURE=1` is set.
+
+See [docs/config-spec.md](config-spec.md) (manifest section) and the README “Base URL Resolution”.
+
+---
+
+## Q12: How do I sanity-check my project before CI or after clone?
+
+Run **`swytchcode doctor`** (or MCP **`swytchcode_doctor`** with `json: true`). It verifies `tooling.json`, installed bundles, `manifest.json`, HTTPS/loopback rules on manifest endpoints, auth posture, and `SWYTCHCODE_INSECURE` vs CI. Exit code **1** if any **error**-level check fails (warnings alone do not fail). See [docs/cli-reference.md](cli-reference.md) and [docs/security.md](security.md).

@@ -44,6 +44,7 @@ From `internal/mcp/tools.go`, the server exposes tools that roughly mirror CLI c
 - `swytchcode_upgrade` — Approve a pending upgrade
 - `swytchcode_discover` — Semantic capability discovery by natural language intent
 - `swytchcode_plan` — Show workflow steps for a canonical workflow ID
+- `swytchcode_doctor` — Local diagnostics (`tooling.json`, bundles, manifest, HTTPS base URLs, auth); use `json: true` for machine-readable output
 
 Clients call these tools; the server:
 
@@ -64,6 +65,19 @@ Clients call these tools; the server:
 - If an integration bundle has an empty or placeholder endpoint for the active `mode`, the CLI falls back to `http://localhost` as the base URL for that integration (see “Base URL Resolution” in the main README).
   - In that case, a 404 like `Route PUT:/... not found` is coming from the **target API** at `http://localhost`, not from the MCP server.
   - To fix it, update the integration’s entry in `.swytchcode/integrations/manifest.json` so `sandbox_endpoint` / `production_endpoint` point at the correct API host, or start the appropriate backend locally on the configured base URL.
+
+### HTTPS vs HTTP for integration base URLs
+
+Execution uses the base URL from `manifest.json` (not the MCP SSE URL). The kernel enforces:
+
+- **`https://`** — any host.
+- **`http://`** — **loopback only**: `localhost`, `127.0.0.1`, `::1`.
+
+Non-loopback HTTP (including Docker Compose service names or LAN IPs) is rejected; use HTTPS or a loopback proxy.
+
+In **CI** or **Docker**, `http://localhost` is still loopback **inside that container/job**. For another service’s hostname, use **`https://`** (or equivalent). See [docs/config-spec.md](config-spec.md) → manifest → “HTTPS and HTTP base URLs”.
+
+**`SWYTCHCODE_INSECURE=1`:** Disables TLS verify for HTTP clients (dev / self-signed). **Registry** requests fail in CI when `CI`, `GITHUB_ACTIONS`, or `GITLAB_CI` is truthy. This does not bypass the HTTPS-or-loopback-HTTP rule for execution base URLs.
 
 ### Daemon mode
 

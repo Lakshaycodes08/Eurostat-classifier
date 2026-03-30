@@ -124,13 +124,9 @@ var addIntegrationCmd = &cobra.Command{
 			return fmt.Errorf("detect project root: %w", err)
 		}
 		toolingPath := util.ToolingPath(projectRoot)
-		var tooling map[string]interface{}
-		if data, err := os.ReadFile(toolingPath); err == nil {
-			if err := json.Unmarshal(data, &tooling); err != nil {
-				return fmt.Errorf("parse tooling.json: %w", err)
-			}
-		} else {
-			return fmt.Errorf("tooling.json not found; run 'swytchcode init' first: %w", err)
+		tooling, err := util.LoadToolingJSON(projectRoot)
+		if err != nil {
+			return err
 		}
 		integrations, _ := tooling["integrations"].(map[string]interface{})
 		if integrations == nil {

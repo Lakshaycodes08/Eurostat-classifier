@@ -11,12 +11,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gopkg.in/yaml.v3"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/constants"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/manifest"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/output"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/registry"
 	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
+	"gopkg.in/yaml.v3"
 )
 
 // ToolMatch represents a found tool (method or workflow) in an integration.
@@ -343,16 +343,9 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, noAutoInst
 	// Validate canonical ID exists in this version on the backend (soft check — skip on network error)
 	validateVersionOnBackend(ctx, project, library, version, canonicalID, stdout)
 
-	// Load tooling.json
-	toolingPath := util.ToolingPath(projectRoot)
-	data, err := os.ReadFile(toolingPath)
+	tooling, err := util.LoadToolingJSON(projectRoot)
 	if err != nil {
-		return fmt.Errorf("tooling.json not found; run 'swytchcode init' first: %w", err)
-	}
-
-	var tooling map[string]interface{}
-	if err := json.Unmarshal(data, &tooling); err != nil {
-		return fmt.Errorf("parse tooling.json: %w", err)
+		return err
 	}
 
 	// Ensure tools map exists
@@ -450,12 +443,12 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, noAutoInst
 
 			stepDef := map[string]interface{}{
 				"canonical_id": step.CanonicalID,
-				"name":        step.Name,
-				"summary":     summary,
-				"desc":        desc,
-				"inputs":      inputs,
-				"integration": stepIntegrationStr,
-				"index":       index,
+				"name":         step.Name,
+				"summary":      summary,
+				"desc":         desc,
+				"inputs":       inputs,
+				"integration":  stepIntegrationStr,
+				"index":        index,
 			}
 			if returnsRaw, ok := methodEntry["RETURNS"]; ok {
 				if resolved, err := ResolveReturns(useWreken, returnsRaw); err != nil {
@@ -548,10 +541,11 @@ func RunAdd(ctx context.Context, canonicalID, integrationSpec string, noAutoInst
 	}
 
 	// Write updated tooling.json
-	data, err = json.MarshalIndent(tooling, "", "  ")
+	data, err := json.MarshalIndent(tooling, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal tooling.json: %w", err)
 	}
+	toolingPath := util.ToolingPath(projectRoot)
 	if err := os.WriteFile(toolingPath, data, 0o644); err != nil {
 		return fmt.Errorf("write tooling.json: %w", err)
 	}
@@ -593,12 +587,12 @@ func ParseIntegrationSpec(spec string) (project, library, version string) {
 	project = strings.TrimSpace(parts[0])
 	rest := strings.TrimSpace(parts[1])
 
-	lastDot := strings.LastIndex(rest, ".")
-	if lastDot < 0 {
+	firstDot := strings.Index(rest, ".")
+	if firstDot < 0 {
 		return "", "", ""
 	}
-	library = strings.TrimSpace(rest[:lastDot])
-	version = strings.TrimSpace(rest[lastDot+1:])
+	library = strings.TrimSpace(rest[:firstDot])
+	version = strings.TrimSpace(rest[firstDot+1:])
 
 	return project, library, version
 }
@@ -730,15 +724,9 @@ func RunAddAll(ctx context.Context, projectName string, stdout, stderr io.Writer
 		return nil
 	}
 
-	// Read tooling.json to determine which are already present.
-	toolingPath := util.ToolingPath(projectRoot)
-	data, err := os.ReadFile(toolingPath)
+	tooling, err := util.LoadToolingJSON(projectRoot)
 	if err != nil {
-		return fmt.Errorf("tooling.json not found; run 'swytchcode init' first: %w", err)
-	}
-	var tooling map[string]interface{}
-	if err := json.Unmarshal(data, &tooling); err != nil {
-		return fmt.Errorf("parse tooling.json: %w", err)
+		return err
 	}
 	existing, _ := tooling["tools"].(map[string]interface{})
 	if existing == nil {

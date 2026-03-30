@@ -69,7 +69,7 @@ func LoadIntegrationBundle(projectRoot, integration string) (*IntegrationBundle,
 	wrekenPath := util.Join(util.IntegrationVersionDir(projectRoot, project, library, version), constants.WrekenfileYAMLFile)
 	data, err := os.ReadFile(wrekenPath)
 	if err != nil {
-		return nil, fmt.Errorf("integration %s not installed. Run: swytchcode get %s", integration, project)
+		return nil, fmt.Errorf("integration %s not installed.\nExpected bundle at: %s\nRun: swytchcode get %s", integration, wrekenPath, integration)
 	}
 
 	var wrekenfile map[string]interface{}

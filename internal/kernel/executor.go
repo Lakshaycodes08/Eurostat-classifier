@@ -19,6 +19,19 @@ type ExecRequest struct {
 	Args map[string]interface{} `json:"args"`
 }
 
+// ExecOptions groups all optional parameters for Execute.
+// Using a struct keeps the call signature stable as new options are added.
+type ExecOptions struct {
+	AllowRaw    bool   // permit tools with the "raw." prefix
+	DryRun      bool   // print request details without making the HTTP call
+	RawOutput   bool   // output the full raw HTTP response instead of normalized JSON
+	JSONOutput  bool   // always output a single JSON object (default for scripting)
+	Verbose     bool   // log request/response details to stderr for debugging
+	OutputFile  string // write binary response body to this file path
+	ProjectRoot string // override project root detection
+	Token       string // auth token for registry calls (workflow fetch)
+}
+
 // Execute is the single entrypoint used by the CLI `exec` command.
 //
 // Invariant: tooling.json pins what is trusted. The registry supplies how it works.
@@ -31,16 +44,16 @@ type ExecRequest struct {
 // workflow definitions are not stored locally).
 //
 // Execution pipeline:
-//   1. Parse request (from stdin or CLI args)
-//   2. Load tooling.json
-//   3. Resolve tool -> integration bundle
-//   4. Load integration bundle (wrekenfile.yaml)
-//   5. Resolve method/workflow from Wreken METHODS section
-//   6. Get base URL from manifest.json based on mode
-//   7. Validate input schema
-//   8. Build HTTP request (method, URL, headers, body)
-//   9. Execute (or dry-run)
-//   10. Return JSON output
+//  1. Parse request (from stdin or CLI args)
+//  2. Load tooling.json
+//  3. Resolve tool -> integration bundle
+//  4. Load integration bundle (wrekenfile.yaml)
+//  5. Resolve method/workflow from Wreken METHODS section
+//  6. Get base URL from manifest.json based on mode
+//  7. Validate input schema
+//  8. Build HTTP request (method, URL, headers, body)
+//  9. Execute (or dry-run)
+//  10. Return JSON output
 //
 // It returns a process exit code from the fixed set defined in errors.go.
 // buildWorkflowOutput converts all step results into the enriched output shape:
@@ -117,13 +130,14 @@ func executeLocalWorkflow(canonicalID string, steps []LocalWorkflowStep, mode st
 		bundleMap[s.Integration] = bundle
 	}
 
-	results, runErr := RunWorkflow(ctx, wf, bundleMap, args, mode, out, errOut)
+	results, runErr := RunWorkflow(ctx, wf, bundleMap, args, mode, out, errOut, projectRoot)
 	if encErr := json.NewEncoder(out).Encode(buildWorkflowOutput(results, runErr)); encErr != nil {
 		LogExecFailure(ExitCodeInternalError, canonicalID, "failed to encode output")
 		return ExitCodeInternalError
 	}
 	if runErr != nil {
-		LogExecFailure(ExitCodeOK, canonicalID, runErr.Error())
+		LogExecFailure(ExitCodeSDKFailure, canonicalID, runErr.Error())
+		return ExitCodeSDKFailure
 	}
 	return ExitCodeOK
 }
@@ -131,7 +145,7 @@ func executeLocalWorkflow(canonicalID string, steps []LocalWorkflowStep, mode st
 // executeWorkflow fetches the workflow definition and bundles from the registry,
 // then runs all steps sequentially via chain.go.
 // Registry calls are intentional here — workflow definitions are not stored locally.
-func executeWorkflow(canonicalID, integration, mode string, args map[string]interface{}, out, errOut io.Writer, token string) int {
+func executeWorkflow(canonicalID, integration, mode string, args map[string]interface{}, out, errOut io.Writer, token, projectRoot string) int {
 	// Derive project name: "weaviate.lyrid@v1" → "weaviate"; "project.workflow" → "project"
 	projectName := integration
 	if i := strings.Index(integration, "."); i > 0 {
@@ -177,30 +191,41 @@ func executeWorkflow(canonicalID, integration, mode string, args map[string]inte
 	}
 
 	// Run workflow steps sequentially
-	results, runErr := RunWorkflow(ctx, wf, bundleMap, args, mode, out, errOut)
+	results, runErr := RunWorkflow(ctx, wf, bundleMap, args, mode, out, errOut, projectRoot)
 	if encErr := json.NewEncoder(out).Encode(buildWorkflowOutput(results, runErr)); encErr != nil {
 		LogExecFailure(ExitCodeInternalError, canonicalID, "failed to encode output")
 		return ExitCodeInternalError
 	}
 	if runErr != nil {
-		LogExecFailure(ExitCodeOK, canonicalID, runErr.Error())
+		LogExecFailure(ExitCodeSDKFailure, canonicalID, runErr.Error())
+		return ExitCodeSDKFailure
 	}
 	return ExitCodeOK
 }
 
-// Execute runs a single tool invocation. When jsonOutput is true, stdout is guaranteed to be a single JSON object (normalized or raw per rawOutput).
-func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool, dryRun bool, rawOutput bool, jsonOutput bool, projectRoot string, token string) int {
+// Execute runs a single tool invocation. When opts.JSONOutput is true, stdout is guaranteed to be a single JSON object.
+func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, opts ExecOptions) int {
 	var req ExecRequest
-	if err := util.ReadJSON(stdin, &req); err != nil {
+	raw, err := io.ReadAll(stdin)
+	if err != nil {
+		msg := "failed to read stdin: " + err.Error()
+		writeClassifiedError(stderr, msg, "internal", false)
+		LogExecFailure(ExitCodeInvalidInput, "", msg)
+		return ExitCodeInvalidInput
+	}
+	if err := json.Unmarshal(raw, &req); err != nil {
 		msg := "invalid json input"
-		writeErrorJSON(stderr, msg)
+		if hint := util.ExecJSONInvalidHint(raw); hint != "" {
+			msg += " " + hint
+		}
+		writeClassifiedError(stderr, msg, "validation", false)
 		LogExecFailure(ExitCodeInvalidInput, "", msg)
 		return ExitCodeInvalidInput
 	}
 
 	if req.Tool == "" {
 		msg := `tool is required (e.g. "project.method_name") — run 'swytchcode init' to generate tooling.json`
-		writeErrorJSON(stderr, msg)
+		writeClassifiedError(stderr, msg, "validation", false)
 		LogExecFailure(ExitCodeInvalidInput, "", msg)
 		return ExitCodeInvalidInput
 	}
@@ -211,12 +236,13 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	LogExecRequest(req.Tool, req.Args)
 
 	// Detect project root if not provided
+	projectRoot := opts.ProjectRoot
 	if projectRoot == "" {
 		var err error
 		projectRoot, err = util.ProjectRoot()
 		if err != nil {
 			msg := "failed to detect project root: " + err.Error()
-			writeErrorJSON(stderr, msg)
+			writeClassifiedError(stderr, msg, "internal", false)
 			LogExecFailure(ExitCodeInternalError, req.Tool, msg)
 			return ExitCodeInternalError
 		}
@@ -224,9 +250,9 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 
 	// Enforce raw method execution policy
 	isRaw := strings.HasPrefix(req.Tool, "raw.")
-	if isRaw && !allowRaw {
+	if isRaw && !opts.AllowRaw {
 		msg := "raw method execution requires --allow-raw flag"
-		writeErrorJSON(stderr, msg)
+		writeClassifiedError(stderr, msg, "validation", false)
 		LogExecFailure(ExitCodeInvalidInput, req.Tool, msg)
 		return ExitCodeInvalidInput
 	}
@@ -234,7 +260,7 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	// Step 1: Resolve tool from tooling.json
 	tool, err := ResolveTool(projectRoot, req.Tool, isRaw)
 	if err != nil {
-		writeErrorJSON(stderr, err.Error())
+		writeClassifiedError(stderr, err.Error(), "not_found", false)
 		LogExecFailure(ExitCodeToolNotFound, req.Tool, err.Error())
 		return ExitCodeToolNotFound
 	}
@@ -246,13 +272,13 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 			return executeLocalWorkflow(req.Tool, tool.Steps, tool.Mode, req.Args, projectRoot, stdout, stderr)
 		}
 		// Fallback: fetch definition and bundles from registry.
-		return executeWorkflow(req.Tool, tool.Integration, tool.Mode, req.Args, stdout, stderr, token)
+		return executeWorkflow(req.Tool, tool.Integration, tool.Mode, req.Args, stdout, stderr, opts.Token, projectRoot)
 	}
 
 	// Step 2: Load integration bundle (single-method path — no registry calls)
 	bundle, err := LoadIntegrationBundle(projectRoot, tool.Integration)
 	if err != nil {
-		writeErrorJSON(stderr, err.Error())
+		writeClassifiedError(stderr, err.Error(), "not_found", false)
 		LogExecFailure(ExitCodeToolNotFound, req.Tool, err.Error())
 		return ExitCodeToolNotFound
 	}
@@ -260,7 +286,7 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	// Step 3: Resolve method from Wreken METHODS section
 	method, err := ResolveMethod(bundle, req.Tool)
 	if err != nil {
-		writeErrorJSON(stderr, err.Error())
+		writeClassifiedError(stderr, err.Error(), "not_found", false)
 		LogExecFailure(ExitCodeToolNotFound, req.Tool, err.Error())
 		return ExitCodeToolNotFound
 	}
@@ -268,7 +294,12 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	// Step 4: Get base URL from manifest based on mode
 	baseURL, err := GetBaseURL(projectRoot, tool.Integration, tool.Mode)
 	if err != nil {
-		writeErrorJSON(stderr, err.Error())
+		writeClassifiedError(stderr, err.Error(), "internal", false)
+		LogExecFailure(ExitCodeInternalError, req.Tool, err.Error())
+		return ExitCodeInternalError
+	}
+	if err := ValidateExecutionBaseURL(baseURL); err != nil {
+		writeClassifiedError(stderr, err.Error(), "validation", false)
 		LogExecFailure(ExitCodeInternalError, req.Tool, err.Error())
 		return ExitCodeInternalError
 	}
@@ -276,7 +307,7 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	// Step 5: Validate input schema
 	if err := ValidateInput(tool, req.Args); err != nil {
 		msg := "input validation failed: " + err.Error()
-		writeErrorJSON(stderr, msg)
+		writeClassifiedError(stderr, msg, "validation", false)
 		LogExecFailure(ExitCodeInvalidInput, req.Tool, msg)
 		return ExitCodeInvalidInput
 	}
@@ -285,13 +316,13 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 	httpReq, err := BuildRequest(method, baseURL, req.Args)
 	if err != nil {
 		msg := "failed to build request: " + err.Error()
-		writeErrorJSON(stderr, msg)
+		writeClassifiedError(stderr, msg, "validation", false)
 		LogExecFailure(ExitCodeInvalidInput, req.Tool, msg)
 		return ExitCodeInvalidInput
 	}
 
 	// Step 7: Execute or dry-run
-	if dryRun {
+	if opts.DryRun {
 		code := ExecuteDryRun(httpReq, stdout)
 		if code != ExitCodeOK {
 			LogExecFailure(code, req.Tool, "dry-run output failed")
@@ -299,18 +330,49 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, allowRaw bool,
 		return code
 	}
 
-	// Step 8: Execute HTTP request
-	resp, err := ExecuteHTTP(httpReq)
+	execPolicy, err := GetExecutionPolicy(projectRoot, tool.Integration)
+	if err != nil {
+		msg := "execution policy: " + err.Error()
+		writeClassifiedError(stderr, msg, "internal", false)
+		LogExecFailure(ExitCodeInternalError, req.Tool, msg)
+		return ExitCodeInternalError
+	}
+
+	// Step 8: Log verbose request details before executing
+	if opts.Verbose {
+		LogVerboseRequest(stderr, httpReq)
+	}
+
+	// Step 9: Execute HTTP request
+	resp, err := ExecuteHTTP(context.Background(), httpReq, execPolicy)
 	if err != nil {
 		msg := "execution failed: " + err.Error()
-		writeErrorJSON(stderr, msg)
+		// Network/retry exhaustion errors are retryable; classify by content
+		category, retryable := classifyExecError(err)
+		writeClassifiedError(stderr, msg, category, retryable)
 		LogExecFailure(ExitCodeSDKFailure, req.Tool, msg)
 		return ExitCodeSDKFailure
 	}
 
-	// Step 9: Output response (include request URL so caller can verify base URL)
-	if rawOutput {
+	// Step 10: Output response
+	if opts.RawOutput {
 		return OutputRawResponse(resp, httpReq, stdout, stderr)
 	}
-	return OutputJSONResponse(resp, httpReq, stdout, stderr)
+	return OutputJSONResponse(resp, httpReq, stdout, stderr, opts.Verbose, opts.OutputFile)
+}
+
+// classifyExecError categorises an error from ExecuteHTTP for machine-readable output.
+func classifyExecError(err error) (category string, retryable bool) {
+	if err == nil {
+		return "internal", false
+	}
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "429") || strings.Contains(msg, "rate limit") || strings.Contains(msg, "too many requests") {
+		return "rate_limit", true
+	}
+	if strings.Contains(msg, "503") || strings.Contains(msg, "504") || strings.Contains(msg, "timeout") ||
+		strings.Contains(msg, "connection reset") || strings.Contains(msg, "eof") || strings.Contains(msg, "tls") {
+		return "network", true
+	}
+	return "network", true // all exec failures are potentially transient
 }

@@ -25,6 +25,7 @@ func Execute() {
 }
 
 func init() {
+	// Command structs and flags live in sibling files; subcommands are attached here.
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(getCmd)
 	rootCmd.AddCommand(addCmd)
@@ -43,6 +44,7 @@ func init() {
 	rootCmd.AddCommand(diffCmd)
 	rootCmd.AddCommand(discoverCmd)
 	rootCmd.AddCommand(planCmd)
+	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(syncCmd)
 }
 

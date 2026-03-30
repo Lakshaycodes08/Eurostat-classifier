@@ -27,14 +27,16 @@ func readStdinIfAvailable() []byte {
 }
 
 var (
-	execAllowRaw bool
-	execDryRun   bool
-	execBodyFile string
-	execInput    []string // key=value pairs
-	execParam    []string // query params key=value
-	execHeader   []string // header key=value pairs
-	execRaw      bool     // output raw HTTP response
-	execJSON     bool     // output JSON (default: true for exec; flag for explicit scripting)
+	execAllowRaw   bool
+	execDryRun     bool
+	execBodyFile   string
+	execInput      []string // key=value pairs
+	execParam      []string // query params key=value
+	execHeader     []string // header key=value pairs
+	execRaw        bool     // output raw HTTP response
+	execJSON       bool     // output JSON (default: true for exec; flag for explicit scripting)
+	execVerbose    bool     // log request/response details to stderr
+	execOutputFile string   // write binary response body to this file
 )
 
 // execCmd implements `swytchcode exec`.
@@ -82,7 +84,10 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 		if len(args) == 0 {
 			// JSON stdin mode — canonical_id is embedded in the JSON payload, unknown here
 			start := time.Now()
-			exitCode = kernel.Execute(os.Stdin, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "", token)
+			exitCode = kernel.Execute(os.Stdin, os.Stdout, os.Stderr, kernel.ExecOptions{
+				AllowRaw: execAllowRaw, DryRun: execDryRun, RawOutput: execRaw, JSONOutput: execJSON,
+				Verbose: execVerbose, OutputFile: execOutputFile, Token: token,
+			})
 			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
 			// Use synchronous telemetry for exec since the process exits immediately after.
 			telemetry.SendEventSync(apiURL, token, fromSession, "exec", "", outcomeErr(exitCode), opts)
@@ -107,7 +112,11 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 				}
 				var bodyJSON map[string]interface{}
 				if err := json.Unmarshal(bodyData, &bodyJSON); err != nil {
-					util.WriteJSON(os.Stderr, map[string]string{"error": "body file must be valid JSON"})
+					msg := "body file must be valid JSON"
+					if hint := util.ExecJSONInvalidHint(bodyData); hint != "" {
+						msg += " " + hint
+					}
+					util.WriteJSON(os.Stderr, map[string]string{"error": msg})
 					os.Exit(kernel.ExitCodeInvalidInput)
 				}
 				argsMap["body"] = bodyJSON
@@ -182,7 +191,10 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 			// Create a reader from the JSON bytes
 			reqReader := util.NewJSONReader(reqJSON)
 			start := time.Now()
-			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, execAllowRaw, execDryRun, execRaw, execJSON, "", token)
+			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, kernel.ExecOptions{
+				AllowRaw: execAllowRaw, DryRun: execDryRun, RawOutput: execRaw, JSONOutput: execJSON,
+				Verbose: execVerbose, OutputFile: execOutputFile, Token: token,
+			})
 			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
 			// Use synchronous telemetry for exec since the process exits immediately after.
 			telemetry.SendEventSync(apiURL, token, fromSession, "exec", canonicalID, outcomeErr(exitCode), opts)
@@ -221,4 +233,6 @@ func init() {
 	execCmd.Flags().StringArrayVar(&execHeader, "header", []string{}, "request header key=value pairs (can be specified multiple times)")
 	execCmd.Flags().BoolVar(&execRaw, "raw", false, "output raw HTTP response instead of normalized JSON")
 	execCmd.Flags().BoolVar(&execJSON, "json", false, "output response as JSON (single JSON object to stdout)")
+	execCmd.Flags().BoolVar(&execVerbose, "verbose", false, "log request and response details to stderr for debugging (headers are redacted)")
+	execCmd.Flags().StringVar(&execOutputFile, "output", "", "write binary response body to this file (required for non-JSON/text responses)")
 }

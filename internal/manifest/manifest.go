@@ -9,14 +9,30 @@ import (
 	"gitlab.com/swytchcode/swytchcode-cli/internal/util"
 )
 
+// IdempotencyPolicy configures idempotency headers for mutating APIs (e.g. Stripe).
+type IdempotencyPolicy struct {
+	Mode       string `json:"mode,omitempty"`        // "none" (default) or "stripe_style"
+	HeaderName string `json:"header_name,omitempty"` // default Idempotency-Key
+}
+
+// ExecutionPolicy holds per-integration HTTP execution defaults (retries, timeout, idempotency).
+// All fields are optional; the kernel merges with built-in defaults when unset.
+type ExecutionPolicy struct {
+	MaxRetries    *int               `json:"max_retries,omitempty"`     // retries after first attempt; default 3
+	BaseDelayMs   *int               `json:"base_delay_ms,omitempty"`   // base backoff; default 500
+	HTTPTimeoutMs *int               `json:"http_timeout_ms,omitempty"` // per-attempt deadline; default 30s
+	Idempotency   *IdempotencyPolicy `json:"idempotency,omitempty"`
+}
+
 // Entry represents a single project.library entry in manifest.json.
 type Entry struct {
-	Version           string                 `json:"version"`
-	SandboxEndpoint   string                 `json:"sandbox_endpoint"`
-	ProductionEndpoint string                `json:"production_endpoint"`
-	Methods           int                    `json:"methods"`
-	Workflows         int                    `json:"workflows"`
-	Auth              map[string]interface{} `json:"auth,omitempty"`
+	Version            string                 `json:"version"`
+	SandboxEndpoint    string                 `json:"sandbox_endpoint"`
+	ProductionEndpoint string                 `json:"production_endpoint"`
+	Methods            int                    `json:"methods"`
+	Workflows          int                    `json:"workflows"`
+	Auth               map[string]interface{} `json:"auth,omitempty"`
+	ExecutionPolicy    *ExecutionPolicy       `json:"execution_policy,omitempty"`
 }
 
 // Path returns the path to .swytchcode/integrations/manifest.json.
@@ -74,13 +90,15 @@ func UpdateEntry(projectRoot, projectLibrary, version, sandboxEndpoint, producti
 		return err
 	}
 
+	prev := manifest[projectLibrary]
 	manifest[projectLibrary] = Entry{
-		Version:           version,
-		SandboxEndpoint:   sandboxEndpoint,
+		Version:            version,
+		SandboxEndpoint:    sandboxEndpoint,
 		ProductionEndpoint: productionEndpoint,
-		Methods:           methodsCount,
-		Workflows:         workflowsCount,
-		Auth:              auth,
+		Methods:            methodsCount,
+		Workflows:          workflowsCount,
+		Auth:               auth,
+		ExecutionPolicy:    prev.ExecutionPolicy,
 	}
 
 	return Write(projectRoot, manifest)

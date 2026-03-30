@@ -91,8 +91,7 @@ func TestProjectRoot_FoundInGrandparent(t *testing.T) {
 	}
 }
 
-func TestProjectRoot_NotFound_FallsBackToCwd(t *testing.T) {
-	// No tooling.json anywhere in this temp tree.
+func TestProjectRoot_NotFound_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "subdir")
 	if err := os.Mkdir(sub, 0o755); err != nil {
@@ -100,14 +99,27 @@ func TestProjectRoot_NotFound_FallsBackToCwd(t *testing.T) {
 	}
 	chdirTemp(t, sub)
 
-	got, err := ProjectRoot()
+	_, err := ProjectRoot()
+	if err == nil {
+		t.Fatal("expected error when no .swytchcode/tooling.json in tree")
+	}
+}
+
+func TestInitProjectRoot_NotFound_UsesCwd(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "subdir")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatalf("Mkdir: %v", err)
+	}
+	chdirTemp(t, sub)
+
+	got, err := InitProjectRoot()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Should fall back to cwd (sub), not the parent.
 	want, _ := filepath.EvalSymlinks(sub)
 	got, _ = filepath.EvalSymlinks(got)
 	if got != want {
-		t.Errorf("got %q, want %q (should fall back to cwd)", got, want)
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
