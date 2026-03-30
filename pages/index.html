@@ -87,6 +87,13 @@
     <button type="button" class="copy-btn" id="copy-btn-win" aria-label="Copy Windows install command">Copy</button>
   </div>
 
+  <h3>npm (Node.js)</h3>
+  <div class="install-block">
+    <code id="install-cmd-npm">npm install -g swytchcode-cli</code>
+    <button type="button" class="copy-btn" id="copy-btn-npm" aria-label="Copy npm install command">Copy</button>
+  </div>
+  <p class="install-note">Requires Node.js 18+.</p>
+
   <p class="note">
     The shell/PowerShell scripts download the correct binary for your OS/arch, verify checksums,
     and install locally.
@@ -95,8 +102,8 @@
   <h2>Links</h2>
   <ul>
     <li><a href="https://swytchcode.com" target="_blank">swytchcode.com</a> - main website</li>
-    <li><a href="https://gitlab.com/swytchcode/swytchcode-cli/-/releases" target="_blank">Releases</a> - binaries and checksums</li>
-    <li><a href="https://gitlab.com/swytchcode/swytchcode-cli/-/wikis/home" target="_blank">Wiki</a> - docs, CLI reference, integrations</li>
+    <li><a href="https://gitlab.com/swytchcode/cli/-/releases" target="_blank">Releases</a> - binaries and checksums</li>
+    <li><a href="https://gitlab.com/swytchcode/cli/-/wikis/home" target="_blank">Wiki</a> - docs, CLI reference, integrations</li>
     <li><a href="https://docs.swytchcode.com" target="_blank">Docs</a> - Swytchcode documentation</li>
     <li><a href="https://blog.swytchcode.com/" target="_blank">Blog</a></li>
     <li><a href="https://wreken.com" target="_blank">Wreken</a> - API spec for agentic integrations</li>
@@ -122,6 +129,7 @@
       }
       wireCopy('copy-btn', 'install-cmd');
       wireCopy('copy-btn-win', 'install-cmd-win');
+      wireCopy('copy-btn-npm', 'install-cmd-npm');
     })();
   </script>
 </body>
