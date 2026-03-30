@@ -12,7 +12,8 @@
     "node": ">=14"
   },
   "files": [
-    "bin/swytchcode.js"
+    "bin/swytchcode.js",
+    "README.md"
   ],
   "optionalDependencies": {
     "swytchcode-cli-darwin-arm64": "0.0.0",

@@ -15,19 +15,39 @@
     }
     h1 { font-size: 1.6rem; margin-bottom: 0.75rem; }
     h2 { font-size: 1.1rem; margin-top: 2rem; }
-    h3 { font-size: 0.95rem; margin: 1rem 0 0.4rem; font-weight: 600; }
     p { margin: 0.75rem 0; }
     a { color: #0066cc; text-decoration: none; }
     a:hover { text-decoration: underline; }
     ul { margin: 0.75rem 0; padding-left: 1.25rem; }
     code { background: #f5f5f5; padding: 0.15rem 0.3rem; border-radius: 4px; }
     .note { color: #666; font-size: 0.9rem; }
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin: 1rem 0 0;
+      border-bottom: 1px solid #ddd;
+    }
+    .tab-btn {
+      padding: 0.45rem 1rem;
+      font-size: 0.9rem;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: #666;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      font-family: inherit;
+    }
+    .tab-btn.active { color: #1a1a1a; border-bottom-color: #1a1a1a; font-weight: 600; }
+    .tab-btn:hover { color: #1a1a1a; }
+    .tab-panel { display: none; padding-top: 0.75rem; }
+    .tab-panel.active { display: block; }
     .install-block {
       display: flex;
       align-items: center;
       gap: 0.5rem;
       flex-wrap: wrap;
-      margin: 0.75rem 0;
+      margin: 0.5rem 0;
       background: #1a1a1a;
       color: #e6e6e6;
       padding: 0.75rem 1rem;
@@ -75,28 +95,39 @@
 
   <h2>Install</h2>
 
-  <h3>macOS / Linux</h3>
-  <div class="install-block">
-    <code id="install-cmd">curl -fsSL https://cli.swytchcode.com/install.sh | sh</code>
-    <button type="button" class="copy-btn" id="copy-btn" aria-label="Copy install command">Copy</button>
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-mac-btn" onclick="showTab('mac')">macOS / Linux</button>
+    <button class="tab-btn" id="tab-win-btn" onclick="showTab('win')">Windows</button>
+    <button class="tab-btn" id="tab-npm-btn" onclick="showTab('npm')">npm</button>
   </div>
 
-  <h3>Windows (PowerShell)</h3>
-  <div class="install-block">
-    <code id="install-cmd-win">irm https://cli.swytchcode.com/install.ps1 | iex</code>
-    <button type="button" class="copy-btn" id="copy-btn-win" aria-label="Copy Windows install command">Copy</button>
+  <div class="tab-panel active" id="tab-mac">
+    <div class="install-block">
+      <code id="install-cmd">curl -fsSL https://cli.swytchcode.com/install.sh | sh</code>
+      <button type="button" class="copy-btn" id="copy-btn" aria-label="Copy install command">Copy</button>
+    </div>
+    <p class="install-note">Supports macOS and Linux on x64 and arm64.</p>
   </div>
 
-  <h3>npm (Node.js)</h3>
-  <div class="install-block">
-    <code id="install-cmd-npm">npm install -g swytchcode-cli</code>
-    <button type="button" class="copy-btn" id="copy-btn-npm" aria-label="Copy npm install command">Copy</button>
+  <div class="tab-panel" id="tab-win">
+    <div class="install-block">
+      <code id="install-cmd-win">irm https://cli.swytchcode.com/install.ps1 | iex</code>
+      <button type="button" class="copy-btn" id="copy-btn-win" aria-label="Copy Windows install command">Copy</button>
+    </div>
+    <p class="install-note">Run in PowerShell. Supports x64 and arm64.</p>
   </div>
-  <p class="install-note">Requires Node.js 18+.</p>
 
-  <p class="note">
-    The shell/PowerShell scripts download the correct binary for your OS/arch, verify checksums,
-    and install locally.
+  <div class="tab-panel" id="tab-npm">
+    <div class="install-block">
+      <code id="install-cmd-npm">npm install -g swytchcode-cli</code>
+      <button type="button" class="copy-btn" id="copy-btn-npm" aria-label="Copy npm install command">Copy</button>
+    </div>
+    <p class="install-note">Requires Node.js 14+. Works on macOS, Linux, and Windows.</p>
+  </div>
+
+  <p class="note" style="margin-top: 1.25rem;">
+    The shell and PowerShell scripts download the correct binary for your OS and architecture,
+    verify checksums, and install locally without requiring Node.js.
   </p>
 
   <h2>Links</h2>
@@ -111,6 +142,14 @@
 
   <script>
     (function () {
+      function showTab(name) {
+        ['mac', 'win', 'npm'].forEach(function (t) {
+          document.getElementById('tab-' + t).classList.toggle('active', t === name);
+          document.getElementById('tab-' + t + '-btn').classList.toggle('active', t === name);
+        });
+      }
+      window.showTab = showTab;
+
       function wireCopy(btnId, codeId) {
         var btn = document.getElementById(btnId);
         var code = document.getElementById(codeId);
