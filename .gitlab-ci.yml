@@ -23,7 +23,7 @@ auto_tag:
       if [ -z "${GITLAB_TOKEN:-}" ]; then
         echo "ERROR: GITLAB_TOKEN is not set!"
         echo "Please add GITLAB_TOKEN to CI/CD Variables:"
-        echo "https://gitlab.com/swytchcode/swytchcode-cli/-/settings/ci_cd"
+        echo "https://gitlab.com/swytchcode/cli/-/settings/ci_cd"
         exit 1
       fi
     # Configure Git user identity for tag creation
@@ -31,7 +31,7 @@ auto_tag:
     - git config --global user.name "GitLab CI"
     # Push tags using a token with read_repository + write_repository scopes
     # Use project path format: swytchcode/cli (URL-encoded: swytchcode%2Fcli)
-    - git remote set-url origin "https://oauth2:${GITLAB_TOKEN}@gitlab.com/swytchcode/swytchcode-cli.git"
+    - git remote set-url origin "https://oauth2:${GITLAB_TOKEN}@gitlab.com/swytchcode/cli.git"
     - git fetch --tags --force
   script:
     - bash scripts/auto_tag.sh
