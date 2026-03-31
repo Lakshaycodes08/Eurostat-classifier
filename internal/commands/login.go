@@ -54,6 +54,7 @@ func RunLogin(cfg LoginConfig, w io.Writer) error {
 
 	verificationURL := resolveURL(cfg.APIURL, startResp.VerificationURL)
 	fmt.Fprintf(w, "To sign in, open this URL in your browser:\n\n  %s\n\n", verificationURL)
+	fmt.Fprintf(w, "Don't have an account? Register at https://app.swytchcode.com\n\n")
 	if startResp.UserCode != "" {
 		fmt.Fprintf(w, "Your confirmation code: %s\n", startResp.UserCode)
 	}
