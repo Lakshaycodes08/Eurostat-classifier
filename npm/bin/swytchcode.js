@@ -35,7 +35,7 @@ try {
 } catch (_) {
   process.stderr.write(
     `swytchcode: could not find the binary for "${key}".\n` +
-    `Try reinstalling: npm install -g swytchcode-cli\n`
+    `Try reinstalling: npm install -g swytchcode\n`
   );
   process.exit(1);
 }
