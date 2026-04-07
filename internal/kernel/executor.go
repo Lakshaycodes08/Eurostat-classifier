@@ -6,6 +6,7 @@ package kernel
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -268,6 +269,14 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, opts ExecOptio
 	// Step 1: Resolve tool from tooling.json
 	tool, err := ResolveTool(projectRoot, req.Tool, isRaw)
 	if err != nil {
+		var notFound *ErrToolNotFound
+		if errors.As(err, &notFound) {
+			// Tool not configured locally — fall back to demo so marketing demos
+			// work even inside a project that has other tools configured.
+			fmt.Fprintf(stderr, "Running in demo mode (no setup required)\n\n")
+			return executeDemoMode(req.Tool, req.Args, stdout, stderr, opts.JSONOutput)
+		}
+		// Real error (malformed tooling.json, missing integration field, etc.) — don't hide it.
 		writeClassifiedError(stderr, err.Error(), "not_found", false)
 		LogExecFailure(ExitCodeToolNotFound, req.Tool, err.Error())
 		return ExitCodeToolNotFound

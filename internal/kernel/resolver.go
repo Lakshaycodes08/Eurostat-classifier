@@ -26,6 +26,17 @@ type Tool struct {
 	Steps       []LocalWorkflowStep // populated for workflow tools
 }
 
+// ErrToolNotFound is returned when a canonical ID is not present in tooling.json.
+// It is distinct from other resolver errors (parse failures, missing fields) so
+// executor.go can safely fall back to demo mode only for the not-found case.
+type ErrToolNotFound struct {
+	CanonicalID string
+}
+
+func (e *ErrToolNotFound) Error() string {
+	return fmt.Sprintf("tool %q not found in tooling.json — run 'swytchcode add %s' to add it, or 'swytchcode search' to find it", e.CanonicalID, e.CanonicalID)
+}
+
 // ResolveTool resolves a canonical_id to a Tool from tooling.json.
 func ResolveTool(projectRoot, canonicalID string, isRaw bool) (*Tool, error) {
 	tooling, err := util.LoadToolingJSON(projectRoot)
@@ -42,12 +53,12 @@ func ResolveTool(projectRoot, canonicalID string, isRaw bool) (*Tool, error) {
 	// Find tool in tools map
 	tools, ok := tooling["tools"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("tool %q not found in tooling.json — run 'swytchcode add <canonical_id>' to add it, or 'swytchcode search' to find it", canonicalID)
+		return nil, &ErrToolNotFound{CanonicalID: canonicalID}
 	}
 
 	toolRaw, ok := tools[canonicalID]
 	if !ok {
-		return nil, fmt.Errorf("tool %q not found in tooling.json — run 'swytchcode add <canonical_id>' to add it, or 'swytchcode search' to find it", canonicalID)
+		return nil, &ErrToolNotFound{CanonicalID: canonicalID}
 	}
 
 	toolMap, ok := toolRaw.(map[string]interface{})
