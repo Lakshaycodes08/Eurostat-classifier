@@ -50,6 +50,9 @@ release:
   gitlab:
     owner: swytchcode
     name: cli
+  # replace: delete and recreate the release on every run.
+  # Handles job retries and concurrent pipelines without "Name already taken" errors.
+  mode: replace
 
 changelog:
   sort: asc
