@@ -6,6 +6,7 @@ package kernel
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 
@@ -24,6 +25,7 @@ type ExecRequest struct {
 type ExecOptions struct {
 	AllowRaw    bool   // permit tools with the "raw." prefix
 	DryRun      bool   // print request details without making the HTTP call
+	Demo        bool   // run in demo mode: skip local setup, call demo API endpoint
 	RawOutput   bool   // output the full raw HTTP response instead of normalized JSON
 	JSONOutput  bool   // always output a single JSON object (default for scripting)
 	Verbose     bool   // log request/response details to stderr for debugging
@@ -235,16 +237,22 @@ func Execute(stdin io.Reader, stdout io.Writer, stderr io.Writer, opts ExecOptio
 
 	LogExecRequest(req.Tool, req.Args)
 
-	// Detect project root if not provided
+	// Demo mode: skip all local setup, call demo API endpoint directly.
+	if opts.Demo {
+		return executeDemoMode(req.Tool, req.Args, stdout, stderr, opts.JSONOutput)
+	}
+
+	// Detect project root if not provided.
+	// If no .swytchcode/tooling.json is found anywhere, auto-enable demo mode so
+	// `npx swytchcode stripe.create_payment` works on a fresh machine with zero setup.
 	projectRoot := opts.ProjectRoot
 	if projectRoot == "" {
 		var err error
 		projectRoot, err = util.ProjectRoot()
 		if err != nil {
-			msg := "failed to detect project root: " + err.Error()
-			writeClassifiedError(stderr, msg, "internal", false)
-			LogExecFailure(ExitCodeInternalError, req.Tool, msg)
-			return ExitCodeInternalError
+			// No project found — fall back to demo mode automatically
+			fmt.Fprintf(stderr, "Running in demo mode (no setup required)\n\n")
+			return executeDemoMode(req.Tool, req.Args, stdout, stderr, opts.JSONOutput)
 		}
 	}
 

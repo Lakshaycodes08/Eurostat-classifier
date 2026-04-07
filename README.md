@@ -16,6 +16,16 @@ Swytchcode is the **execution kernel** for tools. Editors, agents, and languages
 - [Security](docs/security.md) – trust boundaries, HTTPS, `SWYTCHCODE_INSECURE`.
 - [Windows guide](docs/windows-guide.md) – JSON, `cmd.exe`, and `--body`.
 
+### Try it in 5 seconds
+
+```bash
+npx swytchcode stripe.create_payment
+```
+
+No project setup, no API keys. Runs in demo mode automatically — real sandbox response via Stripe's test environment. Install only when you're ready for production.
+
+---
+
 ### Install
 
 **macOS / Linux:**
