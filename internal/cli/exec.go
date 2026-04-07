@@ -29,6 +29,7 @@ func readStdinIfAvailable() []byte {
 var (
 	execAllowRaw   bool
 	execDryRun     bool
+	execDemo       bool
 	execBodyFile   string
 	execInput      []string // key=value pairs
 	execParam      []string // query params key=value
@@ -85,7 +86,7 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 			// JSON stdin mode — canonical_id is embedded in the JSON payload, unknown here
 			start := time.Now()
 			exitCode = kernel.Execute(os.Stdin, os.Stdout, os.Stderr, kernel.ExecOptions{
-				AllowRaw: execAllowRaw, DryRun: execDryRun, RawOutput: execRaw, JSONOutput: execJSON,
+				AllowRaw: execAllowRaw, DryRun: execDryRun, Demo: execDemo, RawOutput: execRaw, JSONOutput: execJSON,
 				Verbose: execVerbose, OutputFile: execOutputFile, Token: token,
 			})
 			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
@@ -192,7 +193,7 @@ It reads only local files (tooling.json, integration bundles) and never calls th
 			reqReader := util.NewJSONReader(reqJSON)
 			start := time.Now()
 			exitCode = kernel.Execute(reqReader, os.Stdout, os.Stderr, kernel.ExecOptions{
-				AllowRaw: execAllowRaw, DryRun: execDryRun, RawOutput: execRaw, JSONOutput: execJSON,
+				AllowRaw: execAllowRaw, DryRun: execDryRun, Demo: execDemo, RawOutput: execRaw, JSONOutput: execJSON,
 				Verbose: execVerbose, OutputFile: execOutputFile, Token: token,
 			})
 			opts := &telemetry.EventOpts{DurationMs: time.Since(start).Milliseconds()}
@@ -227,6 +228,7 @@ func splitKeyValue(s string) []string {
 func init() {
 	execCmd.Flags().BoolVar(&execAllowRaw, "allow-raw", false, "allow execution of raw methods (required for tools starting with 'raw.')")
 	execCmd.Flags().BoolVar(&execDryRun, "dry-run", false, "show what would be executed without making the HTTP call")
+	execCmd.Flags().BoolVar(&execDemo, "demo", false, "run in demo mode — no project setup or API keys required")
 	execCmd.Flags().StringVar(&execBodyFile, "body", "", "path to JSON file containing request body")
 	execCmd.Flags().StringArrayVar(&execInput, "input", []string{}, "input key=value pairs (can be specified multiple times)")
 	execCmd.Flags().StringArrayVar(&execParam, "param", []string{}, "query parameter key=value pairs (can be specified multiple times)")

@@ -17,7 +17,8 @@ This document summarizes the Swytchcode CLI surface, with a focus on inputs, out
 | `swytchcode search [keyword]` | Search the remote registry for integrations. |
 | `swytchcode add [spec] <canonical_id>` | Add a tool to `tooling.json` from fetched integrations. |
 | `swytchcode info <canonical_id>` | Show detailed info about a tool (resolved inputs/output). |
-| `swytchcode exec [canonical_id]` | **Single execution path** – run a tool via the kernel. |
+| `swytchcode exec [canonical_id]` | **Single execution path** – run a tool via the kernel. Shorthand: `swytchcode <canonical_id>` (omit `exec`). |
+| `swytchcode demo list` | List all tools that have a demo available (no setup required). |
 | `swytchcode mcp serve` | Start MCP server (stdio/HTTP). |
 | `swytchcode mcp status` / `swytchcode mcp stop` | Daemon status / stop. |
 | `swytchcode sync [project]` | Re-fetch workflow/method list from backend; updates local files without touching `tooling.json`. Warns on stale method hashes. |
@@ -39,6 +40,38 @@ This document summarizes the Swytchcode CLI surface, with a focus on inputs, out
 See [docs/security.md](security.md) and [docs/windows-guide.md](windows-guide.md) for related operational guidance.
 
 ## swytchcode exec
+
+### Demo mode
+
+Run any tool without a project or API keys:
+
+```bash
+# Shorthand (no 'exec' needed) — auto-detects demo mode
+npx swytchcode stripe.create_payment
+
+# Explicit demo flag
+swytchcode exec stripe.create_payment --demo
+```
+
+When no `.swytchcode/` project is found, demo mode activates automatically. The CLI calls the Swytchcode demo API, which uses shared sandbox credentials (e.g. Stripe test keys) and returns a real sandbox response. No `tooling.json`, no auth required.
+
+```
+✔  Payment created successfully (demo)
+
+→ payment_id: pi_3QxR...
+→ amount: $20.00
+→ currency: USD
+→ status: requires_payment_method
+```
+
+After a successful demo run, the CLI prints an upgrade prompt to stderr:
+
+```
+────────────────────────────────────────
+To use real integrations:
+  swytchcode init
+────────────────────────────────────────
+```
 
 ### Input
 
@@ -71,6 +104,7 @@ Arguments:
 - Default: JSON object on stdout describing the response, including:
   - Request URL (so you can verify base URL and path).
   - Response status, headers, and body (normalized where possible).
+- `--demo`: run in demo mode — no project setup or API keys required. Calls the Swytchcode demo API using shared sandbox credentials. Activates automatically when no `.swytchcode/` project is detected.
 - `--raw`: write raw HTTP response to stdout/stderr instead of normalized JSON.
 - `--dry-run`: do not execute; print a representation of the request that would be sent.
 - `--verbose`: log request and response details to stderr before and after the HTTP call. Output is two JSON lines (one per event) with `"verbose":"request"` and `"verbose":"response"`. Sensitive header values (`Authorization`, `X-Api-Key`) are redacted automatically.
@@ -124,6 +158,32 @@ if (!result.success) {
   const failedStep = result.steps.find(s => s.failed);
 }
 ```
+
+## swytchcode demo
+
+### demo list
+
+Lists all tools that have a demo available. Fetches live from the Swytchcode demo API — no setup or auth required.
+
+```bash
+swytchcode demo list
+```
+
+Output groups tools by integration prefix:
+
+```
+Available demos:
+
+  Stripe
+  → stripe.create_payment
+
+Run any demo:
+  npx swytchcode <tool>
+```
+
+See [demo mode in exec](#swytchcode-exec) for how to run a demo tool.
+
+---
 
 ## init
 

@@ -139,6 +139,21 @@ const (
 // It indicates that the target API must be running locally.
 const DefaultLocalEndpoint = "http://localhost"
 
+// Demo API paths
+const (
+	// DemoExecPath is the backend endpoint for demo tool execution.
+	DemoExecPath = "/v2/cli/demo/exec"
+
+	// DemoToolsPath is the backend endpoint that lists available demo tools.
+	DemoToolsPath = "/v2/cli/demo/tools"
+
+	// DemoUpgradeHint is the message printed after a successful demo run.
+	DemoUpgradeHint = "\n────────────────────────────────────────\nTo use real integrations:\n  swytchcode init\n────────────────────────────────────────\n"
+
+	// DemoInitHint is the short call-to-action appended to demo error messages.
+	DemoInitHint = "\nTo use real integrations:\n  swytchcode init\n"
+)
+
 // Wrekenfile section and field keys
 const (
 	WrekenMethods    = "METHODS"

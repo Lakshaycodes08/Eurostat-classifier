@@ -1,13 +1,21 @@
-# swytchcode-cli
+# swytchcode
 
 Execution authority for agentic API integrations.
 
 Swytchcode sits between AI agents and production APIs, ensuring execution is explicit, controlled, and never implicit or prompt-driven.
 
+## Try without installing
+
+```bash
+npx swytchcode stripe.create_payment
+```
+
+No setup. No API keys. Real sandbox response.
+
 ## Install
 
 ```
-npm install -g swytchcode-cli
+npm install -g swytchcode
 ```
 
 Works on macOS, Linux, and Windows (x64 and arm64). The correct binary for your platform is selected automatically at install time.

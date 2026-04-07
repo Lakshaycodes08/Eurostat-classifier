@@ -1,5 +1,15 @@
 # Getting Started
 
+## Step 0 — Try it first (no setup)
+
+```bash
+npx swytchcode stripe.create_payment
+```
+
+Runs in demo mode automatically — no project, no API keys. You get a real response from Stripe's sandbox. Takes 5 seconds.
+
+---
+
 1. **Install** – [Install page](https://swytchcode.gitlab.io/cli/install/) or:
    ```bash
    curl -fsSL https://swytchcode.gitlab.io/cli/install.sh | sh
