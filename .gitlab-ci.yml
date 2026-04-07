@@ -165,9 +165,22 @@ npm-publish:
           fs.writeFileSync('$f', JSON.stringify(p, null, 2) + '\n');
         "
       done
-    # Publish platform packages first, then the main wrapper
-    - for dir in npm/platforms/*/; do (cd "$dir" && npm publish --access public); done
-    - (cd npm && npm publish --access public)
+    # Publish platform packages first, then the main wrapper.
+    # Skip gracefully if the version is already on npm (handles job retries and manual re-runs).
+    - |
+      npm_publish_if_new() {
+        local pkg_name
+        pkg_name="$(node -p "require('./package.json').name")"
+        if npm view "${pkg_name}@${VERSION}" version 2>/dev/null | grep -q "^${VERSION}$"; then
+          echo "Skipping ${pkg_name}@${VERSION} — already published."
+        else
+          npm publish --access public
+        fi
+      }
+      for dir in npm/platforms/*/; do
+        (cd "$dir" && npm_publish_if_new)
+      done
+      (cd npm && npm_publish_if_new)
 
 # 5) Sync wiki/ folder to the GitLab wiki repo on every merge to main.
 # The wiki/ directory in this repo is the source of truth for all wiki pages.
@@ -188,10 +201,11 @@ wiki-sync:
         echo "ERROR: Missing token for wiki-sync. Set GITLAB_TAG_TOKEN with write_repository scope."
         exit 1
       fi
-    - git clone "https://oauth2:${GITLAB_TAG_TOKEN}@gitlab.com/${SWYTCHCODE_GITLAB_PROJECT_PATH}.wiki.git" wiki-repo
+    - git clone "https://gitlab.com/${SWYTCHCODE_GITLAB_PROJECT_PATH}.wiki.git" wiki-repo
     - cp -R wiki/. wiki-repo/
     - cd wiki-repo
+    - git remote set-url origin "https://oauth2:${GITLAB_TAG_TOKEN}@gitlab.com/${SWYTCHCODE_GITLAB_PROJECT_PATH}.wiki.git"
     - git add -A
     - git diff --cached --quiet && echo "No wiki changes." || git commit -m "sync wiki from main [ci skip]"
-    - git diff HEAD~1..HEAD --quiet || git push
+    - git diff --cached --quiet && echo "Nothing to push." || git push
 
