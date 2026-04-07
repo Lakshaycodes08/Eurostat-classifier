@@ -4,7 +4,7 @@ These markdown files are the **source of truth** for the GitLab Wiki. They live 
 
 ## How to publish to the Wiki
 
-1. Open your project Wiki: `https://gitlab.com/swytchcode/swytchcode-cli/-/wiki`
+1. Open your project Wiki: `https://gitlab.com/swytchcode/cli/-/wikis/home`
 2. Create pages with the same names as the files here (without `.md`), or clone the wiki repo and copy these files in.
 
 **Suggested page titles (Wiki sidebar):**

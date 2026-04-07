@@ -29,6 +29,6 @@ Full command list and behavior. For a short table, see [Pages → CLI](https://s
 - **Output:** JSON by default; `--raw` for raw stdout/stderr; `--dry-run` for no execution.
 - **Exit codes:** Non-zero on resolution failure (tool not found, integration not installed) or tool execution failure. Exact codes are implementation-defined; non-zero means failure.
 - **Flags:** `--json`, `--raw`, `--dry-run`, `--demo`, `--allow-raw`, body/header/param passthrough as needed.
-- **Base URL:** Resolved from `manifest.json` (`sandbox_endpoint` / `production_endpoint`). Must be **`https://`** or **`http://`** on loopback only (`localhost`, `127.0.0.1`, `::1`). Same in CI/Docker. See [docs/config-spec.md](https://gitlab.com/swytchcode/swytchcode-cli/-/blob/main/docs/config-spec.md) and repo README.
+- **Base URL:** Resolved from `manifest.json` (`sandbox_endpoint` / `production_endpoint`). Must be **`https://`** or **`http://`** on loopback only (`localhost`, `127.0.0.1`, `::1`). Same in CI/Docker. See [docs/config-spec.md](https://gitlab.com/swytchcode/cli/-/blob/main/docs/config-spec.md) and repo README.
 
 Document exact exit codes and JSON request/response schema in this page as you stabilize them (e.g. from `internal/kernel/errors.go` and executor).

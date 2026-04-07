@@ -170,13 +170,16 @@ npm-publish:
     # manual re-runs, and npm registry replication lag (pre-checking npm view is unreliable).
     - |
       npm_publish_if_new() {
-        local output exit_code=0
-        printf 'Publishing %s...\n' \
-          "$(node -p "require('./package.json').name + '@' + require('./package.json').version")" >&2
+        local pkg_version output exit_code=0
+        pkg_version=$(node -p "require('./package.json').name + '@' + require('./package.json').version")
+        printf 'Publishing %s...\n' "$pkg_version" >&2
         output=$(npm publish --access public 2>&1) || exit_code=$?
         printf '%s\n' "$output" >&2
         if [ $exit_code -ne 0 ] && printf '%s\n' "$output" | grep -qF "Cannot publish over previously published"; then
-          echo "Version already published — skipping."
+          # Covers two cases:
+          # 1. Retry after a previous successful publish (replication lag)
+          # 2. Version number was used in a past project and permanently reserved by npm
+          printf 'Skipping %s — version already published or reserved on npm.\n' "$pkg_version" >&2
           return 0
         fi
         return $exit_code

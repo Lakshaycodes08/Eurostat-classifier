@@ -32,7 +32,7 @@ The server exposes MCP tools that map to CLI commands, including:
 
 Clients call these tools; the server runs the corresponding Swytchcode command. **Execution still goes through the kernel** – only `swytchcode_exec` runs tools; the rest are discovery and config.
 
-Tool calls use **integration base URLs** from `manifest.json` (not the MCP HTTP port). Those URLs must be **`https://`** or **`http://`** on loopback only; see [MCP & integrations](https://gitlab.com/swytchcode/swytchcode-cli/-/blob/main/docs/mcp-and-integrations.md) and [config-spec](https://gitlab.com/swytchcode/swytchcode-cli/-/blob/main/docs/config-spec.md).
+Tool calls use **integration base URLs** from `manifest.json` (not the MCP HTTP port). Those URLs must be **`https://`** or **`http://`** on loopback only; see [MCP & integrations](https://gitlab.com/swytchcode/cli/-/blob/main/docs/mcp-and-integrations.md) and [config-spec](https://gitlab.com/swytchcode/cli/-/blob/main/docs/config-spec.md).
 
 ## Daemon mode
 

@@ -24,7 +24,7 @@ Retries and idempotency belong **inside** Swytchcode (or inside the tool impleme
 
 ## Where requests go (base URL rules)
 
-The kernel resolves `sandbox_endpoint` / `production_endpoint` from `manifest.json` and validates the scheme/host: **`https://`** anywhere, or **`http://`** only on loopback (`localhost`, `127.0.0.1`, `::1`). The same rules apply in CI and containers. Details: [docs/config-spec.md](https://gitlab.com/swytchcode/swytchcode-cli/-/blob/main/docs/config-spec.md) (manifest section).
+The kernel resolves `sandbox_endpoint` / `production_endpoint` from `manifest.json` and validates the scheme/host: **`https://`** anywhere, or **`http://`** only on loopback (`localhost`, `127.0.0.1`, `::1`). The same rules apply in CI and containers. Details: [docs/config-spec.md](https://gitlab.com/swytchcode/cli/-/blob/main/docs/config-spec.md) (manifest section).
 
 ## Integration not found
 
